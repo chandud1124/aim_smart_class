@@ -96,7 +96,8 @@ exports.getDeviceConfig = async (req, res) => {
     try {
         const { macAddress } = req.params;
 
-        const device = await Device.findOne({ macAddress });
+        // Case-insensitive match for MAC address
+        const device = await Device.findOne({ macAddress: new RegExp('^' + macAddress + '$', 'i') });
         if (!device) {
             return res.status(404).json({ error: 'Device not found' });
         }

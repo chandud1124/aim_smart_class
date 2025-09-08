@@ -1,5 +1,5 @@
 
-import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText } from "lucide-react";
+import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity } from "lucide-react";
 import Index from "./pages/Index";
 import Devices from "./pages/Devices";
 import Switches from "./pages/Switches";
@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 import ActiveLogs from "./pages/ActiveLogs";
+import EnhancedLogs from "./pages/EnhancedLogs";
 
 export const navItems = [
   // Core Operations
@@ -88,6 +89,12 @@ export const navItems = [
     to: "/logs",
     icon: <FileText className="h-4 w-4" />,
     page: <ActiveLogs />,
+  },
+  {
+    title: "Enhanced Logs",
+    to: "/enhanced-logs",
+    icon: <Activity className="h-4 w-4" />,
+    page: <EnhancedLogs />,
   },
 
   // Account

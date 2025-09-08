@@ -34,8 +34,8 @@ const getAllDevices = async (req, res) => {
         accessConditions.push({ classroom: { $in: req.user.assignedRooms } });
       }
 
-      // Department-based access for faculty/HOD
-      if ((req.user.role === 'faculty' || req.user.role === 'hod') && req.user.department) {
+      // Department-based access for management and faculty roles
+      if ((req.user.role === 'principal' || req.user.role === 'dean' || req.user.role === 'hod' || req.user.role === 'faculty') && req.user.department) {
         accessConditions.push({
           classroom: { $regex: `^${req.user.department}-`, $options: 'i' }
         });

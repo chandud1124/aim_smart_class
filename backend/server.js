@@ -60,12 +60,16 @@ const scheduleRoutes = require('./routes/schedules');
 const userRoutes = require('./routes/users');  // Using the new users route
 const activityRoutes = require('./routes/activities');
 const activityLogRoutes = require('./routes/activityLogs');
+const enhancedLogRoutes = require('./routes/enhancedLogs');
 const securityRoutes = require('./routes/security');
 const settingsRoutes = require('./routes/settings');
 const ticketRoutes = require('./routes/tickets');
+const devicePermissionRoutes = require('./routes/devicePermissions');
 
 // Import services (only those actively used)
 const scheduleService = require('./services/scheduleService');
+const deviceMonitoringService = require('./services/deviceMonitoringService');
+const EnhancedLoggingService = require('./services/enhancedLoggingService');
 // Removed legacy DeviceSocketService/TestSocketService/ESP32SocketService for cleanup
 
 // Import Google Calendar routes
@@ -351,6 +355,7 @@ apiRouter.use('/schedules', apiLimiter, scheduleRoutes);
 apiRouter.use('/users', apiLimiter, userRoutes);
 apiRouter.use('/activities', apiLimiter, activityRoutes);
 apiRouter.use('/activity-logs', apiLimiter, activityLogRoutes);
+apiRouter.use('/logs', apiLimiter, enhancedLogRoutes);
 apiRouter.use('/security', apiLimiter, securityRoutes);
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
@@ -358,6 +363,7 @@ apiRouter.use('/tickets', apiLimiter, ticketRoutes);
 apiRouter.use('/google-calendar', apiLimiter, googleCalendarRoutes);
 apiRouter.use('/calendar', apiLimiter, googleCalendarRoutes); // legacy alias
 apiRouter.use('/classroom', apiLimiter, require('./routes/classroom'));
+apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 
 // Mount all routes under /api
 // Health check endpoint
@@ -871,6 +877,22 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
 
   // Connect to database after server starts
   // connectDB().catch(() => { });
+
+  // Start enhanced services after successful startup
+  setTimeout(() => {
+    // Start device monitoring service (5-minute checks)
+    deviceMonitoringService.start();
+    
+    // Set up log cleanup (run daily at midnight)
+    setInterval(async () => {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        await EnhancedLoggingService.cleanupLogs();
+      }
+    }, 60000); // Check every minute
+    
+    console.log('[SERVICES] Enhanced logging and monitoring services started');
+  }, 5000); // Wait 5 seconds for database connection
 });
 
 module.exports = { app, io };

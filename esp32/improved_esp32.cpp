@@ -26,13 +26,13 @@
 #include <mbedtls/md.h>
 #endif
 
-#define WIFI_SSID "AIMS-WIFI"
-#define WIFI_PASSWORD "Aimswifi#2025"
-#define BACKEND_HOST "172.16.3.56" // backend LAN IP
+#define WIFI_SSID "I am Not A Witch I am Your Wifi"
+#define WIFI_PASSWORD "Whoareu@0000"
+#define BACKEND_HOST "172.16.3.171" // Updated to match current backend IP
 #define BACKEND_PORT 3001
 #define WS_PATH "/esp32-ws"
 #define HEARTBEAT_MS 30000UL                                             // 30s heartbeat interval
-#define DEVICE_SECRET "9545c46f0f9f494a27412fce1f5b22095550c4e88d82868f" // device secret from backend
+#define DEVICE_SECRET "6af44c010af8ba58514c6fa989c6e6d3469068f2d8da19a4" // Updated to match config.h
 
 // Optional status LED (set to 255 to disable if your board lacks LED_BUILTIN)
 #ifndef STATUS_LED_PIN
@@ -60,7 +60,7 @@
 
 // ========= Struct Definitions =========
 
-// Extended switch state supports optional manual (wall) switch input GPIO
+// Extended switch state supports optional manual (wall) switch input GPIO and PIR response
 struct SwitchState
 {
   int gpio;                             // relay control GPIO (output)
@@ -76,6 +76,9 @@ struct SwitchState
   bool lastManualActive = false;        // previous debounced logical active level (after polarity)
   bool defaultState = false;            // default state for offline mode
   bool manualOverride = false;          // whether this switch was manually overridden
+  bool usePir = false;                  // whether this switch responds to PIR motion
+  bool dontAutoOff = false;             // if true, PIR won't auto-turn-off this switch (manual override)
+  bool pirActivated = false;            // track if this switch was turned on by PIR
 };
 
 // Command queue to prevent crashes from multiple simultaneous commands
@@ -103,6 +106,16 @@ const unsigned long HEALTH_CHECK_INTERVAL_MS = 10000;
 std::vector<SwitchState> switchesLocal; // dynamically populated
 bool isOfflineMode = true;
 std::vector<GpioSeq> lastSeqs;
+
+// ========= PIR Sensor Variables =========
+int pirGpio = -1;                           // PIR sensor GPIO pin (-1 = disabled)
+bool pirEnabled = false;                    // whether PIR sensor is enabled
+unsigned long pirAutoOffDelay = 30000;     // auto-off delay in milliseconds (default 30 seconds)
+bool pirMotionDetected = false;            // current PIR motion state
+bool lastPirState = false;                 // previous PIR reading
+unsigned long lastPirChangeTime = 0;      // last time PIR state changed
+unsigned long pirDebounceDelay = 500;     // PIR debounce delay (500ms)
+unsigned long lastMotionTime = 0;         // last time motion was detected
 
 // ========= Enhanced Error Handling =========
 unsigned long lastErrorReport = 0;
@@ -230,6 +243,16 @@ void setLastSeq(int gpio, long seq);
 bool applySwitchState(int gpio, bool state);
 void loadConfigFromJsonArray(JsonArray arr);
 void saveConfigToNVS();
+void loadConfigFromNVS();
+void onWsEvent(WStype_t type, uint8_t *payload, size_t length);
+void setupRelays();
+void processCommandQueue();
+void blinkStatus();
+void handleManualSwitches();
+void handlePirSensor();
+void setupPirSensor();
+void onPirMotionDetected();
+void onPirMotionStopped();
 void loadConfigFromNVS();
 void onWsEvent(WStype_t type, uint8_t *payload, size_t length);
 void setupRelays();
@@ -442,6 +465,11 @@ void loadConfigFromJsonArray(JsonArray arr)
     sw.name = String(o["name"].is<const char *>() ? o["name"].as<const char *>() : "");
     sw.manualOverride = false;
 
+    // PIR configuration (per-switch)
+    sw.usePir = o["usePir"].is<bool>() ? o["usePir"].as<bool>() : false;
+    sw.dontAutoOff = o["dontAutoOff"].is<bool>() ? o["dontAutoOff"].as<bool>() : false;
+    sw.pirActivated = false; // Reset PIR activation state
+
     // Manual switch config (optional)
     if (o["manualSwitchEnabled"].is<bool>() && o["manualSwitchEnabled"].as<bool>() && o["manualSwitchGpio"].is<int>())
     {
@@ -498,9 +526,10 @@ void loadConfigFromJsonArray(JsonArray arr)
   // Snapshot print for verification
   for (auto &sw : switchesLocal)
   {
-    Serial.printf("[SNAPSHOT] gpio=%d state=%s manual=%s manualGpio=%d mode=%s activeLow=%d\n",
+    Serial.printf("[SNAPSHOT] gpio=%d state=%s manual=%s manualGpio=%d mode=%s activeLow=%d pir=%s autoOff=%s\n",
                   sw.gpio, sw.state ? "ON" : "OFF", sw.manualEnabled ? "yes" : "no", sw.manualGpio,
-                  sw.manualMomentary ? "momentary" : "maintained", sw.manualActiveLow ? 1 : 0);
+                  sw.manualMomentary ? "momentary" : "maintained", sw.manualActiveLow ? 1 : 0,
+                  sw.usePir ? "yes" : "no", sw.dontAutoOff ? "no" : "yes");
   }
 
   // Save configuration to NVS for offline persistence
@@ -530,7 +559,14 @@ void saveConfigToNVS()
     prefs.putBool(("momentary" + String(i)).c_str(), switchesLocal[i].manualMomentary);
     prefs.putString(("name" + String(i)).c_str(), switchesLocal[i].name);
     prefs.putBool(("override" + String(i)).c_str(), switchesLocal[i].manualOverride);
+    prefs.putBool(("use_pir" + String(i)).c_str(), switchesLocal[i].usePir);
+    prefs.putBool(("no_auto_off" + String(i)).c_str(), switchesLocal[i].dontAutoOff);
   }
+
+  // Save PIR global configuration
+  prefs.putBool("pir_enabled", pirEnabled);
+  prefs.putInt("pir_gpio", pirGpio);
+  prefs.putULong("pir_delay", pirAutoOffDelay);
 
   // ...existing code...
 
@@ -570,6 +606,9 @@ void loadConfigFromNVS()
     sw.manualMomentary = prefs.getBool(("momentary" + String(i)).c_str(), false);
     sw.name = prefs.getString(("name" + String(i)).c_str(), "Switch " + String(i + 1));
     sw.manualOverride = prefs.getBool(("override" + String(i)).c_str(), false);
+    sw.usePir = prefs.getBool(("use_pir" + String(i)).c_str(), false);
+    sw.dontAutoOff = prefs.getBool(("no_auto_off" + String(i)).c_str(), false);
+    sw.pirActivated = false; // Always reset on load
 
     // Initialize pins
     pinMode(sw.gpio, OUTPUT);
@@ -600,11 +639,23 @@ void loadConfigFromNVS()
     switchesLocal.push_back(sw);
   }
 
+  // Load PIR global configuration
+  pirEnabled = prefs.getBool("pir_enabled", false);
+  pirGpio = prefs.getInt("pir_gpio", -1);
+  pirAutoOffDelay = prefs.getULong("pir_delay", 30000);
+
   // ...existing code...
 
   prefs.end();
 
-  Serial.printf("[NVS] Loaded %d switches\n", (int)switchesLocal.size());
+  Serial.printf("[NVS] Loaded %d switches, PIR: enabled=%s gpio=%d delay=%lums\n", 
+                (int)switchesLocal.size(), pirEnabled ? "true" : "false", pirGpio, pirAutoOffDelay);
+  
+  // Setup PIR if enabled
+  if (pirEnabled)
+  {
+    setupPirSensor();
+  }
 }
 
 void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
@@ -646,6 +697,18 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
         Serial.printf("[WS] <- identified mode=%s\n", _mode);
         // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
         lastSeqs.clear();
+        
+        // Process PIR configuration (global per ESP32)
+        if (doc["pirEnabled"].is<bool>())
+        {
+          pirEnabled = doc["pirEnabled"].as<bool>();
+          pirGpio = doc["pirGpio"].is<int>() ? doc["pirGpio"].as<int>() : -1;
+          pirAutoOffDelay = doc["pirAutoOffDelay"].is<int>() ? doc["pirAutoOffDelay"].as<int>() * 1000 : 30000; // convert to ms
+          Serial.printf("[PIR] Config: enabled=%s gpio=%d autoOff=%lums\n", 
+                        pirEnabled ? "true" : "false", pirGpio, pirAutoOffDelay);
+          setupPirSensor();
+        }
+        
         if (doc["switches"].is<JsonArray>())
           loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
         else
@@ -656,6 +719,17 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
       }
       if (strcmp(msgType, "config_update") == 0)
       {
+        // Process PIR configuration updates
+        if (doc["pirEnabled"].is<bool>())
+        {
+          pirEnabled = doc["pirEnabled"].as<bool>();
+          pirGpio = doc["pirGpio"].is<int>() ? doc["pirGpio"].as<int>() : -1;
+          pirAutoOffDelay = doc["pirAutoOffDelay"].is<int>() ? doc["pirAutoOffDelay"].as<int>() * 1000 : 30000;
+          Serial.printf("[PIR] Updated: enabled=%s gpio=%d autoOff=%lums\n", 
+                        pirEnabled ? "true" : "false", pirGpio, pirAutoOffDelay);
+          setupPirSensor();
+        }
+        
         if (doc["switches"].is<JsonArray>())
         {
           Serial.println(F("[WS] <- config_update"));
@@ -1032,9 +1106,122 @@ void loop()
     sendStateUpdate(true);
   }
 
+  // Handle PIR sensor
+  handlePirSensor();
+
   // Check system health periodically
   checkSystemHealth();
 
   // Small delay to prevent CPU hogging
   delay(10);
+}
+
+// ========= PIR Sensor Functions =========
+
+void setupPirSensor()
+{
+  if (pirEnabled && pirGpio >= 0)
+  {
+    pinMode(pirGpio, INPUT);
+    lastPirState = digitalRead(pirGpio);
+    pirMotionDetected = lastPirState;
+    lastPirChangeTime = millis();
+    Serial.printf("[PIR] Setup: GPIO %d initialized, initial state=%s\n", 
+                  pirGpio, lastPirState ? "MOTION" : "NO_MOTION");
+  }
+  else
+  {
+    Serial.println("[PIR] Disabled or invalid GPIO");
+  }
+}
+
+void handlePirSensor()
+{
+  if (!pirEnabled || pirGpio < 0)
+    return;
+
+  unsigned long now = millis();
+  bool currentPirReading = digitalRead(pirGpio);
+
+  // Debounce PIR sensor reading
+  if (currentPirReading != lastPirState)
+  {
+    lastPirChangeTime = now;
+    lastPirState = currentPirReading;
+  }
+
+  if (now - lastPirChangeTime >= pirDebounceDelay)
+  {
+    if (currentPirReading != pirMotionDetected)
+    {
+      pirMotionDetected = currentPirReading;
+      Serial.printf("[PIR] Motion %s\n", pirMotionDetected ? "DETECTED" : "STOPPED");
+      
+      if (pirMotionDetected)
+      {
+        lastMotionTime = now;
+        onPirMotionDetected();
+      }
+      else
+      {
+        onPirMotionStopped();
+      }
+    }
+  }
+
+  // Auto-off logic: turn off PIR-activated switches after delay
+  if (!pirMotionDetected && lastMotionTime > 0 && (now - lastMotionTime >= pirAutoOffDelay))
+  {
+    for (auto &sw : switchesLocal)
+    {
+      if (sw.usePir && sw.pirActivated && !sw.dontAutoOff && sw.state)
+      {
+        Serial.printf("[PIR] Auto-off switch %s (GPIO %d) after %lums\n", 
+                      sw.name.c_str(), sw.gpio, pirAutoOffDelay);
+        queueSwitchCommand(sw.gpio, false);
+        sw.pirActivated = false;
+      }
+    }
+    lastMotionTime = 0; // Reset to prevent repeated auto-off
+  }
+}
+
+void onPirMotionDetected()
+{
+  // Turn ON all switches that respond to PIR motion
+  for (auto &sw : switchesLocal)
+  {
+    if (sw.usePir && !sw.state) // Only turn on if currently off
+    {
+      Serial.printf("[PIR] Turning ON switch %s (GPIO %d)\n", sw.name.c_str(), sw.gpio);
+      queueSwitchCommand(sw.gpio, true);
+      sw.pirActivated = true; // Mark as PIR-activated for auto-off
+    }
+  }
+
+  // Send PIR motion event to backend
+  if (ws.isConnected())
+  {
+    DynamicJsonDocument doc(256);
+    doc["type"] = "pir_motion";
+    doc["mac"] = WiFi.macAddress();
+    doc["motion"] = true;
+    doc["timestamp"] = millis();
+    sendJson(doc);
+  }
+}
+
+void onPirMotionStopped()
+{
+  // Send PIR motion stopped event to backend
+  if (ws.isConnected())
+  {
+    DynamicJsonDocument doc(256);
+    doc["type"] = "pir_motion";
+    doc["mac"] = WiFi.macAddress();
+    doc["motion"] = false;
+    doc["timestamp"] = millis();
+    sendJson(doc);
+  }
+  // Note: Auto-off is handled in handlePirSensor() after the delay
 }

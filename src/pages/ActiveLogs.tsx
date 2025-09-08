@@ -3,298 +3,985 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  Activity, 
+  AlertTriangle, 
+  Settings, 
+  Monitor,
+  Download,
+  Calendar as CalendarIcon,
+  Filter,
+  RefreshCw,
+  Trash2,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Zap
+} from 'lucide-react';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import api from '@/services/api';
 
 interface ActivityLog {
   _id: string;
   timestamp: string | number | Date;
-  action?: 'on' | 'off' | 'toggle' | 'device_created' | 'device_updated' | 'device_deleted' | 'bulk_on' | 'bulk_off' | string;
+  action: string;
+  deviceId?: string;
   deviceName?: string;
+  switchId?: string;
   switchName?: string;
+  userId?: string;
   userName?: string;
-  triggeredBy?: 'user' | 'schedule' | 'pir' | 'master' | 'system' | string;
+  triggeredBy: string;
   location?: string;
   classroom?: string;
+  isManualOverride?: boolean;
+  previousState?: boolean;
+  newState?: boolean;
+  conflictResolution?: string;
+  details?: any;
+  context?: any;
 }
 
-const ALL = 'all' as const;
+interface ErrorLog {
+  _id: string;
+  timestamp: string | number | Date;
+  errorType: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  deviceId?: string;
+  deviceName?: string;
+  userId?: string;
+  userName?: string;
+  resolved: boolean;
+  resolvedBy?: string;
+  resolvedAt?: Date;
+  notes?: string;
+  details?: any;
+  stackTrace?: string;
+  endpoint?: string;
+  method?: string;
+}
 
-type DateFilter = typeof ALL | 'today' | 'yesterday' | 'week' | 'month';
+interface ManualSwitchLog {
+  _id: string;
+  timestamp: string | number | Date;
+  deviceId: string;
+  deviceName?: string;
+  switchId: string;
+  switchName?: string;
+  action: 'manual_on' | 'manual_off' | 'manual_toggle';
+  previousState: 'on' | 'off' | 'unknown';
+  newState: 'on' | 'off';
+  conflictWith?: {
+    webCommand?: boolean;
+    scheduleCommand?: boolean;
+    pirCommand?: boolean;
+  };
+  responseTime?: number;
+  location?: string;
+  classroom?: string;
+  details?: any;
+}
 
-type ActionFilter = typeof ALL | NonNullable<ActivityLog['action']>;
+interface DeviceStatusLog {
+  _id: string;
+  timestamp: string | number | Date;
+  deviceId: string;
+  deviceName?: string;
+  deviceMac?: string;
+  checkType: string;
+  deviceStatus: {
+    isOnline: boolean;
+    wifiSignalStrength?: number;
+    uptime?: number;
+    freeHeap?: number;
+    temperature?: number;
+    lastSeen?: Date;
+    responseTime?: number;
+    powerStatus?: string;
+  };
+  switchStates?: any[];
+  alerts?: any[];
+  summary?: {
+    totalSwitchesOn?: number;
+    totalSwitchesOff?: number;
+    totalPowerConsumption?: number;
+    averageResponseTime?: number;
+    inconsistenciesFound?: number;
+  };
+  classroom?: string;
+  location?: string;
+}
 
-type SourceFilter = typeof ALL | NonNullable<ActivityLog['triggeredBy']>;
+interface LogStats {
+  activities: { total: number; today: number };
+  errors: { total: number; today: number; unresolved: number };
+  manualSwitches: { total: number; today: number; conflicts: number };
+  deviceStatus: { total: number; today: number };
+}
+
+type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
 
 const ActiveLogs: React.FC = () => {
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [activeTab, setActiveTab] = useState<LogType>('activities');
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin] = useState(true); // TODO: replace with actual admin check if needed
+  const [isExporting, setIsExporting] = useState(false);
+  const [stats, setStats] = useState<LogStats | null>(null);
+  
+  // Data states
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
+  const [manualSwitchLogs, setManualSwitchLogs] = useState<ManualSwitchLog[]>([]);
+  const [deviceStatusLogs, setDeviceStatusLogs] = useState<DeviceStatusLog[]>([]);
 
-  // Filters
+  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [actionFilter, setActionFilter] = useState<ActionFilter>(ALL);
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(ALL);
-  const [userFilter, setUserFilter] = useState<string | typeof ALL>(ALL);
-  const [dateFilter, setDateFilter] = useState<DateFilter>(ALL);
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [deviceFilter, setDeviceFilter] = useState<string>('all');
+  const [severityFilter, setSeverityFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+
+  // Error resolution dialog
+  const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
+  const [resolutionText, setResolutionText] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.get('/activity-logs');
-        const data = res.data;
-        if (!cancelled) {
-          // controller returns a plain array
-          setLogs(Array.isArray(data) ? data : (data?.data ?? []));
-        }
-      } catch (e) {
-        if (!cancelled) setLogs([]);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    loadData();
+    loadStats();
+  }, [activeTab]);
 
-  const uniqueUsers = useMemo(() => {
-    return Array.from(new Set(logs.map(l => (l.userName || '').trim()).filter(Boolean)));
-  }, [logs]);
+  useEffect(() => {
+    const delayedLoad = setTimeout(() => {
+      loadData();
+    }, 500);
+    return () => clearTimeout(delayedLoad);
+  }, [searchTerm, deviceFilter, severityFilter, statusFilter, dateRange, currentPage]);
 
-  const filteredLogs = useMemo(() => {
-    let data = logs.slice();
-
-    // Text search
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      data = data.filter(l => (
-        (l.deviceName && l.deviceName.toLowerCase().includes(q)) ||
-        (l.switchName && l.switchName.toLowerCase().includes(q)) ||
-        (l.action && String(l.action).toLowerCase().includes(q)) ||
-        (l.userName && l.userName.toLowerCase().includes(q)) ||
-        (l.triggeredBy && String(l.triggeredBy).toLowerCase().includes(q)) ||
-        (l.location && l.location.toLowerCase().includes(q)) ||
-        (l.classroom && l.classroom.toLowerCase().includes(q))
-      ));
-    }
-
-    // Action filter
-    if (actionFilter !== ALL) {
-      data = data.filter(l => l.action === actionFilter);
-    }
-
-    // Source filter (triggeredBy)
-    if (sourceFilter !== ALL) {
-      data = data.filter(l => l.triggeredBy === sourceFilter);
-    }
-
-    // User filter (userName)
-    if (userFilter !== ALL) {
-      data = data.filter(l => (l.userName || '') === userFilter);
-    }
-
-    // Date filter
-    if (dateFilter !== ALL) {
-      const now = new Date();
-      const start = new Date();
-      let end: Date | null = null;
-      switch (dateFilter) {
-        case 'today':
-          start.setHours(0, 0, 0, 0);
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      let endpoint = '';
+      switch (activeTab) {
+        case 'activities':
+          endpoint = '/logs/activities';
           break;
-        case 'yesterday':
-          start.setDate(start.getDate() - 1);
-          start.setHours(0, 0, 0, 0);
-          end = new Date(start);
-          end.setHours(23, 59, 59, 999);
+        case 'errors':
+          endpoint = '/logs/errors';
           break;
-        case 'week':
-          start.setDate(start.getDate() - 7);
+        case 'manual-switches':
+          endpoint = '/logs/manual-switches';
           break;
-        case 'month':
-          start.setMonth(start.getMonth() - 1);
+        case 'device-status':
+          endpoint = '/logs/device-status';
           break;
       }
-      data = data.filter(l => {
-        const t = new Date(l.timestamp).getTime();
-        const afterStart = t >= start.getTime();
-        const beforeEnd = end ? t <= end.getTime() : true;
-        return afterStart && beforeEnd;
+
+      const params = new URLSearchParams();
+      if (searchTerm) params.set('search', searchTerm);
+      if (deviceFilter !== 'all') params.set('deviceId', deviceFilter);
+      if (severityFilter !== 'all') params.set('severity', severityFilter);
+      if (statusFilter !== 'all') params.set('resolved', statusFilter === 'resolved' ? 'true' : 'false');
+      if (dateRange.from) params.set('startDate', dateRange.from.toISOString());
+      if (dateRange.to) params.set('endDate', dateRange.to.toISOString());
+      params.set('page', currentPage.toString());
+      params.set('limit', itemsPerPage.toString());
+
+      const response = await api.get(`${endpoint}?${params.toString()}`);
+      const data = response.data.logs || response.data.data || response.data;
+
+      switch (activeTab) {
+        case 'activities':
+          setActivityLogs(Array.isArray(data) ? data : []);
+          break;
+        case 'errors':
+          setErrorLogs(Array.isArray(data) ? data : []);
+          break;
+        case 'manual-switches':
+          setManualSwitchLogs(Array.isArray(data) ? data : []);
+          break;
+        case 'device-status':
+          setDeviceStatusLogs(Array.isArray(data) ? data : []);
+          break;
+      }
+    } catch (error) {
+      console.error('Error loading logs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await api.get('/logs/stats');
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // Set default stats structure to prevent undefined errors
+      setStats({
+        activities: { total: 0, today: 0 },
+        errors: { total: 0, today: 0, unresolved: 0 },
+        manualSwitches: { total: 0, today: 0, conflicts: 0 },
+        deviceStatus: { total: 0, today: 0 }
       });
     }
+  };
 
+  const exportToExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    
+    try {
+      const params = new URLSearchParams();
+      params.set('type', activeTab);
+      if (searchTerm) params.set('search', searchTerm);
+      if (deviceFilter !== 'all') params.set('deviceId', deviceFilter);
+      if (severityFilter !== 'all') params.set('severity', severityFilter);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (dateRange.from) params.set('startDate', dateRange.from.toISOString());
+      if (dateRange.to) params.set('endDate', dateRange.to.toISOString());
+
+      const response = await api.post(`/logs/export/excel?${params.toString()}`, {}, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${activeTab}-logs-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting logs:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const resolveError = async (errorId: string, resolution: string) => {
+    try {
+      await api.patch(`/logs/errors/${errorId}/resolve`, { notes: resolution });
+      setSelectedError(null);
+      setResolutionText('');
+      loadData();
+    } catch (error) {
+      console.error('Error resolving error:', error);
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setDateRange({});
+    setDeviceFilter('all');
+    setSeverityFilter('all');
+    setStatusFilter('all');
+    setCurrentPage(1);
+  };
+
+  const getTabIcon = (tab: LogType) => {
+    switch (tab) {
+      case 'activities': return <Activity className="w-4 h-4" />;
+      case 'errors': return <AlertTriangle className="w-4 h-4" />;
+      case 'manual-switches': return <Zap className="w-4 h-4" />;
+      case 'device-status': return <Monitor className="w-4 h-4" />;
+    }
+  };
+
+  const getSeverityBadge = (severity: string) => {
+    const colors = {
+      low: 'bg-blue-100 text-blue-800',
+      medium: 'bg-yellow-100 text-yellow-800',
+      high: 'bg-red-100 text-red-800',
+      critical: 'bg-red-600 text-white'
+    };
+    return colors[severity as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusBadge = (resolved: boolean) => {
+    return resolved 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
+  };
+
+  const filteredData = useMemo(() => {
+    let data: any[] = [];
+    switch (activeTab) {
+      case 'activities': data = activityLogs; break;
+      case 'errors': data = errorLogs; break;
+      case 'manual-switches': data = manualSwitchLogs; break;
+      case 'device-status': data = deviceStatusLogs; break;
+    }
     return data;
-  }, [logs, searchTerm, actionFilter, sourceFilter, userFilter, dateFilter]);
+  }, [activeTab, activityLogs, errorLogs, manualSwitchLogs, deviceStatusLogs]);
 
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center" />
-      </div>
-    );
-  }
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredData.slice(startIndex, endIndex);
+  }, [filteredData, currentPage, itemsPerPage]);
 
-  // Color maps for actions and sources
-  const actionColors: Record<string, string> = {
-    on: 'bg-green-500 text-white',
-    off: 'bg-red-500 text-white',
-    toggle: 'bg-yellow-500 text-black',
-    bulk_on: 'bg-green-700 text-white',
-    bulk_off: 'bg-red-700 text-white',
-    device_created: 'bg-blue-500 text-white',
-    device_updated: 'bg-blue-300 text-black',
-    device_deleted: 'bg-gray-500 text-white',
-  };
-  const sourceColors: Record<string, string> = {
-    user: 'bg-purple-500 text-white',
-    schedule: 'bg-teal-500 text-white',
-    pir: 'bg-orange-500 text-white',
-    master: 'bg-pink-500 text-white',
-    system: 'bg-gray-400 text-black',
-  };
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   return (
-    <div className="w-full max-w-6xl mx-auto mt-4 space-y-4">
-      {/* Filters */}
+    <div className="w-full max-w-7xl mx-auto mt-4 space-y-6">
+      {/* Statistics Dashboard */}
+      {stats && stats.activities && stats.errors && stats.manualSwitches && stats.deviceStatus && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Activity Logs</p>
+                  <p className="text-2xl font-bold">{stats.activities.total}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.activities.today} today
+                  </p>
+                </div>
+                <Activity className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Error Logs</p>
+                  <p className="text-2xl font-bold">{stats.errors.total}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.errors.unresolved} unresolved
+                  </p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Manual Switches</p>
+                  <p className="text-2xl font-bold">{stats.manualSwitches.total}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.manualSwitches.conflicts} conflicts
+                  </p>
+                </div>
+                <Zap className="h-8 w-8 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Device Status</p>
+                  <p className="text-2xl font-bold">{stats.deviceStatus.total}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.deviceStatus.today} today
+                  </p>
+                </div>
+                <Monitor className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Main Content */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters & Search</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Enhanced Logs
+            </CardTitle>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadData()}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToExcel}
+                disabled={isExporting}
+              >
+                <Download className={`h-4 w-4 mr-2 ${isExporting ? 'animate-spin' : ''}`} />
+                Export Excel
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div className="relative">
+          {/* Filters */}
+          <div className="mb-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <Input
                 placeholder="Search logs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="lg:col-span-2"
               />
+
+              <Popover open={showCalendar} onOpenChange={setShowCalendar}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="justify-start text-left">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd")} - {format(dateRange.to, "LLL dd")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      "Date range"
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange.from}
+                    selected={dateRange.from ? dateRange as { from: Date; to?: Date } : undefined}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Select value={deviceFilter} onValueChange={setDeviceFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Device" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Devices</SelectItem>
+                  {/* Device options will be populated dynamically */}
+                </SelectContent>
+              </Select>
+
+              {activeTab === 'errors' && (
+                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severities</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+
+              {activeTab === 'errors' && (
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="unresolved">Unresolved</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-
-            <Select value={actionFilter} onValueChange={(v) => setActionFilter(v as ActionFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All Actions</SelectItem>
-                <SelectItem value="on">On</SelectItem>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="toggle">Toggle</SelectItem>
-                <SelectItem value="bulk_on">Bulk On</SelectItem>
-                <SelectItem value="bulk_off">Bulk Off</SelectItem>
-                <SelectItem value="device_created">Device Created</SelectItem>
-                <SelectItem value="device_updated">Device Updated</SelectItem>
-                <SelectItem value="device_deleted">Device Deleted</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Source" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All Sources</SelectItem>
-                <SelectItem value="user">User</SelectItem>
-                <SelectItem value="schedule">Schedule</SelectItem>
-                <SelectItem value="pir">PIR</SelectItem>
-                <SelectItem value="master">Master</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={userFilter} onValueChange={(v) => setUserFilter(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="User" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All Users</SelectItem>
-                {uniqueUsers.map((u) => (
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="week">Last 7 days</SelectItem>
-                <SelectItem value="month">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">Showing {filteredLogs.length} of {logs.length} logs</div>
-        </CardContent>
-      </Card>
 
-      {/* Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Logs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <span className="animate-spin w-6 h-6 mr-2">⏳</span> Loading logs...
-            </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="text-muted-foreground">No activity logs found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="px-2 py-1 text-left">Time</th>
-                    <th className="px-2 py-1 text-left">Action</th>
-                    <th className="px-2 py-1 text-left">Device</th>
-                    <th className="px-2 py-1 text-left">Switch</th>
-                    <th className="px-2 py-1 text-left">User/Source</th>
-                    <th className="px-2 py-1 text-left">Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.map((log) => {
-                    // Color for action badge
-                    const actionClass = log.action && actionColors[log.action] ? actionColors[log.action] : 'bg-gray-200 text-black';
-                    // Color for source badge
-                    const sourceClass = log.triggeredBy && sourceColors[log.triggeredBy] ? sourceColors[log.triggeredBy] : 'bg-gray-100 text-black';
-                    // No row highlight; only badges are colored
-                    const rowClass = '';
+          {/* Tabbed Interface */}
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LogType)}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="activities" className="flex items-center gap-2">
+                {getTabIcon('activities')}
+                <span className="hidden md:inline">Activity Logs</span>
+                <span className="md:hidden">Activity</span>
+              </TabsTrigger>
+              <TabsTrigger value="errors" className="flex items-center gap-2">
+                {getTabIcon('errors')}
+                <span className="hidden md:inline">Error Logs</span>
+                <span className="md:hidden">Errors</span>
+              </TabsTrigger>
+              <TabsTrigger value="manual-switches" className="flex items-center gap-2">
+                {getTabIcon('manual-switches')}
+                <span className="hidden md:inline">Manual Switches</span>
+                <span className="md:hidden">Manual</span>
+              </TabsTrigger>
+              <TabsTrigger value="device-status" className="flex items-center gap-2">
+                {getTabIcon('device-status')}
+                <span className="hidden md:inline">Device Status</span>
+                <span className="md:hidden">Status</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Activity Logs */}
+            <TabsContent value="activities">
+              <div className="space-y-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="animate-spin w-6 h-6 mr-2" />
+                    Loading activity logs...
+                  </div>
+                ) : paginatedData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No activity logs found.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-2 text-left">Time</th>
+                          <th className="px-4 py-2 text-left">Action</th>
+                          <th className="px-4 py-2 text-left">Device/Switch</th>
+                          <th className="px-4 py-2 text-left">User/Source</th>
+                          <th className="px-4 py-2 text-left">Details</th>
+                          <th className="px-4 py-2 text-left">Location</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(paginatedData as ActivityLog[]).map((log) => (
+                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={(log.action || 'unknown') === 'on' ? 'default' : 'secondary'}>
+                                {log.action || 'unknown'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div>
+                                <div className="font-medium">{log.deviceName || '-'}</div>
+                                {log.switchName && (
+                                  <div className="text-xs text-muted-foreground">{log.switchName}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div>
+                                {log.userName && (
+                                  <div className="font-medium">{log.userName}</div>
+                                )}
+                                <div className="text-xs">
+                                  <Badge variant="outline" className="text-xs">
+                                    {log.triggeredBy || 'unknown'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              {log.isManualOverride && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Manual Override
+                                </Badge>
+                              )}
+                              {log.conflictResolution && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Resolved: {log.conflictResolution}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-xs text-muted-foreground">
+                              {log.location || log.classroom || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Error Logs */}
+            <TabsContent value="errors">
+              <div className="space-y-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="animate-spin w-6 h-6 mr-2" />
+                    Loading error logs...
+                  </div>
+                ) : paginatedData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No error logs found.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-2 text-left">Time</th>
+                          <th className="px-4 py-2 text-left">Severity</th>
+                          <th className="px-4 py-2 text-left">Error Type</th>
+                          <th className="px-4 py-2 text-left">Message</th>
+                          <th className="px-4 py-2 text-left">Source</th>
+                          <th className="px-4 py-2 text-left">Status</th>
+                          <th className="px-4 py-2 text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(paginatedData as ErrorLog[]).map((log) => (
+                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge className={getSeverityBadge(log.severity || 'low')}>
+                                {(log.severity || 'unknown').toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div>
+                                <div className="font-medium">{log.errorType || 'Unknown'}</div>
+                                <div className="text-xs text-muted-foreground">Error Type</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="max-w-md">
+                                <div className="truncate">{log.message || 'No message available'}</div>
+                                {log.deviceName && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    Device: {log.deviceName}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              {log.endpoint ? `${log.method || 'GET'} ${log.endpoint}` : (log.deviceName ? 'Device' : 'System')}
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge className={getStatusBadge(log.resolved)}>
+                                {log.resolved ? (
+                                  <><CheckCircle className="w-3 h-3 mr-1" /> Resolved</>
+                                ) : (
+                                  <><Clock className="w-3 h-3 mr-1" /> Open</>
+                                )}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              {!log.resolved && (
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => setSelectedError(log)}
+                                    >
+                                      Resolve
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Resolve Error</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <p className="text-sm font-medium">Error Message:</p>
+                                        <p className="text-sm text-muted-foreground">{log.message}</p>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-medium">Resolution Notes:</label>
+                                        <textarea
+                                          className="w-full mt-1 p-2 border rounded-md"
+                                          rows={3}
+                                          placeholder="Describe how this error was resolved..."
+                                          value={resolutionText}
+                                          onChange={(e) => setResolutionText(e.target.value)}
+                                        />
+                                      </div>
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => setSelectedError(null)}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          onClick={() => resolveError(log._id, resolutionText)}
+                                          disabled={!resolutionText.trim()}
+                                        >
+                                          Mark Resolved
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Manual Switch Logs */}
+            <TabsContent value="manual-switches">
+              <div className="space-y-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="animate-spin w-6 h-6 mr-2" />
+                    Loading manual switch logs...
+                  </div>
+                ) : paginatedData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No manual switch logs found.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-2 text-left">Time</th>
+                          <th className="px-4 py-2 text-left">Device/Switch</th>
+                          <th className="px-4 py-2 text-left">Action</th>
+                          <th className="px-4 py-2 text-left">Previous State</th>
+                          <th className="px-4 py-2 text-left">New State</th>
+                          <th className="px-4 py-2 text-left">Conflicts</th>
+                          <th className="px-4 py-2 text-left">Response Time</th>
+                          <th className="px-4 py-2 text-left">Location</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(paginatedData as ManualSwitchLog[]).map((log) => (
+                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
+                            </td>
+                            <td className="px-4 py-2">
+                              <div>
+                                <div className="font-medium">{log.deviceName || '-'}</div>
+                                {log.switchName && (
+                                  <div className="text-xs text-muted-foreground">{log.switchName}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant="outline" className="text-xs">
+                                {(log.action || 'unknown').replace('manual_', '').toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={(log.previousState || 'unknown') === 'on' ? 'default' : (log.previousState || 'unknown') === 'off' ? 'secondary' : 'outline'}>
+                                {(log.previousState || 'unknown').toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={(log.newState || 'unknown') === 'on' ? 'default' : 'secondary'}>
+                                {(log.newState || 'unknown').toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2">
+                              {log.conflictWith && (log.conflictWith.webCommand || log.conflictWith.scheduleCommand || log.conflictWith.pirCommand) ? (
+                                <div className="space-y-1">
+                                  {log.conflictWith.webCommand && (
+                                    <Badge variant="destructive" className="text-xs mr-1">
+                                      Web
+                                    </Badge>
+                                  )}
+                                  {log.conflictWith.scheduleCommand && (
+                                    <Badge variant="destructive" className="text-xs mr-1">
+                                      Schedule
+                                    </Badge>
+                                  )}
+                                  {log.conflictWith.pirCommand && (
+                                    <Badge variant="destructive" className="text-xs mr-1">
+                                      PIR
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="default" className="text-xs">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  No Conflict
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              {log.responseTime ? `${log.responseTime}ms` : '-'}
+                            </td>
+                            <td className="px-4 py-2 text-xs text-muted-foreground">
+                              {log.location || log.classroom || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Device Status Logs */}
+            <TabsContent value="device-status">
+              <div className="space-y-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="animate-spin w-6 h-6 mr-2" />
+                    Loading device status logs...
+                  </div>
+                ) : paginatedData.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No device status logs found.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="px-4 py-2 text-left">Time</th>
+                          <th className="px-4 py-2 text-left">Device</th>
+                          <th className="px-4 py-2 text-left">Online Status</th>
+                          <th className="px-4 py-2 text-left">Signal/Temp</th>
+                          <th className="px-4 py-2 text-left">Switches</th>
+                          <th className="px-4 py-2 text-left">Alerts</th>
+                          <th className="px-4 py-2 text-left">Response Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(paginatedData as DeviceStatusLog[]).map((log) => (
+                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
+                            </td>
+                            <td className="px-4 py-2">
+                              <div>
+                                <div className="font-medium">{log.deviceName || '-'}</div>
+                                {log.deviceMac && (
+                                  <div className="text-xs text-muted-foreground">{log.deviceMac}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Badge variant={log.deviceStatus.isOnline ? 'default' : 'destructive'}>
+                                {log.deviceStatus.isOnline ? (
+                                  <>🟢 Online</>
+                                ) : (
+                                  <>🔴 Offline</>
+                                )}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              <div>
+                                {log.deviceStatus.wifiSignalStrength && (
+                                  <div>Signal: {log.deviceStatus.wifiSignalStrength}dBm</div>
+                                )}
+                                {log.deviceStatus.temperature && (
+                                  <div>Temp: {log.deviceStatus.temperature}°C</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              {log.summary && (
+                                <div>
+                                  <div>On: {log.summary.totalSwitchesOn || 0}</div>
+                                  <div>Off: {log.summary.totalSwitchesOff || 0}</div>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2">
+                              {log.alerts && log.alerts.length > 0 ? (
+                                <Badge variant="destructive">
+                                  {log.alerts.length} Alert{log.alerts.length > 1 ? 's' : ''}
+                                </Badge>
+                              ) : (
+                                <Badge variant="default">No Alerts</Badge>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-xs">
+                              {log.deviceStatus.responseTime ? `${log.deviceStatus.responseTime}ms` : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const pageNum = currentPage - 2 + i;
+                    if (pageNum < 1 || pageNum > totalPages) return null;
                     return (
-                      <tr key={log._id} className={`border-b last:border-b-0 ${rowClass}`}>
-                        <td className="px-2 py-1 whitespace-nowrap">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td className="px-2 py-1">
-                          <span className={`inline-block rounded px-2 py-1 text-xs font-semibold ${actionClass}`}>
-                            {log.action || '-'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-1">{log.deviceName || '-'}</td>
-                        <td className="px-2 py-1">{log.switchName || '-'}</td>
-                        <td className="px-2 py-1">
-                          {log.userName ? (
-                            <span className="inline-block rounded px-2 py-1 text-xs font-semibold bg-purple-600 text-white">
-                              {log.userName}
-                            </span>
-                          ) : log.triggeredBy === 'schedule' ? (
-                            <span className="inline-block rounded px-2 py-1 text-xs font-semibold bg-teal-600 text-white">
-                              schedule
-                            </span>
-                          ) : log.triggeredBy ? (
-                            <span className={`inline-block rounded px-2 py-1 text-xs font-semibold ${sourceClass}`}>
-                              {log.triggeredBy}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-2 py-1">{log.location || log.classroom || '-'}</td>
-                      </tr>
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

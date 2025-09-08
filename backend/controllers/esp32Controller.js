@@ -1,5 +1,6 @@
 const Device = require('../models/Device');
 const ActivityLog = require('../models/ActivityLog');
+const EnhancedLoggingService = require('../services/enhancedLoggingService');
 const { logger } = require('../middleware/logger');
 const securityService = require('../services/securityService');
 
@@ -47,6 +48,21 @@ class WebSocketHandler {
                 const verified = securityService.verifyDeviceToken(data.token, process.env.DEVICE_SECRET);
                 if (!verified) {
                     securityService.trackActivity(deviceId, { type: 'auth_failure' });
+                    
+                    // Log authentication failure
+                    await EnhancedLoggingService.logError({
+                        errorType: 'authentication_failed',
+                        severity: 'high',
+                        message: 'ESP32 device authentication failed',
+                        details: { deviceId, ip: socket.handshake.address },
+                        deviceMac: data.mac,
+                        ip: socket.handshake.address,
+                        context: {
+                            userAgent: socket.handshake.headers['user-agent'],
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                    
                     throw new SecurityError('Invalid device token');
                 }
                 await this.handleIdentify(socket, data);
@@ -59,6 +75,7 @@ class WebSocketHandler {
         socket.on('disconnect', () => this.handleDisconnect(socket));
         socket.on('heartbeat', (data) => this.handleHeartbeat(socket, data));
         socket.on('state_update', (data) => this.handleStateUpdate(socket, data));
+        socket.on('manual_switch', (data) => this.handleManualSwitch(socket, data));
     }
 
     async handleIdentify(socket, data) {
@@ -69,6 +86,15 @@ class WebSocketHandler {
 
         const device = await Device.findOne({ macAddress: mac });
         if (!device || device.secret !== secret) {
+            // Log device credential error
+            await EnhancedLoggingService.logError({
+                errorType: 'authentication_failed',
+                severity: 'high',
+                message: 'Invalid ESP32 device credentials',
+                details: { mac, hasDevice: !!device, secretMatch: device?.secret === secret },
+                deviceMac: mac,
+                ip: socket.handshake.address
+            });
             throw new Error('Invalid device credentials');
         }
 
@@ -140,6 +166,121 @@ class WebSocketHandler {
             device.connectionStatus = 'online';
             await device.save();
         }
+    }
+
+    async handleManualSwitch(socket, data) {
+        if (!socket.deviceMac) return;
+
+        try {
+            const { switchId, action, previousState, newState, detectedBy, responseTime, physicalPin } = data;
+            
+            const device = await Device.findOne({ macAddress: socket.deviceMac });
+            if (!device) {
+                await EnhancedLoggingService.logError({
+                    errorType: 'device_connection_failed',
+                    severity: 'medium',
+                    message: 'Manual switch event from unknown device',
+                    details: { mac: socket.deviceMac, switchId, action },
+                    deviceMac: socket.deviceMac
+                });
+                return;
+            }
+
+            // Check for conflicts
+            const conflictWith = {
+                webCommand: false,
+                scheduleCommand: false,
+                pirCommand: false
+            };
+
+            // Check if there was a recent web command for this switch
+            const recentWebCommand = device.pendingCommands.find(cmd => 
+                cmd.payload?.switchId === switchId && 
+                cmd.timestamp > new Date(Date.now() - 30000) // 30 seconds
+            );
+            
+            if (recentWebCommand) {
+                conflictWith.webCommand = true;
+                // Remove the conflicting web command
+                device.pendingCommands = device.pendingCommands.filter(cmd => cmd.id !== recentWebCommand.id);
+            }
+
+            // Update device switch state
+            const switchToUpdate = device.switches.find(s => s.id === switchId);
+            if (switchToUpdate) {
+                switchToUpdate.state = newState;
+                switchToUpdate.lastChanged = new Date();
+                switchToUpdate.lastChangedBy = 'manual';
+            }
+
+            device.lastSeen = new Date();
+            await device.save();
+
+            // Log manual switch operation
+            await EnhancedLoggingService.logManualSwitch({
+                deviceId: device._id,
+                deviceName: device.name,
+                deviceMac: device.macAddress,
+                switchId: switchId,
+                switchName: switchToUpdate?.name || `Switch ${switchId}`,
+                physicalPin: physicalPin,
+                action: action,
+                previousState: previousState,
+                newState: newState,
+                conflictWith: conflictWith,
+                detectedBy: detectedBy || 'gpio_interrupt',
+                responseTime: responseTime || 0,
+                classroom: device.classroom,
+                location: device.location,
+                context: {
+                    activeWebUsers: this.getActiveWebUsers(),
+                    socketId: socket.id,
+                    ipAddress: socket.handshake.address,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            // Emit state change to frontend
+            this.io.emit('switchStateChanged', {
+                deviceId: device._id,
+                deviceName: device.name,
+                switchId: switchId,
+                state: newState,
+                triggeredBy: 'manual_switch',
+                hasConflict: conflictWith.webCommand || conflictWith.scheduleCommand || conflictWith.pirCommand,
+                timestamp: new Date()
+            });
+
+            // Send acknowledgment to ESP32
+            socket.emit('manual_switch_ack', {
+                switchId: switchId,
+                acknowledged: true,
+                newState: newState,
+                timestamp: new Date()
+            });
+
+            logger.info(`Manual switch: ${device.name} - ${switchId} - ${action}`);
+
+        } catch (error) {
+            console.error('[MANUAL-SWITCH-ERROR]', error);
+            await EnhancedLoggingService.logError({
+                errorType: 'system_error',
+                severity: 'medium',
+                message: 'Failed to process manual switch event',
+                details: { error: error.message, data },
+                deviceMac: socket.deviceMac
+            });
+            
+            socket.emit('error', { 
+                code: 'manual_switch_failed', 
+                message: 'Failed to process manual switch event' 
+            });
+        }
+    }
+
+    getActiveWebUsers() {
+        // Count active socket.io connections (rough estimate)
+        return this.io.engine.clientsCount || 0;
     }
 
     async handleStateUpdate(socket, data) {
@@ -214,6 +355,7 @@ exports.getDeviceConfig = async (req, res) => {
         name: sw.name,
         relayGpio: sw.relayGpio,
         usePir: sw.usePir,
+        dontAutoOff: sw.dontAutoOff,
         manualSwitchEnabled: sw.manualSwitchEnabled,
         manualSwitchGpio: sw.manualSwitchGpio
       }))
