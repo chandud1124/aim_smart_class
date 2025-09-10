@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Users as UsersIcon, Plus, Shield, User, Edit, Trash2, GraduationCap, ShieldCheck, RefreshCcw, Search } from 'lucide-react';
+import { Users as UsersIcon, Plus, Shield, User, Edit, Trash2, GraduationCap, ShieldCheck, RefreshCcw, Search, Wrench } from 'lucide-react';
 import { UserDialog } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'principal' | 'dean' | 'hod' | 'faculty' | 'security' | 'student' | 'user';
+  role: 'admin' | 'manager' | 'supervisor' | 'technician' | 'operator' | 'security' | 'user';
   isActive: boolean;
   lastLogin: Date;
   assignedDevices: string[];
@@ -370,12 +370,12 @@ const Users = () => {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <Shield className="w-4 h-4" />;
-      case 'principal': return <Shield className="w-4 h-4" />;
-      case 'dean': return <Shield className="w-4 h-4" />;
-      case 'hod': return <Shield className="w-4 h-4" />;
-      case 'faculty': return <GraduationCap className="w-4 h-4" />;
+      case 'manager': return <Shield className="w-4 h-4" />;
+      case 'supervisor': return <Shield className="w-4 h-4" />;
+      case 'technician': return <Wrench className="w-4 h-4" />;
+      case 'operator': return <GraduationCap className="w-4 h-4" />;
       case 'security': return <ShieldCheck className="w-4 h-4" />;
-      case 'student': return <User className="w-4 h-4" />;
+      case 'user': return <User className="w-4 h-4" />;
       default: return <User className="w-4 h-4" />;
     }
   };
@@ -383,12 +383,12 @@ const Users = () => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'default';
-      case 'principal': return 'default';
-      case 'dean': return 'default';
-      case 'hod': return 'default';
-      case 'faculty': return 'secondary';
+      case 'manager': return 'default';
+      case 'supervisor': return 'default';
+      case 'technician': return 'default';
+      case 'operator': return 'secondary';
       case 'security': return 'destructive';
-      case 'student': return 'outline';
+      case 'user': return 'outline';
       default: return 'outline';
     }
   };
@@ -438,12 +438,11 @@ const Users = () => {
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="border rounded px-2 py-1 bg-primary/10 text-primary focus:ring-2 focus:ring-primary">
           <option value="all" className="bg-background text-primary">All Roles</option>
           <option value="admin" className="bg-background text-primary">Admin</option>
-          <option value="principal" className="bg-background text-primary">Principal</option>
-          <option value="dean" className="bg-background text-primary">Dean</option>
-          <option value="hod" className="bg-background text-primary">HOD</option>
-          <option value="faculty" className="bg-background text-primary">Faculty</option>
+          <option value="manager" className="bg-background text-primary">Manager</option>
+          <option value="supervisor" className="bg-background text-primary">Supervisor</option>
+          <option value="technician" className="bg-background text-primary">Technician</option>
+          <option value="operator" className="bg-background text-primary">Operator</option>
           <option value="security" className="bg-background text-primary">Security</option>
-          <option value="student" className="bg-background text-primary">Student</option>
           <option value="user" className="bg-background text-primary">General Staff</option>
         </select>
         <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="border rounded px-2 py-1 bg-primary/10 text-primary focus:ring-2 focus:ring-primary">

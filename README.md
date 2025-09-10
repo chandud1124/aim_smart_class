@@ -1,7 +1,7 @@
 
-# IoT Smart Classroom Dashboard
+# AutoVolt - Intelligent Power Management System
 
-A comprehensive IoT automation system for smart classrooms with real-time device control, scheduling, and monitoring capabilities.
+An advanced intelligent power management system with real-time device control, energy optimization, scheduling, and comprehensive monitoring capabilities.
 
 ## 🚀 Quick Start - Windows Setup
 
@@ -15,8 +15,8 @@ A comprehensive IoT automation system for smart classrooms with real-time device
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/chandud1124/iotsmartclass.git
-   cd iotsmartclass
+   git clone https://github.com/chandud1124/autovolt.git
+   cd autovolt
    ```
 
 2. **Quick Setup (Windows - Recommended)**
@@ -113,12 +113,13 @@ If you prefer using Docker:
 docker-compose up --build
 ```
 
-### 📋 System Requirements
+## 📋 System Requirements
 
 - **RAM:** 4GB minimum, 8GB recommended
 - **Storage:** 2GB free space
 - **Network:** Stable internet connection for MongoDB Atlas
 - **Browser:** Chrome 90+, Firefox 88+, Edge 90+
+- **Power Management Hardware:** Compatible IoT devices and smart meters (optional)
 
 ### 🔍 Troubleshooting
 
@@ -157,16 +158,17 @@ For issues or questions:
 
 ## 🚀 Features
 
-- **Real-time Device Control**: Control lights, fans, projectors, and other devices via WebSocket
-- **Smart Scheduling**: Automated device control based on time and calendar events
+- **Intelligent Power Management**: Advanced power optimization with real-time energy monitoring
+- **Smart Device Control**: Control electrical devices, lighting systems, and appliances via WebSocket
+- **Energy Optimization**: Automated power management based on usage patterns and schedules
 - **Advanced User Management**: Comprehensive role-based access control with admin approval workflow
-- **Class Extension Requests**: Teachers can request class time extensions with authority approval
-- **Security Notifications**: Real-time alerts for unauthorized access and suspicious activities
+- **Power Analytics**: Detailed energy consumption analytics and cost tracking
+- **Security & Monitoring**: Real-time alerts for power anomalies and unauthorized access
 - **Permission System**: Multi-level approval workflow for user registration and access control
-- **🏫 Classroom Access Management**: Granular classroom-specific permissions and time-based restrictions
+- **⚡ Facility Management**: Granular facility-specific permissions and time-based restrictions
 - **Offline Operation**: ESP32 devices work independently when backend is unavailable
 - **Responsive UI**: Modern React interface with dark/light theme support
-- **RESTful API**: Complete API for device management and automation
+- **RESTful API**: Complete API for power management and automation
 - **WebSocket Communication**: Real-time updates and device synchronization
 - **Database Integration**: MongoDB with optimized queries and indexing
 - **Security**: JWT authentication, input validation, CORS protection
@@ -182,12 +184,12 @@ The system implements a hierarchical permission structure:
 | Role | Permissions | Can Approve |
 |------|-------------|-------------|
 | **Admin** | Full system access, user management, all approvals | All requests |
-| **Principal** | School-wide oversight, major approvals | Registration, role changes, extensions |
-| **Dean** | Department oversight, academic approvals | Role changes, access upgrades, extensions |
-| **HOD** | Department head, team approvals | Access upgrades, extensions |
-| **Faculty** | Teaching staff, class management | Short extensions (≤15 min) |
+| **Manager** | Facility oversight, major approvals | Registration, role changes, power requests |
+| **Supervisor** | Department oversight, operational approvals | Role changes, access upgrades, power requests |
+| **Technician** | Equipment maintenance, technical approvals | Access upgrades, power requests |
+| **Operator** | Daily operations, basic control | Short operations (≤15 min) |
 | **Security** | Security monitoring, access control | N/A |
-| **Student** | Basic access, device viewing | N/A |
+| **User** | Basic access, device viewing | N/A |
 
 ### Approval Workflow
 
@@ -197,11 +199,11 @@ The system implements a hierarchical permission structure:
 3. **Activation**: Upon approval, user account is activated with appropriate permissions
 4. **Notification**: User receives email/in-app notification of approval status
 
-#### Class Extension Process
-1. **Request**: Teacher requests class time extension with justification
-2. **Auto-Approval**: Extensions ≤15 minutes are automatically approved
-3. **Authority Review**: Longer extensions require HOD/Dean/Principal approval
-4. **Schedule Update**: Approved extensions automatically update the class schedule
+#### Power Management Process
+1. **Request**: Operator requests extended power operation with justification
+2. **Auto-Approval**: Operations ≤15 minutes are automatically approved
+3. **Authority Review**: Longer operations require Technician/Supervisor/Manager approval
+4. **Schedule Update**: Approved operations automatically update the power schedule
 5. **Notification**: All parties receive notifications of the decision
 
 ### Security Features
@@ -212,25 +214,25 @@ The system implements a hierarchical permission structure:
 - **Security Alerts**: Real-time notifications for unauthorized access attempts
 - **Session Management**: Secure JWT tokens with configurable expiration
 
-## � Classroom Access Management
+## ⚡ Facility Management
 
 ### New Features Added
 
-The system now includes comprehensive classroom-specific access control:
+The system now includes comprehensive facility-specific access control:
 
-#### Classroom Permissions
-- **Granular Access Control**: Users can be granted access to specific classrooms only
+#### Facility Permissions
+- **Granular Access Control**: Users can be granted access to specific facilities only
 - **Time-Based Restrictions**: Schedule-based device access permissions
 - **Department-Based Access**: Automatic permissions based on user department
 - **Role-Specific Permissions**: Different access levels for different user roles
 
-#### Classroom Management API
+#### Facility Management API
 ```javascript
-// Grant classroom access
-POST /api/classroom/grant
+// Grant facility access
+POST /api/facility/grant
 {
   "userId": "user_id",
-  "classroomId": "classroom_101",
+  "facilityId": "facility_101",
   "permissions": ["device_control", "scheduling"],
   "timeRestrictions": {
     "startTime": "08:00",
@@ -239,18 +241,18 @@ POST /api/classroom/grant
   }
 }
 
-// Get classroom access summary
-GET /api/classroom/summary
+// Get facility access summary
+GET /api/facility/summary
 
-// Revoke classroom access
-DELETE /api/classroom/:id
+// Revoke facility access
+DELETE /api/facility/:id
 ```
 
 #### Frontend Components
-- **ClassroomAccessManager**: Interface for managing classroom permissions
-- **ClassroomAccessPage**: Dedicated page for classroom access administration
-- **Enhanced Sidebar**: Navigation updates for classroom management
-- **Permission Hooks**: React hooks for classroom access validation
+- **FacilityAccessManager**: Interface for managing facility permissions
+- **FacilityAccessPage**: Dedicated page for facility access administration
+- **Enhanced Sidebar**: Navigation updates for facility management
+- **Permission Hooks**: React hooks for facility access validation
 
 ## ⚡ Advanced Scaling & Performance
 
@@ -334,7 +336,7 @@ CACHE_TTL=300
 │   React Frontend│    │  Node.js Backend │    │   MongoDB       │
 │   (TypeScript)  │◄──►│  (Express)      │◄──►│   Database      │
 │                 │    │                 │    │                 │
-│ - Dashboard UI  │    │ - REST API      │    │ - Devices       │
+│ - Power Dashboard│    │ - REST API      │    │ - Devices       │
 │ - Real-time UI  │    │ - WebSocket     │    │ - Schedules     │
 │ - User Auth     │    │ - Auth/JWT      │    │ - Users         │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
@@ -343,9 +345,9 @@ CACHE_TTL=300
                                  ▼
                     ┌─────────────────┐
                     │   ESP32 Devices │
-                    │   (C++/Arduino)│
+                    │   (C++/Arduino) │
                     │                 │
-                    │ - Device Control│
+                    │ - Power Control │
                     │ - Offline Mode  │
                     │ - WiFi/MQTT     │
                     └─────────────────┘
@@ -365,8 +367,8 @@ CACHE_TTL=300
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/chandud1124/iotsmartclass.git
-   cd iotsmartclass
+   git clone https://github.com/chandud1124/autovolt.git
+   cd autovolt
    ```
 
 2. **Start all services**
@@ -496,7 +498,7 @@ CACHE_TTL=300
    copy .env.example .env
 
    # Edit .env file with your MongoDB connection string
-   # For local MongoDB: MONGODB_URI=mongodb://localhost:27017/iot_classroom
+   # For local MongoDB: MONGODB_URI=mongodb://localhost:27017/autovolt_system
    # For MongoDB Atlas: Use your connection string
 
    # Create initial admin user
@@ -532,7 +534,7 @@ CACHE_TTL=300
 # Set environment variables
 $env:NODE_ENV="development"
 $env:PORT="3001"
-$env:MONGODB_URI="mongodb://localhost:27017/iot_classroom"
+$env:MONGODB_URI="mongodb://localhost:27017/autovolt_system"
 ```
 
 **Running Multiple Services:**
@@ -562,7 +564,7 @@ start powershell { cd frontend; npm run dev }
 3. **Monitor performance**
    ```bash
    pm2 monit
-   pm2 logs iot-classroom-backend
+   pm2 logs autovolt-backend
    ```
 
 ## 🧪 Testing the Permission System
@@ -619,26 +621,26 @@ curl -X PUT http://localhost:3001/api/auth/permission-requests/<request-id>/appr
   -d '{"comments": "Approved - valid faculty member"}'
 ```
 
-### Testing Class Extension Flow
+### Testing Power Management Flow
 ```bash
-# 1. Login as faculty user
+# 1. Login as operator user
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "john.doe@college.edu",
+    "email": "john.doe@company.com",
     "password": "password123"
   }'
 
-# 2. Request class extension
-curl -X POST http://localhost:3001/api/auth/class-extensions \
-  -H "Authorization: Bearer <faculty-jwt-token>" \
+# 2. Request power operation extension
+curl -X POST http://localhost:3001/api/auth/power-operations \
+  -H "Authorization: Bearer <operator-jwt-token>" \
   -H "Content-Type: application/json" \
   -d '{
     "scheduleId": "<schedule-id>",
     "requestedEndTime": "2024-01-15T11:30:00Z",
-    "reason": "Extra time for lab demonstration",
-    "roomNumber": "101",
-    "subject": "Computer Science"
+    "reason": "Extra time for equipment maintenance",
+    "facilityNumber": "101",
+    "equipmentType": "HVAC System"
   }'
 
 # 3. Check notifications
@@ -654,7 +656,7 @@ Create `.env` file in the backend directory:
 
 ```env
 # Database
-MONGODB_URI=mongodb://localhost:27017/iot-automation
+MONGODB_URI=mongodb://localhost:27017/autovolt-system
 NODE_ENV=development
 
 # Security
@@ -692,7 +694,7 @@ Content-Type: application/json
   "name": "John Doe",
   "email": "john@example.com",
   "password": "password123",
-  "role": "faculty"
+  "role": "operator"
 }
 ```
 
@@ -722,7 +724,7 @@ Authorization: Bearer <jwt-token>
 Content-Type: application/json
 
 {
-  "comments": "Approved - valid faculty member"
+  "comments": "Approved - valid operator member"
 }
 ```
 
@@ -738,38 +740,38 @@ Content-Type: application/json
 }
 ```
 
-### Class Extension Management
+### Power Operation Extension Management
 
-#### Request Class Extension
+#### Request Power Operation Extension
 ```http
-POST /api/auth/class-extensions
+POST /api/auth/power-operations
 Authorization: Bearer <jwt-token>
 Content-Type: application/json
 
 {
   "scheduleId": "schedule_id_here",
   "requestedEndTime": "2024-01-15T11:30:00Z",
-  "reason": "Extra time needed for lab demonstration",
-  "roomNumber": "101",
-  "subject": "Computer Science",
-  "classDetails": {
-    "semester": "6",
-    "section": "A",
-    "batch": "2024",
-    "studentCount": 45
+  "reason": "Extra time needed for equipment maintenance",
+  "facilityNumber": "A101",
+  "equipmentType": "HVAC System",
+  "operationDetails": {
+    "department": "Facilities",
+    "team": "Maintenance",
+    "shift": "Day",
+    "operatorCount": 2
   }
 }
 ```
 
 #### Get Pending Extension Requests
 ```http
-GET /api/auth/class-extensions/pending
+GET /api/auth/power-operations/pending
 Authorization: Bearer <jwt-token>
 ```
 
 #### Approve Extension Request
 ```http
-PUT /api/auth/class-extensions/:requestId/approve
+PUT /api/auth/power-operations/:requestId/approve
 Authorization: Bearer <jwt-token>
 Content-Type: application/json
 

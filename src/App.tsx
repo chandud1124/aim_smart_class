@@ -25,7 +25,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile").then(module => ({ default: module.Profile })));
 const PermissionManagement = lazy(() => import("./pages/PermissionManagement"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
-const ClassroomAccessPage = lazy(() => import("./pages/ClassroomAccessPage"));
+const FacilityAccessPage = lazy(() => import("./pages/FacilityAccessPage"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const ActiveLogs = lazy(() => import("./pages/ActiveLogs"));
 const EnhancedLogs = lazy(() => import("./pages/EnhancedLogs"));
@@ -92,7 +92,7 @@ const App = () => {
                   <Route path="profile" element={<UserProfile />} />
                   <Route path="permissions" element={<PermissionManagement />} />
                   <Route path="roles" element={<RoleManagement />} />
-                  <Route path="classroom-access" element={<ClassroomAccessPage />} />
+                  <Route path="facility-access" element={<FacilityAccessPage />} />
                   <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
                   <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
                   <Route path="activity-stats" element={<ActivityStatisticsPage />} />

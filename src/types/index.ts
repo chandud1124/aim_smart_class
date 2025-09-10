@@ -70,7 +70,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'faculty' | 'security' | 'student';
+  role: 'admin' | 'manager' | 'supervisor' | 'technician' | 'operator' | 'security' | 'user';
   department: string;
   accessLevel: 'full' | 'limited';
   isActive: boolean;
@@ -88,7 +88,7 @@ export interface ActivityLog {
   triggeredBy: 'user' | 'schedule' | 'pir' | 'master' | 'system';
   userId?: string;
   userName?: string;
-  classroom: string;
+  facility: string;
   location: string;
   timestamp: Date;
   ip?: string;

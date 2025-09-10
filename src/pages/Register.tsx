@@ -37,25 +37,25 @@ const roles = [
   {
     value: 'principal',
     label: 'Principal',
-    description: 'School-wide oversight and approval permissions',
+    description: 'Organization-wide oversight and approval permissions',
     permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
   },
   {
-    value: 'dean',
-    label: 'Dean',
-    description: 'Faculty oversight and departmental approval permissions',
+    value: 'supervisor',
+    label: 'Supervisor',
+    description: 'Team oversight and departmental approval permissions',
     permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
   },
   {
-    value: 'hod',
-    label: 'Head of Department',
-    description: 'Department oversight and approval permissions',
+    value: 'technician',
+    label: 'Technician',
+    description: 'Equipment maintenance and technical operations',
     permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: false }
   },
   {
-    value: 'faculty',
-    label: 'Faculty/Teacher',
-    description: 'Can control devices and request class extensions',
+    value: 'operator',
+    label: 'Operator',
+    description: 'Can control devices and request power extensions',
     permissions: { canRequestExtensions: true, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
   },
   {
@@ -65,9 +65,9 @@ const roles = [
     permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
   },
   {
-    value: 'student',
-    label: 'Student',
-    description: 'Access to basic classroom devices and schedules',
+    value: 'user',
+    label: 'General User',
+    description: 'Access to basic facility monitoring',
     permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
   },
   {

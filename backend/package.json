@@ -1,7 +1,7 @@
 {
-  "name": "classroom-automation-backend",
+  "name": "autovolt-backend",
   "version": "1.0.0",
-  "description": "Backend API for IoT Classroom Automation System",
+  "description": "Backend API for AutoVolt - Intelligent Power Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

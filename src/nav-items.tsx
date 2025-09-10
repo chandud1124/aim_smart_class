@@ -74,8 +74,8 @@ export const navItems = [
     page: <PermissionManagement />,
   },
   {
-    title: "Classroom Access",
-    to: "/classroom-access",
+    title: "Facility Access",
+    to: "/facility-access",
     icon: <Shield className="h-4 w-4" />,
     page: <PermissionManagement />, // Reusing existing component
   },

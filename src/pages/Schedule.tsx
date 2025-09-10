@@ -229,7 +229,7 @@ const Schedule: React.FC = () => {
             <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No schedules configured</h3>
             <p className="text-muted-foreground mb-4">
-              Create automated schedules for your classroom devices
+              Create automated schedules for your facility devices
             </p>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />

@@ -365,7 +365,7 @@ apiRouter.use('/logs', apiLimiter, enhancedLogRoutes);
 apiRouter.use('/security', apiLimiter, securityRoutes);
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
-apiRouter.use('/classroom', apiLimiter, require('./routes/classroom'));
+apiRouter.use('/facility', apiLimiter, require('./routes/classroom'));
 apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 
 // Mount all routes under /api
@@ -425,7 +425,7 @@ const createAdminUser = async () => {
       // Previously this code hashed manually AND the pre-save hook re-hashed, breaking login.
       await User.create({
         name: process.env.ADMIN_NAME || 'System Administrator',
-        email: process.env.ADMIN_EMAIL || 'admin@college.edu',
+        email: process.env.ADMIN_EMAIL || 'admin@company.com',
         password: process.env.ADMIN_PASSWORD || 'admin123456',
         role: 'admin',
         department: 'IT Department',

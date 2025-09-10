@@ -178,12 +178,11 @@ const UserProfile: React.FC = () => {
     const getRoleBadge = (role: string) => {
         const colors = {
             admin: 'bg-red-500',
-            principal: 'bg-purple-500',
-            dean: 'bg-blue-500',
-            hod: 'bg-indigo-500',
-            faculty: 'bg-green-500',
+            manager: 'bg-purple-500',
+            supervisor: 'bg-blue-500',
+            technician: 'bg-indigo-500',
+            operator: 'bg-green-500',
             security: 'bg-orange-500',
-            student: 'bg-gray-500',
             user: 'bg-slate-500'
         };
 
