@@ -110,7 +110,7 @@ const defaultRoles: Role[] = [
     {
         value: 'student',
         label: 'Student',
-        description: 'Access to basic classroom devices and schedules',
+        description: 'Access to basic facility devices and schedules',
         permissions: {
             canRequestExtensions: false,
             canApproveExtensions: false,

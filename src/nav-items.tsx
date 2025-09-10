@@ -23,7 +23,7 @@ import SystemHealthPage from "./pages/SystemHealthPage";
 export const navItems = [
   // Core Operations
   {
-    title: "Dashboard",
+    title: "Power Dashboard",
     to: "/",
     icon: <Home className="h-4 w-4" />,
     page: <Index />,

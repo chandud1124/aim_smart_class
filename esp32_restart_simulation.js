@@ -32,7 +32,7 @@ function simulateESP32Restart() {
     event: 'ESP32 Boot',
     action: 'Serial.begin(115200)',
     state: { relay: 'unknown', manual: 'unknown' },
-    log: '[BOOT] ESP32 Classroom Automation System Starting...'
+    log: '[BOOT] ESP32 AutoVolt Power Management System Starting...'
   });
   
   // Step 2: Setup relays and load NVS
@@ -207,7 +207,7 @@ console.log('   ensuring the system behaves intuitively and safely after any');
 console.log('   power cycle or restart scenario.');
 
 console.log('\n💡 Real-World Examples:');
-console.log('   🏫 Classroom: Teacher manually turns off lights, power outage occurs');
+console.log('   🏫 Facility: Manager manually turns off lights, power outage occurs');
 console.log('      → Lights stay OFF after power restoration (respects manual action)');
 console.log('   🚨 Emergency: Manual switch used to quickly shut off equipment');
 console.log('      → System remembers and maintains safe state after restart');

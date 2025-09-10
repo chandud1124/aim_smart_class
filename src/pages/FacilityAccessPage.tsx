@@ -1,12 +1,12 @@
 import React from 'react';
-import { ClassroomAccessManager } from '@/components/ClassroomAccessManager';
+import { FacilityAccessManager } from '@/components/FacilityAccessManager';
 import { RoleGuard } from '@/components/RoleGuard';
 
 const FacilityAccessPage: React.FC = () => {
     return (
         <RoleGuard roles={['admin', 'manager', 'supervisor', 'technician']}>
             <div className="container mx-auto p-6">
-                <ClassroomAccessManager />
+                <FacilityAccessManager />
             </div>
         </RoleGuard>
     );

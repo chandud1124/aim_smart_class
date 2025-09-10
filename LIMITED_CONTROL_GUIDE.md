@@ -2,7 +2,7 @@
 
 ## Overview
 
-The IoT Classroom system implements a comprehensive limited control framework that allows administrators to grant granular, restricted access to devices. This system is designed to provide secure, controlled access while maintaining user safety and system integrity.
+The AutoVolt system implements a comprehensive limited control framework that allows administrators to grant granular, restricted access to devices. This system is designed to provide secure, controlled access while maintaining user safety and system integrity.
 
 ## Architecture
 
@@ -117,7 +117,7 @@ POST /api/device-permissions/grant
       "days": ["monday", "tuesday", "wednesday", "thursday", "friday"]
     }]
   },
-  "reason": "Basic classroom access"
+  "reason": "Basic facility access"
 }
 ```
 

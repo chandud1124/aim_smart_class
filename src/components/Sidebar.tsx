@@ -30,7 +30,7 @@ const navigationSections = [
   {
     title: 'Core Operations',
     items: [
-      { name: 'Dashboard', icon: Home, href: '/', current: false },
+      { name: 'Power Dashboard', icon: Home, href: '/', current: false },
       { name: 'Devices', icon: Cpu, href: '/devices', current: false, requiresPermission: 'canManageDevices' },
       { name: 'Switches', icon: ToggleLeft, href: '/switches', current: false, requiresPermission: 'canManageDevices' },
       { name: 'Master Control', icon: Power, href: '/master', current: false, requiresPermission: 'canManageDevices' },
@@ -119,8 +119,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <h1 className="font-bold text-lg truncate">IoT Control</h1>
-              <p className="text-xs text-muted-foreground truncate">College Automation</p>
+              <h1 className="font-bold text-lg truncate">AutoVolt</h1>
+              <p className="text-xs text-muted-foreground truncate">Power Management</p>
             </div>
           )}
         </div>

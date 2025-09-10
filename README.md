@@ -593,7 +593,7 @@ curl -X POST http://localhost:3001/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
-    "email": "john.doe@college.edu",
+    "email": "john.doe@autovolt.com",
     "password": "password123",
     "role": "faculty",
     "department": "Computer Science",
@@ -602,11 +602,11 @@ curl -X POST http://localhost:3001/api/auth/register \
     "designation": "Assistant Professor"
   }'
 
-# 2. Login as admin (default: admin@college.edu / admin123456)
+# 2. Login as admin (default: admin@autovolt.com / admin123456)
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@college.edu",
+    "email": "admin@autovolt.com",
     "password": "admin123456"
   }'
 
@@ -1023,8 +1023,8 @@ For support and questions:
 
 ## 📈 Latest Updates
 
-### v1.0.0 - Classroom Access Management & Scaling
-- ✅ **Classroom Access Management**: Granular classroom-specific permissions
+### v1.0.0 - Facility Access Management & Scaling
+- ✅ **Facility Access Management**: Granular facility-specific permissions
 - ✅ **Time-Based Restrictions**: Schedule-based device access control
 - ✅ **PM2 Clustering**: Multi-core processing for better performance
 - ✅ **Redis Integration**: Session management and caching
@@ -1042,10 +1042,10 @@ For support and questions:
 
 ### New API Endpoints
 ```javascript
-// Classroom Management
-GET /api/classroom/summary
-POST /api/classroom/grant
-DELETE /api/classroom/:id
+// Facility Management
+GET /api/facility/summary
+POST /api/facility/grant
+DELETE /api/facility/:id
 
 // Health & Monitoring
 GET /api/health

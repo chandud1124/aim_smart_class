@@ -1,8 +1,10 @@
 # IoT Smart Classroom - Windows Setup Script (PowerShell)
 # Run this script with: .\setup-windows.ps1
 
-Write-Host "==========================================="
-Write-Host "IoT Smart Classroom - Windows Setup Script"
+# AutoVolt - Windows Setup Script (PowerShell)
+
+Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "           AutoVolt Setup Script"
 Write-Host "==========================================="
 Write-Host ""
 

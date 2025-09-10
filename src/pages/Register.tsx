@@ -456,7 +456,7 @@ const Register: React.FC = () => {
             </Button>
             <div>
               <CardTitle>Create Your Account</CardTitle>
-              <CardDescription>Step {currentStep} of 3 - Join the IoT Classroom Management System</CardDescription>
+              <CardDescription>Step {currentStep} of 3 - Join AutoVolt Power Management System</CardDescription>
             </div>
           </div>
         </CardHeader>

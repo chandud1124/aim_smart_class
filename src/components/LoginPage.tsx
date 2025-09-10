@@ -82,7 +82,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@college.edu"
+                placeholder="admin@autovolt.com"
                 required
               />
             </div>
@@ -127,7 +127,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="mt-4 p-4 bg-muted rounded-lg">
             <p className="text-sm font-medium mb-2">Default Admin Account:</p>
             <p className="text-xs text-muted-foreground">
-              Email: admin@college.edu<br />
+              Email: admin@autovolt.com<br />
               Password: admin123456
             </p>
           </div>
