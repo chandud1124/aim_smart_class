@@ -25,8 +25,18 @@ import {
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import api from '@/services/api';
+import { ActivityLog } from '@/types';
 
-interface ActivityLog {
+// Safe property access helper
+const safe = (obj: any, path: string, defaultValue: any = null) => {
+  try {
+    return path.split('.').reduce((current, key) => current?.[key], obj) ?? defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+interface LocalActivityLog {
   _id: string;
   timestamp: string | number | Date;
   action: string;
@@ -42,7 +52,12 @@ interface ActivityLog {
   isManualOverride?: boolean;
   previousState?: boolean;
   newState?: boolean;
-  conflictResolution?: string;
+  conflictResolution?: {
+    hasConflict: boolean;
+    conflictType?: string;
+    resolution?: string;
+    responseTime?: number;
+  } | string;
   details?: any;
   context?: any;
 }
@@ -127,14 +142,31 @@ interface LogStats {
 
 type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
 
-const ActiveLogs: React.FC = () => {
+  // Safe rendering of statistics cards
+  const renderStatsCard = (title: string, icon: React.ReactNode, value: number, subtitle: string) => (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold">{value || 0}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          </div>
+          {icon}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const ActiveLogsPage = () => {
   const [activeTab, setActiveTab] = useState<LogType>('activities');
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [stats, setStats] = useState<LogStats | null>(null);
   
   // Data states
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  // State for different log types
+  const [activityLogs, setActivityLogs] = useState<LocalActivityLog[]>([]);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [manualSwitchLogs, setManualSwitchLogs] = useState<ManualSwitchLog[]>([]);
   const [deviceStatusLogs, setDeviceStatusLogs] = useState<DeviceStatusLog[]>([]);
@@ -340,16 +372,15 @@ const ActiveLogs: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto mt-4 space-y-6">
       {/* Statistics Dashboard */}
-      {stats && stats.activities && stats.errors && stats.manualSwitches && stats.deviceStatus && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Activity Logs</p>
-                  <p className="text-2xl font-bold">{stats.activities.total}</p>
+                  <p className="text-2xl font-bold">{safe(stats, 'activities.total', 0)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {stats.activities.today} today
+                    {safe(stats, 'activities.today', 0)} today
                   </p>
                 </div>
                 <Activity className="h-8 w-8 text-blue-600" />
@@ -362,9 +393,9 @@ const ActiveLogs: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Error Logs</p>
-                  <p className="text-2xl font-bold">{stats.errors.total}</p>
+                  <p className="text-2xl font-bold">{safe(stats, 'errors.total', 0)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {stats.errors.unresolved} unresolved
+                    {safe(stats, 'errors.unresolved', 0)} unresolved
                   </p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-red-600" />
@@ -377,9 +408,9 @@ const ActiveLogs: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Manual Switches</p>
-                  <p className="text-2xl font-bold">{stats.manualSwitches.total}</p>
+                  <p className="text-2xl font-bold">{safe(stats, 'manualSwitches.total', 0)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {stats.manualSwitches.conflicts} conflicts
+                    {safe(stats, 'manualSwitches.conflicts', 0)} conflicts
                   </p>
                 </div>
                 <Zap className="h-8 w-8 text-yellow-600" />
@@ -392,9 +423,9 @@ const ActiveLogs: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Device Status</p>
-                  <p className="text-2xl font-bold">{stats.deviceStatus.total}</p>
+                  <p className="text-2xl font-bold">{safe(stats, 'deviceStatus.total', 0)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {stats.deviceStatus.today} today
+                    {safe(stats, 'deviceStatus.today', 0)} today
                   </p>
                 </div>
                 <Monitor className="h-8 w-8 text-green-600" />
@@ -402,7 +433,6 @@ const ActiveLogs: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-      )}
 
       {/* Main Content */}
       <Card>
@@ -614,9 +644,15 @@ const ActiveLogs: React.FC = () => {
                                   Manual Override
                                 </Badge>
                               )}
-                              {log.conflictResolution && (
+                              {log.conflictResolution && typeof log.conflictResolution === 'object' && log.conflictResolution.hasConflict && (
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  Resolved: {log.conflictResolution}
+                                  Conflict: {log.conflictResolution.resolution || log.conflictResolution.conflictType}
+                                  {log.conflictResolution.responseTime && ` (${log.conflictResolution.responseTime}ms)`}
+                                </div>
+                              )}
+                              {log.conflictResolution && typeof log.conflictResolution === 'string' && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Conflict: {log.conflictResolution}
                                 </div>
                               )}
                             </td>
@@ -894,8 +930,8 @@ const ActiveLogs: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-4 py-2">
-                              <Badge variant={log.deviceStatus.isOnline ? 'default' : 'destructive'}>
-                                {log.deviceStatus.isOnline ? (
+                              <Badge variant={safe(log, 'deviceStatus.isOnline', false) ? 'default' : 'destructive'}>
+                                {safe(log, 'deviceStatus.isOnline', false) ? (
                                   <>🟢 Online</>
                                 ) : (
                                   <>🔴 Offline</>
@@ -904,19 +940,19 @@ const ActiveLogs: React.FC = () => {
                             </td>
                             <td className="px-4 py-2 text-xs">
                               <div>
-                                {log.deviceStatus.wifiSignalStrength && (
-                                  <div>Signal: {log.deviceStatus.wifiSignalStrength}dBm</div>
+                                {safe(log, 'deviceStatus.wifiSignalStrength') && (
+                                  <div>Signal: {safe(log, 'deviceStatus.wifiSignalStrength')}dBm</div>
                                 )}
-                                {log.deviceStatus.temperature && (
-                                  <div>Temp: {log.deviceStatus.temperature}°C</div>
+                                {safe(log, 'deviceStatus.temperature') && (
+                                  <div>Temp: {safe(log, 'deviceStatus.temperature')}°C</div>
                                 )}
                               </div>
                             </td>
                             <td className="px-4 py-2 text-xs">
                               {log.summary && (
                                 <div>
-                                  <div>On: {log.summary.totalSwitchesOn || 0}</div>
-                                  <div>Off: {log.summary.totalSwitchesOff || 0}</div>
+                                  <div>On: {safe(log, 'summary.totalSwitchesOn', 0)}</div>
+                                  <div>Off: {safe(log, 'summary.totalSwitchesOff', 0)}</div>
                                 </div>
                               )}
                             </td>
@@ -930,7 +966,7 @@ const ActiveLogs: React.FC = () => {
                               )}
                             </td>
                             <td className="px-4 py-2 text-xs">
-                              {log.deviceStatus.responseTime ? `${log.deviceStatus.responseTime}ms` : '-'}
+                              {safe(log, 'deviceStatus.responseTime') ? `${safe(log, 'deviceStatus.responseTime')}ms` : '-'}
                             </td>
                           </tr>
                         ))}
@@ -990,4 +1026,4 @@ const ActiveLogs: React.FC = () => {
   );
 };
 
-export default ActiveLogs;
+export default ActiveLogsPage;

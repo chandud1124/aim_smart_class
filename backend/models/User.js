@@ -105,14 +105,6 @@ const userSchema = new mongoose.Schema({
     inApp: { type: Boolean, default: true },
     securityAlerts: { type: Boolean, default: false } // Only security personnel
   },
-  googleCalendarTokens: {
-    access_token: String,
-    refresh_token: String,
-    scope: String,
-    token_type: String,
-    expiry_date: Number,
-    obtainedAt: { type: Date }
-  },
   registrationReason: {
     type: String,
     trim: true,

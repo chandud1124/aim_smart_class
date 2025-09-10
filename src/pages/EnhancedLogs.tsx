@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Clock, Download, Filter, Search, AlertCircle, CheckCircle, XCircle, Info, Zap, Settings, Activity, Bug } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import api from '@/services/api';
+import config from '@/config/env';
 
 const EnhancedLogsPage = () => {
   const [logs, setLogs] = useState({
@@ -52,24 +54,16 @@ const EnhancedLogsPage = () => {
         ...Object.fromEntries(Object.entries(filters).filter(([_, value]) => value))
       });
 
-      const response = await fetch(`/api/logs/${activeTab}?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(prev => ({ ...prev, [activeTab]: data.logs }));
-        setPagination(prev => ({
-          ...prev,
-          page,
-          totalPages: data.pagination.totalPages,
-          totalCount: data.pagination.totalCount
-        }));
-      } else {
-        throw new Error('Failed to fetch logs');
-      }
+      const response = await api.get(`/logs/${activeTab}?${queryParams}`);
+      const data = response.data;
+      
+      setLogs(prev => ({ ...prev, [activeTab]: data.logs }));
+      setPagination(prev => ({
+        ...prev,
+        page,
+        totalPages: data.pagination.totalPages,
+        totalCount: data.pagination.totalCount
+      }));
     } catch (error) {
       toast({
         title: 'Error',
@@ -84,16 +78,9 @@ const EnhancedLogsPage = () => {
   // Fetch statistics
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/logs/stats?timeframe=24h', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
+      const response = await api.get('/logs/stats?timeframe=24h');
+      const data = response.data;
+      setStats(data);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
@@ -102,36 +89,27 @@ const EnhancedLogsPage = () => {
   // Export logs to Excel
   const exportToExcel = async () => {
     try {
-      const response = await fetch('/api/logs/export/excel', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          logType: activeTab,
-          filters
-        })
+      const response = await api.post('/logs/export/excel', {
+        logType: activeTab,
+        filters
+      }, {
+        responseType: 'blob'
       });
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${activeTab}_logs_${new Date().toISOString().split('T')[0]}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        toast({
-          title: 'Success',
-          description: 'Logs exported to Excel successfully'
-        });
-      } else {
-        throw new Error('Export failed');
-      }
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeTab}_logs_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'Success',
+        description: 'Logs exported to Excel successfully'
+      });
     } catch (error) {
       toast({
         title: 'Error',
@@ -144,26 +122,17 @@ const EnhancedLogsPage = () => {
   // Resolve error
   const resolveError = async (errorId) => {
     try {
-      const response = await fetch(`/api/logs/errors/${errorId}/resolve`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ notes: resolveNotes })
+      const response = await api.patch(`/logs/errors/${errorId}/resolve`, {
+        notes: resolveNotes
       });
 
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Error marked as resolved'
-        });
-        fetchLogs();
-        setSelectedError(null);
-        setResolveNotes('');
-      } else {
-        throw new Error('Failed to resolve error');
-      }
+      toast({
+        title: 'Success',
+        description: 'Error marked as resolved'
+      });
+      fetchLogs();
+      setSelectedError(null);
+      setResolveNotes('');
     } catch (error) {
       toast({
         title: 'Error',

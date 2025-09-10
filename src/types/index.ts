@@ -95,6 +95,18 @@ export interface ActivityLog {
   userAgent?: string;
   duration?: number;
   powerConsumption?: number;
+  conflictResolution?: {
+    hasConflict: boolean;
+    conflictType?: string;
+    resolution?: string;
+    responseTime?: number;
+  } | string;
+  deviceStatus?: {
+    isOnline: boolean;
+    responseTime?: number;
+    signalStrength?: number;
+  };
+  isManualOverride?: boolean;
   metadata?: any;
 }
 

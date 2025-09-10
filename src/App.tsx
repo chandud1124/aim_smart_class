@@ -28,9 +28,15 @@ const UserProfile = lazy(() => import("./pages/UserProfile"));
 const ClassroomAccessPage = lazy(() => import("./pages/ClassroomAccessPage"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const ActiveLogs = lazy(() => import("./pages/ActiveLogs"));
+const EnhancedLogs = lazy(() => import("./pages/EnhancedLogs"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
 const Tickets = lazy(() => import("./pages/Tickets"));
+// New feature pages
+const ActivityStatisticsPage = lazy(() => import("./pages/ActivityStatisticsPage"));
+const BulkOperationsPage = lazy(() => import("./pages/BulkOperationsPage"));
+const SecurityDashboardPage = lazy(() => import("./pages/SecurityDashboardPage"));
+const SystemHealthPage = lazy(() => import("./pages/SystemHealthPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +94,11 @@ const App = () => {
                   <Route path="roles" element={<RoleManagement />} />
                   <Route path="classroom-access" element={<ClassroomAccessPage />} />
                   <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
+                  <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
+                  <Route path="activity-stats" element={<ActivityStatisticsPage />} />
+                  <Route path="bulk-operations" element={<BulkOperationsPage />} />
+                  <Route path="security" element={<SecurityDashboardPage />} />
+                  <Route path="system-health" element={<SystemHealthPage />} />
                   <Route path="tickets" element={<Tickets />} />
                 </Route>
 

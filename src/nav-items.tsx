@@ -1,5 +1,5 @@
 
-import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity } from "lucide-react";
+import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity, BarChart3, Server, Settings2 } from "lucide-react";
 import Index from "./pages/Index";
 import Devices from "./pages/Devices";
 import Switches from "./pages/Switches";
@@ -13,6 +13,11 @@ import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 import ActiveLogs from "./pages/ActiveLogs";
 import EnhancedLogs from "./pages/EnhancedLogs";
+// New feature pages
+import ActivityStatisticsPage from "./pages/ActivityStatisticsPage";
+import BulkOperationsPage from "./pages/BulkOperationsPage";
+import SecurityDashboardPage from "./pages/SecurityDashboardPage";
+import SystemHealthPage from "./pages/SystemHealthPage";
 
 export const navItems = [
   // Core Operations
@@ -95,6 +100,34 @@ export const navItems = [
     to: "/enhanced-logs",
     icon: <Activity className="h-4 w-4" />,
     page: <EnhancedLogs />,
+  },
+  {
+    title: "Activity Statistics",
+    to: "/activity-stats",
+    icon: <BarChart3 className="h-4 w-4" />,
+    page: <ActivityStatisticsPage />,
+  },
+
+  // Operations
+  {
+    title: "Bulk Operations",
+    to: "/bulk-operations",
+    icon: <Settings2 className="h-4 w-4" />,
+    page: <BulkOperationsPage />,
+  },
+
+  // Security & Monitoring
+  {
+    title: "Security Dashboard",
+    to: "/security",
+    icon: <Shield className="h-4 w-4" />,
+    page: <SecurityDashboardPage />,
+  },
+  {
+    title: "System Health",
+    to: "/system-health",
+    icon: <Server className="h-4 w-4" />,
+    page: <SystemHealthPage />,
   },
 
   // Account

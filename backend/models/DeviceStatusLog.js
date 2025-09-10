@@ -1,5 +1,25 @@
 const mongoose = require('mongoose');
 
+// Define the alert sub-schema explicitly
+const alertSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    required: true
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  severity: {
+    type: String,
+    required: true
+  },
+  timestamp: {
+    type: Date,
+    required: true
+  }
+}, { _id: false });
+
 const deviceStatusLogSchema = new mongoose.Schema({
   deviceId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -50,12 +70,7 @@ const deviceStatusLogSchema = new mongoose.Schema({
     dns: String,
     macAddress: String
   },
-  alerts: [{
-    type: String,
-    message: String,
-    severity: String,
-    timestamp: Date
-  }],
+  alerts: [alertSchema],
   summary: {
     totalSwitchesOn: Number,
     totalSwitchesOff: Number,

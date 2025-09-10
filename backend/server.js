@@ -72,9 +72,6 @@ const deviceMonitoringService = require('./services/deviceMonitoringService');
 const EnhancedLoggingService = require('./services/enhancedLoggingService');
 // Removed legacy DeviceSocketService/TestSocketService/ESP32SocketService for cleanup
 
-// Import Google Calendar routes
-const googleCalendarRoutes = require('./routes/googleCalendar');
-
 
 // ...existing code...
 
@@ -216,30 +213,39 @@ app.use(cors({
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:5175',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
       'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
       'http://192.168.1.100:5173', // Example extra network host
       'http://192.168.0.108:5173', // New IP for your network
       'http://172.16.3.171:5173', // Your remote frontend
+      'http://172.16.3.171:5174', // Alternative port
     ];
-    // Dynamically add LAN IPs
+    // Dynamically add LAN IPs for multiple ports
     const os = require('os');
     const nets = os.networkInterfaces();
+    const ports = [5173, 5174, 3000, 8080];
     Object.values(nets).forEach(ifaces => {
       ifaces.forEach(iface => {
         if (iface.family === 'IPv4' && !iface.internal) {
-          allowed.push(`http://${iface.address}:5173`);
+          ports.forEach(port => {
+            allowed.push(`http://${iface.address}:${port}`);
+          });
         }
       });
     });
+    
+    console.log(`[DEBUG] CORS check - Origin: ${origin}`);
+    
     if (!origin) {
-      callback(null, false); // No origin, allow (for curl, etc)
+      callback(null, true); // Allow requests with no origin (curl, mobile apps, etc)
     } else if (allowed.includes(origin)) {
       callback(null, origin); // Echo allowed origin for credentials
     } else {
+      console.log(`[ERROR] CORS blocked origin: ${origin}, allowed: ${allowed.slice(0, 5).join(', ')}...`);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -359,9 +365,6 @@ apiRouter.use('/logs', apiLimiter, enhancedLogRoutes);
 apiRouter.use('/security', apiLimiter, securityRoutes);
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
-// Google Calendar routes (primary path + legacy alias)
-apiRouter.use('/google-calendar', apiLimiter, googleCalendarRoutes);
-apiRouter.use('/calendar', apiLimiter, googleCalendarRoutes); // legacy alias
 apiRouter.use('/classroom', apiLimiter, require('./routes/classroom'));
 apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 

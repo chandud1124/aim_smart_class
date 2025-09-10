@@ -146,13 +146,19 @@ class EnhancedLoggingService {
   // Device status logging (every 5 minutes)
   static async logDeviceStatus(data) {
     try {
-      console.log('[DEBUG-ENHANCED-LOG] Received data:', {
-        deviceId: data.deviceId,
-        alertsType: typeof data.alerts,
-        isArray: Array.isArray(data.alerts),
-        alertsLength: data.alerts?.length,
-        firstAlert: data.alerts?.[0]
-      });
+      // Ensure alerts is properly formatted as an array of objects
+      let processedAlerts = [];
+      
+      if (data.alerts && Array.isArray(data.alerts)) {
+        processedAlerts = data.alerts
+          .filter(alert => alert && typeof alert === 'object' && !Array.isArray(alert))
+          .map(alert => ({
+            type: String(alert.type || 'unknown'),
+            message: String(alert.message || 'No message'),
+            severity: String(alert.severity || 'medium'),
+            timestamp: alert.timestamp instanceof Date ? alert.timestamp : new Date(alert.timestamp || Date.now())
+          }));
+      }
 
       const statusLog = new DeviceStatusLog({
         deviceId: data.deviceId,
@@ -162,7 +168,7 @@ class EnhancedLoggingService {
         switchStates: data.switchStates || [],
         deviceStatus: data.deviceStatus || {},
         networkInfo: data.networkInfo || {},
-        alerts: Array.isArray(data.alerts) ? data.alerts : [],
+        alerts: processedAlerts,
         summary: data.summary || {},
         classroom: data.classroom,
         location: data.location,

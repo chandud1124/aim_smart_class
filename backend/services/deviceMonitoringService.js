@@ -89,7 +89,6 @@ class DeviceMonitoringService {
 
       // Check for alerts
       const alerts = await this.checkForAlerts(device, deviceStatus, switchStates);
-      console.log(`[DEBUG] Alerts for ${device.name}:`, typeof alerts, Array.isArray(alerts), alerts);
       statusData.alerts = alerts;
 
       // Generate summary
@@ -97,7 +96,6 @@ class DeviceMonitoringService {
       statusData.summary = summary;
 
       // Log the status
-      console.log(`[DEBUG] StatusData alerts before logging:`, typeof statusData.alerts, Array.isArray(statusData.alerts));
       await EnhancedLoggingService.logDeviceStatus(statusData);
 
       // Update device last checked timestamp

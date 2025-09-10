@@ -252,15 +252,24 @@ export const scheduleAPI = {
 export const activityAPI = {
   getActivities: (filters?: any) => api.get('/activities', { params: filters }),
 
+  getStats: (period?: string) => api.get('/activities/stats', { params: { period } }),
+
   getDeviceActivities: (deviceId: string) => api.get(`/activities/device/${deviceId}`),
 
   getUserActivities: (userId: string) => api.get(`/activities/user/${userId}`),
 };
 
 export const securityAPI = {
-  getAlerts: () => api.get('/security/alerts'),
+  getAlerts: (params?: any) => api.get('/security/alerts', { params }),
 
-  acknowledgeAlert: (alertId: string) => api.put(`/security/alerts/${alertId}/acknowledge`),
+  getBlacklist: () => api.get('/security/blacklist'),
+
+  getMetrics: (range?: string) => api.get('/security/metrics', { params: { range } }),
+
+  acknowledgeAlert: (alertId: string) => api.post(`/security/alerts/${alertId}/acknowledge`),
+
+  resolveAlert: (alertId: string, resolution?: string) => 
+    api.post(`/security/alerts/${alertId}/resolve`, { resolution }),
 
   createAlert: (alertData: any) => api.post('/security/alerts', alertData),
 };
@@ -302,6 +311,15 @@ export const ticketAPI = {
   deleteTicket: (ticketId: string) => api.delete(`/tickets/${ticketId}`),
 
   getTicketStats: () => api.get('/tickets/stats'),
+};
+
+export const bulkAPI = {
+  createDevices: (devices: any[]) => api.post('/bulk/devices', { devices }),
+  
+  toggleSwitches: (devices: string[], switchId: string, state: boolean) => 
+    api.post('/bulk/toggle', { devices, switchId, state }),
+  
+  updateDevices: (updates: any[]) => api.put('/bulk/devices', { updates }),
 };
 
 export default api;

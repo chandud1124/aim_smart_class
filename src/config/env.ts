@@ -1,9 +1,9 @@
 
 // Environment configuration
 export const config = {
-  // API Configuration (normalized to 3001 default)
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://172.16.3.56:3001',
-  websocketUrl: import.meta.env.VITE_WEBSOCKET_URL || 'ws://172.16.3.56:3001',
+  // API Configuration (development vs production)
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:3001' : 'http://172.16.3.56:3001'),
+  websocketUrl: import.meta.env.VITE_WEBSOCKET_URL || (import.meta.env.DEV ? 'ws://localhost:3001' : 'ws://172.16.3.56:3001'),
   
   // Application Settings
   appName: import.meta.env.VITE_APP_NAME || 'IoT College Automation',
