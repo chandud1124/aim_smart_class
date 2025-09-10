@@ -93,9 +93,9 @@ export const ClassroomAccessManager: React.FC = () => {
             }
 
             const [classroomsRes, usersRes, accessRes] = await Promise.all([
-                api.get('/classroom/summary'),
+                api.get('/facility/summary'),
                 api.get('/users'),
-                api.get('/classroom/all')
+                api.get('/facility/all')
             ]);
 
             console.log('Classrooms response:', classroomsRes.data);
@@ -124,7 +124,7 @@ export const ClassroomAccessManager: React.FC = () => {
 
         try {
             setGranting(true);
-            await api.post('/classroom/grant', {
+            await api.post('/facility/grant', {
                 userId: selectedUser,
                 classroom: selectedClassroom,
                 permissions,
@@ -164,7 +164,7 @@ export const ClassroomAccessManager: React.FC = () => {
     const handleRevokeAccess = async (accessId: string) => {
         try {
             setRevoking(accessId);
-            await api.delete(`/classroom/${accessId}`);
+            await api.delete(`/facility/${accessId}`);
             loadData();
         } catch (error) {
             console.error('Error revoking access:', error);
