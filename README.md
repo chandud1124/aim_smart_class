@@ -1,7 +1,7 @@
 
-# IoT Control - Smart Device Management System
+# AutoVolt - Intelligent Power Management System
 
-An advanced smart device management system with real-time device control, automation, scheduling, and comprehensive monitoring capabilities.
+An advanced intelligent power management system with real-time device control, energy optimization, scheduling, and comprehensive monitoring capabilities.
 
 ## 🚀 Quick Start - Windows Setup
 
@@ -15,8 +15,8 @@ An advanced smart device management system with real-time device control, automa
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/chandud1124/iot-control.git
-   cd iot-control
+   git clone https://github.com/chandud1124/autovolt.git
+   cd autovolt
    ```
 
 2. **Quick Setup (Windows - Recommended)**

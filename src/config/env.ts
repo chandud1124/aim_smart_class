@@ -6,7 +6,7 @@ export const config = {
   websocketUrl: import.meta.env.VITE_WEBSOCKET_URL || (import.meta.env.DEV ? 'ws://localhost:3001' : 'ws://172.16.3.56:3001'),
   
   // Application Settings
-  appName: import.meta.env.VITE_APP_NAME || 'IoT Control - Smart Device Management',
+  appName: import.meta.env.VITE_APP_NAME || 'AutoVolt - Intelligent Power Management',
   appVersion: import.meta.env.VITE_APP_VERSION || '1.0.0',
   
   // Development Settings
