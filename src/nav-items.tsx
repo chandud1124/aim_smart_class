@@ -13,6 +13,7 @@ import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 import ActiveLogs from "./pages/ActiveLogs";
 import EnhancedLogs from "./pages/EnhancedLogs";
+import FacilityAccessPage from "./pages/FacilityAccessPage";
 // New feature pages
 import ActivityStatisticsPage from "./pages/ActivityStatisticsPage";
 import BulkOperationsPage from "./pages/BulkOperationsPage";
@@ -77,7 +78,7 @@ export const navItems = [
     title: "Facility Access",
     to: "/facility-access",
     icon: <Shield className="h-4 w-4" />,
-    page: <PermissionManagement />, // Reusing existing component
+    page: <FacilityAccessPage />,
   },
 
   // Support

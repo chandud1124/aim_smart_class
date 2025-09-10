@@ -1,7 +1,7 @@
 {
-  "name": "autovolt-backend",
+  "name": "iot-control-backend",
   "version": "1.0.0",
-  "description": "Backend API for AutoVolt - Intelligent Power Management System",
+  "description": "Backend API for IoT Control - Smart Device Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

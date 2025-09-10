@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { Layout } from "@/components/Layout";
 import { PrivateRoute } from "./components/PrivateRoute";
@@ -93,6 +93,7 @@ const App = () => {
                   <Route path="permissions" element={<PermissionManagement />} />
                   <Route path="roles" element={<RoleManagement />} />
                   <Route path="facility-access" element={<FacilityAccessPage />} />
+                  <Route path="classroom-access" element={<Navigate to="/facility-access" replace />} />
                   <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
                   <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
                   <Route path="activity-stats" element={<ActivityStatisticsPage />} />
