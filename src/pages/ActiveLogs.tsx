@@ -37,7 +37,7 @@ const safe = (obj: any, path: string, defaultValue: any = null) => {
 };
 
 interface LocalActivityLog {
-  _id: string;
+  id: string;
   timestamp: string | number | Date;
   action: string;
   deviceId?: string;
@@ -48,7 +48,7 @@ interface LocalActivityLog {
   userName?: string;
   triggeredBy: string;
   location?: string;
-  classroom?: string;
+  facility?: string;
   isManualOverride?: boolean;
   previousState?: boolean;
   newState?: boolean;
@@ -63,7 +63,7 @@ interface LocalActivityLog {
 }
 
 interface ErrorLog {
-  _id: string;
+  id: string;
   timestamp: string | number | Date;
   errorType: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -83,7 +83,7 @@ interface ErrorLog {
 }
 
 interface ManualSwitchLog {
-  _id: string;
+  id: string;
   timestamp: string | number | Date;
   deviceId: string;
   deviceName?: string;
@@ -99,12 +99,12 @@ interface ManualSwitchLog {
   };
   responseTime?: number;
   location?: string;
-  classroom?: string;
+  facility?: string;
   details?: any;
 }
 
 interface DeviceStatusLog {
-  _id: string;
+  id: string;
   timestamp: string | number | Date;
   deviceId: string;
   deviceName?: string;
@@ -129,7 +129,7 @@ interface DeviceStatusLog {
     averageResponseTime?: number;
     inconsistenciesFound?: number;
   };
-  classroom?: string;
+  facility?: string;
   location?: string;
 }
 
@@ -609,7 +609,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                       </thead>
                       <tbody>
                         {(paginatedData as ActivityLog[]).map((log) => (
-                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                          <tr key={log.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-2 whitespace-nowrap">
                               {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
                             </td>
@@ -657,7 +657,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                               )}
                             </td>
                             <td className="px-4 py-2 text-xs text-muted-foreground">
-                              {log.location || log.classroom || '-'}
+                              {log.location || log.facility || '-'}
                             </td>
                           </tr>
                         ))}
@@ -696,7 +696,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                       </thead>
                       <tbody>
                         {(paginatedData as ErrorLog[]).map((log) => (
-                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                          <tr key={log.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-2 whitespace-nowrap">
                               {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
                             </td>
@@ -772,7 +772,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                                           Cancel
                                         </Button>
                                         <Button
-                                          onClick={() => resolveError(log._id, resolutionText)}
+                                          onClick={() => resolveError(log.id, resolutionText)}
                                           disabled={!resolutionText.trim()}
                                         >
                                           Mark Resolved
@@ -821,7 +821,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                       </thead>
                       <tbody>
                         {(paginatedData as ManualSwitchLog[]).map((log) => (
-                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                          <tr key={log.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-2 whitespace-nowrap">
                               {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
                             </td>
@@ -878,7 +878,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                               {log.responseTime ? `${log.responseTime}ms` : '-'}
                             </td>
                             <td className="px-4 py-2 text-xs text-muted-foreground">
-                              {log.location || log.classroom || '-'}
+                              {log.location || log.facility || '-'}
                             </td>
                           </tr>
                         ))}
@@ -917,7 +917,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                       </thead>
                       <tbody>
                         {(paginatedData as DeviceStatusLog[]).map((log) => (
-                          <tr key={log._id} className="border-b hover:bg-muted/50">
+                          <tr key={log.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-2 whitespace-nowrap">
                               {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
                             </td>
