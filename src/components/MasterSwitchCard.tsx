@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Zap, Settings, Trash2 } from 'lucide-react';
@@ -247,9 +247,11 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Delete Custom Master Switch</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to delete this custom master switch group? This action cannot be undone.
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <p>Are you sure you want to delete this custom master switch group? This action cannot be undone.</p>
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
                               Cancel
@@ -321,6 +323,9 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create Custom Master Switch</DialogTitle>
+            <DialogDescription>
+              Create a custom group of switches that can be controlled together as a master switch.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

@@ -28,8 +28,12 @@ class SocketService {
       timeout: 20000, // Increased timeout
       forceNew: false,
       upgrade: true, // Allow transport upgrades
-      rememberUpgrade: true, // Remember successful upgrades
-      path: '/socket.io'
+      rememberUpgrade: false, // Don't remember upgrades to avoid header issues
+      path: '/socket.io',
+      withCredentials: false, // Disable credentials to avoid CORS issues
+      extraHeaders: {
+        'Access-Control-Allow-Origin': '*'
+      }
     });
 
     // Quick version / debug info

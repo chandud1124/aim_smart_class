@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { 
   Activity, 
   AlertTriangle, 
@@ -183,9 +183,9 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
 
-  // Error resolution dialog
-  const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
-  const [resolutionText, setResolutionText] = useState('');
+  // Error resolution dialog - removed
+  // const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
+  // const [resolutionText, setResolutionText] = useState('');
 
   useEffect(() => {
     loadData();
@@ -305,16 +305,17 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
     }
   };
 
-  const resolveError = async (errorId: string, resolution: string) => {
-    try {
-      await api.patch(`/logs/errors/${errorId}/resolve`, { notes: resolution });
-      setSelectedError(null);
-      setResolutionText('');
-      loadData();
-    } catch (error) {
-      console.error('Error resolving error:', error);
-    }
-  };
+  // Error resolution function removed
+  // const resolveError = async (errorId: string, resolution: string) => {
+  //   try {
+  //     await api.patch(`/logs/errors/${errorId}/resolve`, { notes: resolution });
+  //     setSelectedError(null);
+  //     setResolutionText('');
+  //     loadData();
+  //   } catch (error) {
+  //     console.error('Error resolving error:', error);
+  //   }
+  // };
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -603,7 +604,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                           <th className="px-4 py-2 text-left">Action</th>
                           <th className="px-4 py-2 text-left">Device/Switch</th>
                           <th className="px-4 py-2 text-left">User/Source</th>
-                          <th className="px-4 py-2 text-left">Details</th>
                           <th className="px-4 py-2 text-left">Location</th>
                         </tr>
                       </thead>
@@ -637,24 +637,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                                   </Badge>
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-4 py-2">
-                              {log.isManualOverride && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Manual Override
-                                </Badge>
-                              )}
-                              {log.conflictResolution && typeof log.conflictResolution === 'object' && log.conflictResolution.hasConflict && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Conflict: {log.conflictResolution.resolution || log.conflictResolution.conflictType}
-                                  {log.conflictResolution.responseTime && ` (${log.conflictResolution.responseTime}ms)`}
-                                </div>
-                              )}
-                              {log.conflictResolution && typeof log.conflictResolution === 'string' && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Conflict: {log.conflictResolution}
-                                </div>
-                              )}
                             </td>
                             <td className="px-4 py-2 text-xs text-muted-foreground">
                               {log.location || log.facility || '-'}
@@ -734,54 +716,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                               </Badge>
                             </td>
                             <td className="px-4 py-2">
-                              {!log.resolved && (
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      onClick={() => setSelectedError(log)}
-                                    >
-                                      Resolve
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Resolve Error</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <p className="text-sm font-medium">Error Message:</p>
-                                        <p className="text-sm text-muted-foreground">{log.message}</p>
-                                      </div>
-                                      <div>
-                                        <label className="text-sm font-medium">Resolution Notes:</label>
-                                        <textarea
-                                          className="w-full mt-1 p-2 border rounded-md"
-                                          rows={3}
-                                          placeholder="Describe how this error was resolved..."
-                                          value={resolutionText}
-                                          onChange={(e) => setResolutionText(e.target.value)}
-                                        />
-                                      </div>
-                                      <div className="flex justify-end gap-2">
-                                        <Button
-                                          variant="outline"
-                                          onClick={() => setSelectedError(null)}
-                                        >
-                                          Cancel
-                                        </Button>
-                                        <Button
-                                          onClick={() => resolveError(log.id, resolutionText)}
-                                          disabled={!resolutionText.trim()}
-                                        >
-                                          Mark Resolved
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              )}
+                              {/* Error resolution dialog removed */}
                             </td>
                           </tr>
                         ))}
@@ -812,9 +747,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                           <th className="px-4 py-2 text-left">Time</th>
                           <th className="px-4 py-2 text-left">Device/Switch</th>
                           <th className="px-4 py-2 text-left">Action</th>
-                          <th className="px-4 py-2 text-left">Previous State</th>
-                          <th className="px-4 py-2 text-left">New State</th>
-                          <th className="px-4 py-2 text-left">Conflicts</th>
                           <th className="px-4 py-2 text-left">Response Time</th>
                           <th className="px-4 py-2 text-left">Location</th>
                         </tr>
@@ -837,42 +769,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                               <Badge variant="outline" className="text-xs">
                                 {(log.action || 'unknown').replace('manual_', '').toUpperCase()}
                               </Badge>
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge variant={(log.previousState || 'unknown') === 'on' ? 'default' : (log.previousState || 'unknown') === 'off' ? 'secondary' : 'outline'}>
-                                {(log.previousState || 'unknown').toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge variant={(log.newState || 'unknown') === 'on' ? 'default' : 'secondary'}>
-                                {(log.newState || 'unknown').toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2">
-                              {log.conflictWith && (log.conflictWith.webCommand || log.conflictWith.scheduleCommand || log.conflictWith.pirCommand) ? (
-                                <div className="space-y-1">
-                                  {log.conflictWith.webCommand && (
-                                    <Badge variant="destructive" className="text-xs mr-1">
-                                      Web
-                                    </Badge>
-                                  )}
-                                  {log.conflictWith.scheduleCommand && (
-                                    <Badge variant="destructive" className="text-xs mr-1">
-                                      Schedule
-                                    </Badge>
-                                  )}
-                                  {log.conflictWith.pirCommand && (
-                                    <Badge variant="destructive" className="text-xs mr-1">
-                                      PIR
-                                    </Badge>
-                                  )}
-                                </div>
-                              ) : (
-                                <Badge variant="default" className="text-xs">
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  No Conflict
-                                </Badge>
-                              )}
                             </td>
                             <td className="px-4 py-2 text-xs">
                               {log.responseTime ? `${log.responseTime}ms` : '-'}

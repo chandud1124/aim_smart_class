@@ -15,7 +15,7 @@ import api from '@/services/api';
 
 interface FacilityAccess {
     _id: string;
-    facility: string;
+    classroom: string;
     user: {
         _id: string;
         name: string;
@@ -52,7 +52,7 @@ interface User {
 
 export const FacilityAccessManager: React.FC = () => {
     const { user } = useAuth();
-    const { canAccess } = usePermissions();
+    const { hasManagementAccess } = usePermissions();
     const [accessRecords, setAccessRecords] = useState<FacilityAccess[]>([]);
     const [facilities, setFacilities] = useState<string[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -90,14 +90,14 @@ export const FacilityAccessManager: React.FC = () => {
             const [facilitiesRes, usersRes, accessRes] = await Promise.all([
                 api.get('/api/facility/summary'),  // This gets unique facilities from devices
                 api.get('/api/users'),
-                api.get('/api/facility')  // This gets access records
+                api.get('/api/facility/all')  // This gets access records
             ]);
 
             console.log('Facilities response:', facilitiesRes.data);
             console.log('Users response:', usersRes.data);
             console.log('Access response:', accessRes.data);
 
-            setFacilities(facilitiesRes.data.data.map((c: any) => c.facility));
+            setFacilities(facilitiesRes.data.data.map((c: any) => c.classroom));
             setUsers(usersRes.data.data);
             setAccessRecords(accessRes.data.data || []);
             
@@ -123,7 +123,7 @@ export const FacilityAccessManager: React.FC = () => {
             
             const response = await api.post('/api/facility/grant', {
                 userId: selectedUser,
-                facility: selectedFacility,
+                classroom: selectedFacility,
                 permissions: {
                     canControl,
                     canSchedule,
@@ -191,9 +191,9 @@ export const FacilityAccessManager: React.FC = () => {
         }
     }, [success]);
 
-    if (!canAccess('facility_access_management')) {
+    if (!hasManagementAccess) {
         return (
-            <RoleGuard allowedRoles={['admin', 'manager']}>
+            <RoleGuard roles={['admin', 'manager']}>
                 <div className="p-6">
                     <Alert>
                         <AlertTriangle className="h-4 w-4" />
@@ -218,7 +218,7 @@ export const FacilityAccessManager: React.FC = () => {
     }
 
     return (
-        <RoleGuard allowedRoles={['admin', 'manager']}>
+        <RoleGuard roles={['admin', 'manager']}>
             <div className="container mx-auto px-4 py-6 space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -289,7 +289,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {users.length === 0 ? (
-                                            <SelectItem value="" disabled>
+                                            <SelectItem value="no-users" disabled>
                                                 No users available
                                             </SelectItem>
                                         ) : (
@@ -312,7 +312,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {facilities.length === 0 ? (
-                                            <SelectItem value="" disabled>
+                                            <SelectItem value="no-facilities" disabled>
                                                 No facilities available. Try refreshing the page.
                                             </SelectItem>
                                         ) : (
@@ -335,7 +335,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     <Checkbox
                                         id="can-control"
                                         checked={canControl}
-                                        onCheckedChange={setCanControl}
+                                        onCheckedChange={(checked) => setCanControl(checked === true)}
                                     />
                                     <Label htmlFor="can-control">Device Control</Label>
                                 </div>
@@ -343,7 +343,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     <Checkbox
                                         id="can-schedule"
                                         checked={canSchedule}
-                                        onCheckedChange={setCanSchedule}
+                                        onCheckedChange={(checked) => setCanSchedule(checked === true)}
                                     />
                                     <Label htmlFor="can-schedule">Schedule Management</Label>
                                 </div>
@@ -351,7 +351,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     <Checkbox
                                         id="can-view-logs"
                                         checked={canViewLogs}
-                                        onCheckedChange={setCanViewLogs}
+                                        onCheckedChange={(checked) => setCanViewLogs(checked === true)}
                                     />
                                     <Label htmlFor="can-view-logs">View Activity Logs</Label>
                                 </div>
@@ -359,7 +359,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     <Checkbox
                                         id="can-modify-settings"
                                         checked={canModifySettings}
-                                        onCheckedChange={setCanModifySettings}
+                                        onCheckedChange={(checked) => setCanModifySettings(checked === true)}
                                     />
                                     <Label htmlFor="can-modify-settings">Modify Settings</Label>
                                 </div>
@@ -368,16 +368,14 @@ export const FacilityAccessManager: React.FC = () => {
 
                         {/* Time Restrictions */}
                         <div className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id="time-restriction"
-                                    checked={timeRestrictionEnabled}
-                                    onCheckedChange={setTimeRestrictionEnabled}
-                                />
-                                <Label htmlFor="time-restriction">Enable Time Restrictions</Label>
-                            </div>
-                            
-                            {timeRestrictionEnabled && (
+            <div className="flex items-center space-x-2">
+                <Checkbox
+                    id="time-restriction"
+                    checked={timeRestrictionEnabled}
+                    onCheckedChange={(checked) => setTimeRestrictionEnabled(checked === true)}
+                />
+                <Label htmlFor="time-restriction">Enable Time Restrictions</Label>
+            </div>                            {timeRestrictionEnabled && (
                                 <div className="grid md:grid-cols-2 gap-4 ml-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="start-time">Start Time</Label>
@@ -460,7 +458,7 @@ export const FacilityAccessManager: React.FC = () => {
                                     >
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <h3 className="font-medium">{record.facility}</h3>
+                                                <h3 className="font-medium">{record.classroom}</h3>
                                                 <Badge variant={record.isActive ? "default" : "secondary"}>
                                                     {record.isActive ? "Active" : "Inactive"}
                                                 </Badge>
@@ -482,7 +480,7 @@ export const FacilityAccessManager: React.FC = () => {
                                             size="sm"
                                             onClick={() => handleRevokeAccess(record._id)}
                                             disabled={revoking === record._id}
-                                            aria-label={`Revoke access for ${record.user.name} to ${record.facility}`}
+                                            aria-label={`Revoke access for ${record.user.name} to ${record.classroom}`}
                                         >
                                             {revoking === record._id && (
                                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

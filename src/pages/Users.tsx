@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Users as UsersIcon, Plus, Shield, User, Edit, Trash2, GraduationCap, ShieldCheck, RefreshCcw, Search, Wrench } from 'lucide-react';
 import { UserDialog } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -579,10 +579,10 @@ const Users = () => {
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Delete User</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to delete this user? This action cannot be undone.
+                          </DialogDescription>
                         </DialogHeader>
-                        <p className="text-sm text-muted-foreground">
-                          Are you sure you want to delete this user? This action cannot be undone.
-                        </p>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
                             Cancel

@@ -5,7 +5,7 @@ import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Calendar, Clock, Plus, Edit, Trash2 } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
 import { scheduleAPI } from '@/services/api';
@@ -327,10 +327,10 @@ const Schedule: React.FC = () => {
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Delete Schedule</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to delete this schedule? This action cannot be undone.
+                            </DialogDescription>
                           </DialogHeader>
-                          <p className="text-sm text-muted-foreground">
-                            Are you sure you want to delete this schedule? This action cannot be undone.
-                          </p>
                           <DialogFooter>
                             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
                               Cancel
