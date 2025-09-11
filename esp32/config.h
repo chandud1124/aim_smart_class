@@ -4,8 +4,8 @@
 #include <Arduino.h>
 
 // ---------------- WiFi ----------------
-#define WIFI_SSID "I am Not A Witch I am Your Wifi"
-#define WIFI_PASSWORD "Whoareu@0000"
+#define WIFI_SSID "AIMS-WIFI"
+#define WIFI_PASSWORD "Aimswifi#2025"
 
 // ---------------- WebSocket ----------------
 #define WEBSOCKET_HOST "172.16.3.171" // Updated to match current backend server
@@ -13,7 +13,7 @@
 // Raw WebSocket endpoint path (matches backend server.js)
 #define WEBSOCKET_PATH "/esp32-ws"
 // Device authentication
-#define DEVICE_SECRET_KEY "6af44c010af8ba58514c6fa989c6e6d3469068f2d8da19a4"
+#define DEVICE_SECRET_KEY "eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def"
 
 // ---------------- Pins ----------------
 #define LED_PIN 2 // Built-in LED on most ESP32 dev boards
