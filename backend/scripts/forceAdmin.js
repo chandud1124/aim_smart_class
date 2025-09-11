@@ -6,7 +6,7 @@ require('dotenv').config();
   try {
     const email = (process.argv[2] || process.env.ADMIN_EMAIL || 'root@system.local').toLowerCase();
     const password = process.argv[3] || process.env.ADMIN_PASSWORD || 'ChangeMeNow!123';
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
 
     let user = await User.findOne({ email });
     if (!user) {

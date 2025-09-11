@@ -14,7 +14,7 @@ const Device = require('../models/Device');
     console.error('MAC required. Example: node scripts/printOrSetDeviceSecret.js FC:B4:67:EF:33:C8 [--set]');
     process.exit(1);
   }
-  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/iot';
+  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/autovolt';
   await mongoose.connect(uri);
   let device = await Device.findOne({ macAddress: mac }).select('+deviceSecret');
   if (!device) {

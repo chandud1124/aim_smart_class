@@ -115,55 +115,48 @@ class DeviceMonitoringService {
   async getSwitchStates(device) {
     try {
       // In a real implementation, this would query the ESP32 via WebSocket
-      // For now, we'll use the stored states and simulate some data
+      // For now, we'll use the stored states from the device model
       
       const switchStates = [];
-      const defaultSwitches = [
-        { id: 'fan1', name: 'Fan 1', pin: 4 },
-        { id: 'fan2', name: 'Fan 2', pin: 5 },
-        { id: 'light1', name: 'Light 1', pin: 18 },
-        { id: 'light2', name: 'Light 2', pin: 19 },
-        { id: 'projector', name: 'Projector', pin: 21 },
-        { id: 'ac', name: 'Air Conditioner', pin: 22 },
-        { id: 'speaker', name: 'Speaker', pin: 23 },
-        { id: 'whiteboard', name: 'Smart Whiteboard', pin: 25 }
-      ];
+      
+      // Use actual switches from device if available
+      if (device.switches && Array.isArray(device.switches)) {
+        for (const switchData of device.switches) {
+          const currentState = switchData.state ? 'on' : 'off'; // Convert boolean to string
+          const expectedState = currentState; // Would come from schedule/commands
+          
+          // Calculate duration (simulated)
+          const currentSession = Math.floor(Math.random() * 120); // 0-120 minutes
+          const totalToday = Math.floor(Math.random() * 480); // 0-8 hours
+          const totalWeek = totalToday * 7 + Math.floor(Math.random() * 1000);
+          
+          // Calculate power consumption (simulated)
+          const basePower = this.getBasePowerConsumption(switchData.name);
+          const currentPower = currentState === 'on' ? basePower : 0;
+          const totalTodayPower = (totalToday / 60) * basePower;
+          const totalWeekPower = (totalWeek / 60) * basePower;
 
-      for (const switchConfig of defaultSwitches) {
-        const currentState = device.switches?.[switchConfig.id]?.state || 'off';
-        const expectedState = currentState; // Would come from schedule/commands
-        
-        // Calculate duration (simulated)
-        const currentSession = Math.floor(Math.random() * 120); // 0-120 minutes
-        const totalToday = Math.floor(Math.random() * 480); // 0-8 hours
-        const totalWeek = totalToday * 7 + Math.floor(Math.random() * 1000);
-        
-        // Calculate power consumption (simulated)
-        const basePower = this.getBasePowerConsumption(switchConfig.name);
-        const currentPower = currentState === 'on' ? basePower : 0;
-        const totalTodayPower = (totalToday / 60) * basePower;
-        const totalWeekPower = (totalWeek / 60) * basePower;
-
-        switchStates.push({
-          switchId: switchConfig.id,
-          switchName: switchConfig.name,
-          physicalPin: switchConfig.pin,
-          expectedState: expectedState,
-          actualState: currentState,
-          isMatch: expectedState === currentState,
-          duration: {
-            currentSession: currentSession,
-            totalToday: totalToday,
-            totalWeek: totalWeek
-          },
-          powerConsumption: {
-            current: currentPower,
-            totalToday: totalTodayPower,
-            totalWeek: totalWeekPower
-          },
-          lastChanged: device.switches?.[switchConfig.id]?.lastChanged || new Date(),
-          changeReason: device.switches?.[switchConfig.id]?.lastChangedBy || 'unknown'
-        });
+          switchStates.push({
+            switchId: switchData._id?.toString() || switchData.id,
+            switchName: switchData.name,
+            physicalPin: switchData.gpio,
+            expectedState: expectedState,
+            actualState: currentState,
+            isMatch: expectedState === currentState,
+            duration: {
+              currentSession: currentSession,
+              totalToday: totalToday,
+              totalWeek: totalWeek
+            },
+            powerConsumption: {
+              current: currentPower,
+              totalToday: totalTodayPower,
+              totalWeek: totalWeekPower
+            },
+            lastChanged: switchData.lastChanged || new Date(),
+            changeReason: switchData.lastChangedBy || 'unknown'
+          });
+        }
       }
 
       return switchStates;
@@ -302,18 +295,19 @@ class DeviceMonitoringService {
 
   // Get base power consumption for different devices
   getBasePowerConsumption(deviceName) {
-    const powerMap = {
-      'Fan 1': 75,
-      'Fan 2': 75,
-      'Light 1': 20,
-      'Light 2': 20,
-      'Projector': 250,
-      'Air Conditioner': 1200,
-      'Speaker': 30,
-      'Smart Whiteboard': 100
-    };
-
-    return powerMap[deviceName] || 50; // Default 50W
+    // Convert name to lowercase for better matching
+    const name = deviceName.toLowerCase();
+    
+    if (name.includes('fan')) return 75;
+    if (name.includes('light')) return 20;
+    if (name.includes('projector')) return 250;
+    if (name.includes('ac') || name.includes('air')) return 1200;
+    if (name.includes('speaker')) return 30;
+    if (name.includes('whiteboard') || name.includes('board')) return 100;
+    if (name.includes('outlet')) return 100;
+    
+    // Default power consumption
+    return 50;
   }
 
   // Get due monitoring checks

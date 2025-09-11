@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const testFullUserWorkflow = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
         console.log('✅ Connected to MongoDB');
 
         const testEmail = 'newuser@test.college.edu';

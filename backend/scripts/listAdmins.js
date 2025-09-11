@@ -4,7 +4,7 @@ require('dotenv').config();
 
 (async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     const admins = await User.find({ role: 'admin' }).lean();
     if (!admins.length) {
       console.log('No admin users found.');

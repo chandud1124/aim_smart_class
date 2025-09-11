@@ -206,7 +206,7 @@ class WebSocketHandler {
             }
 
             // Update device switch state
-            const switchToUpdate = device.switches.find(s => s.id === switchId);
+            const switchToUpdate = device.switches.find(s => s.gpio === parseInt(switchId) || s.relayGpio === parseInt(switchId) || s.id === switchId);
             if (switchToUpdate) {
                 switchToUpdate.state = newState;
                 switchToUpdate.lastChanged = new Date();
@@ -293,7 +293,7 @@ class WebSocketHandler {
             // Update switch states
             if (data.switches) {
                 for (const sw of data.switches) {
-                    const deviceSwitch = device.switches.id(sw.gpio);
+                    const deviceSwitch = device.switches.find(s => s.gpio === parseInt(sw.gpio) || s.relayGpio === parseInt(sw.gpio));
                     if (deviceSwitch) {
                         deviceSwitch.state = sw.state;
                         if (sw.manual_override !== undefined) {

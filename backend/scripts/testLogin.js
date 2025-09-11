@@ -12,7 +12,7 @@ require('dotenv').config();
       process.exit(1);
     }
     const email = emailArg.trim().toLowerCase();
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       console.log('No user found for email:', email);

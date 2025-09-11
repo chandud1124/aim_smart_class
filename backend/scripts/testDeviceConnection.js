@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 async function testDeviceConnection() {
   try {
     // Connect to MongoDB
-    await mongoose.connect('mongodb://localhost:27017/classroom_automation');
+    await mongoose.connect('mongodb://localhost:27017/autovolt');
     console.log('Connected to MongoDB');
 
     // Get the device

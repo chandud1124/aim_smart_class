@@ -3,7 +3,7 @@ const Device = require('../models/Device');
 
 async function createDepartmentDevices() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
         console.log('Connected to MongoDB');
 
         // Update existing devices to have Computer Science department classrooms

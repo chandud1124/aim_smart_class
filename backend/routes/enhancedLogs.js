@@ -55,17 +55,39 @@ router.get('/activities', auth, async (req, res) => {
     }
 
     const totalCount = await ActivityLog.countDocuments(query);
-    const logs = await ActivityLog.find(query)
+    const rawLogs = await ActivityLog.find(query)
       .populate('deviceId', 'name classroom location')
-      .populate('userId', 'username role')
+      .populate('userId', 'name role')
       .sort({ timestamp: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Transform data for frontend compatibility
+    const logs = rawLogs.map(log => ({
+      id: log._id.toString(),
+      timestamp: log.timestamp,
+      action: log.action,
+      deviceId: log.deviceId?._id?.toString(),
+      deviceName: log.deviceName || log.deviceId?.name,
+      switchId: log.switchId,
+      switchName: log.switchName,
+      userId: log.userId?._id?.toString(),
+      userName: log.userName || log.userId?.name || 'System',
+      triggeredBy: log.triggeredBy,
+      location: log.location || log.deviceId?.location,
+      facility: log.classroom || log.deviceId?.classroom,
+      isManualOverride: log.conflictResolution?.hasConflict || false,
+      previousState: log.previousState,
+      newState: log.newState,
+      conflictResolution: log.conflictResolution,
+      details: log.details,
+      context: log.context
+    }));
+
     res.json({
       logs,
       pagination: {
-        currentPage: page,
+        currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / limit),
         totalCount,
         hasNext: page * limit < totalCount,
@@ -129,18 +151,39 @@ router.get('/errors', auth, async (req, res) => {
     }
 
     const totalCount = await ErrorLog.countDocuments(query);
-    const logs = await ErrorLog.find(query)
+    const rawLogs = await ErrorLog.find(query)
       .populate('deviceId', 'name classroom location')
-      .populate('userId', 'username role')
-      .populate('resolvedBy', 'username')
+      .populate('userId', 'name role')
+      .populate('resolvedBy', 'name')
       .sort({ timestamp: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Transform data for frontend compatibility
+    const logs = rawLogs.map(log => ({
+      id: log._id.toString(),
+      timestamp: log.timestamp,
+      errorType: log.errorType,
+      severity: log.severity,
+      message: log.message,
+      deviceId: log.deviceId?._id?.toString(),
+      deviceName: log.deviceName || log.deviceId?.name,
+      userId: log.userId?._id?.toString(),
+      userName: log.userName || log.userId?.name || 'System',
+      resolved: log.resolved,
+      resolvedBy: log.resolvedBy?._id?.toString(),
+      resolvedAt: log.resolvedAt,
+      notes: log.notes,
+      details: log.details,
+      stackTrace: log.stackTrace,
+      endpoint: log.endpoint,
+      method: log.method
+    }));
+
     res.json({
       logs,
       pagination: {
-        currentPage: page,
+        currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / limit),
         totalCount,
         hasNext: page * limit < totalCount,
@@ -187,16 +230,34 @@ router.get('/manual-switches', auth, async (req, res) => {
     }
 
     const totalCount = await ManualSwitchLog.countDocuments(query);
-    const logs = await ManualSwitchLog.find(query)
+    const rawLogs = await ManualSwitchLog.find(query)
       .populate('deviceId', 'name classroom location')
       .sort({ timestamp: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Transform data for frontend compatibility
+    const logs = rawLogs.map(log => ({
+      id: log._id.toString(),
+      timestamp: log.timestamp,
+      deviceId: log.deviceId?._id?.toString(),
+      deviceName: log.deviceName || log.deviceId?.name,
+      switchId: log.switchId,
+      switchName: log.switchName,
+      action: log.action,
+      previousState: log.previousState,
+      newState: log.newState,
+      conflictWith: log.conflictWith || {},
+      responseTime: log.responseTime,
+      location: log.location || log.deviceId?.location,
+      facility: log.classroom || log.deviceId?.classroom,
+      details: log.details
+    }));
+
     res.json({
       logs,
       pagination: {
-        currentPage: page,
+        currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / limit),
         totalCount,
         hasNext: page * limit < totalCount,
@@ -237,16 +298,32 @@ router.get('/device-status', auth, async (req, res) => {
     }
 
     const totalCount = await DeviceStatusLog.countDocuments(query);
-    const logs = await DeviceStatusLog.find(query)
+    const rawLogs = await DeviceStatusLog.find(query)
       .populate('deviceId', 'name classroom location')
       .sort({ timestamp: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
+    // Transform data for frontend compatibility
+    const logs = rawLogs.map(log => ({
+      id: log._id.toString(),
+      timestamp: log.timestamp,
+      deviceId: log.deviceId?._id?.toString(),
+      deviceName: log.deviceName || log.deviceId?.name,
+      deviceMac: log.deviceMac,
+      checkType: log.checkType,
+      deviceStatus: log.deviceStatus || {},
+      switchStates: log.switchStates || [],
+      alerts: log.alerts || [],
+      summary: log.summary || {},
+      facility: log.classroom || log.deviceId?.classroom,
+      location: log.location || log.deviceId?.location
+    }));
+
     res.json({
       logs,
       pagination: {
-        currentPage: page,
+        currentPage: parseInt(page),
         totalPages: Math.ceil(totalCount / limit),
         totalCount,
         hasNext: page * limit < totalCount,

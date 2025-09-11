@@ -4,7 +4,7 @@ require('dotenv').config();
 
 async function testEnhancedLogging() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     console.log('Connected to MongoDB');
     console.log('==========================================');
     console.log('🧪 ENHANCED LOGGING SYSTEM TEST');

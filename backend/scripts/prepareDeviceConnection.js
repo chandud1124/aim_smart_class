@@ -3,7 +3,7 @@ const Device = require('../models/Device');
 
 async function prepareDeviceForConnection() {
   try {
-    await mongoose.connect('mongodb://localhost:27017/classroom_automation');
+    await mongoose.connect('mongodb://localhost:27017/autovolt');
     console.log('🔗 Connected to MongoDB');
 
     // Check current device configuration

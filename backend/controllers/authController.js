@@ -20,6 +20,7 @@ const register = async (req, res) => {
   try {
     logger.info('Registration request received');
     logger.debug('Request body keys:', Object.keys(req.body || {}));
+    logger.debug('Full request body:', JSON.stringify(req.body, null, 2));
 
     const {
       name,

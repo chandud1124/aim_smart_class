@@ -7,7 +7,7 @@ const SecurityAlert = require('../models/SecurityAlert');
 const monitorLogs = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dwell-control');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     logger.info('Connected to MongoDB');
 
     // Get last 24 hours of activity logs

@@ -70,7 +70,7 @@ const devices = [
 const setupTestData = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dwell-control');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     logger.info('Connected to MongoDB');
 
     // Create users

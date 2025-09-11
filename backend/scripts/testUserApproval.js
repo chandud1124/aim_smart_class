@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const testUserApproval = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
         console.log('Connected to MongoDB');
 
         // Test user data
