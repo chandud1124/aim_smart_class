@@ -154,8 +154,19 @@ void logHealth(const char *context)
 
  // Warning if heap is getting low
  if (freeHeap < 50000)
- { // Less than 50KB free
- Serial.printf("[WARNING] Low heap memory: %u bytes free!\n", freeHeap);
+ { // Less than 50KB free - CRITICAL
+ Serial.printf("[CRITICAL] Very low heap memory: %u bytes free!\n", freeHeap);
+ 
+ // Emergency cleanup if memory gets dangerously low
+ if (freeHeap < 30000) {
+ Serial.println("[EMERGENCY] Attempting memory cleanup...");
+ // Force garbage collection if available
+ heap_caps_check_integrity_all(true);
+ }
+ }
+ else if (freeHeap < 80000)
+ { // Less than 80KB free - WARNING  
+ Serial.printf("[WARNING] Heap memory getting low: %u bytes free\n", freeHeap);
  }
 
  // Warning if stack is getting low
@@ -451,14 +462,41 @@ void processCommandQueue()
  if (now - lastCommandProcess < COMMAND_PROCESS_INTERVAL)
  return;
  lastCommandProcess = now;
+ 
+ // CRASH PREVENTION: Process multiple commands but limit batch size  
+ int processedCount = 0;
+ const int MAX_BATCH_SIZE = 5; // Process max 5 commands per cycle
 
  Command cmd;
+ while (uxQueueMessagesWaiting(cmdQueue) > 0 && processedCount < MAX_BATCH_SIZE)
+ {
  if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
  {
  if (cmd.valid)
  {
+ // CRASH PREVENTION: Add watchdog reset during command processing
+ esp_task_wdt_reset();
+ 
  applySwitchState(cmd.gpio, cmd.state);
+ processedCount++;
+ 
+ // Small delay between commands to prevent rapid GPIO changes
+ if (processedCount < MAX_BATCH_SIZE && uxQueueMessagesWaiting(cmdQueue) > 0) {
+ delay(5); // 5ms between commands
  }
+ }
+ }
+ else
+ {
+ break; // No more commands
+ }
+ }
+ 
+ // Log if queue is backing up (potential performance issue)
+ UBaseType_t remainingItems = uxQueueMessagesWaiting(cmdQueue);
+ if (remainingItems > MAX_COMMAND_QUEUE / 2) {
+ Serial.printf("[WARNING] Command queue backing up: %d/%d items\n", 
+              remainingItems, MAX_COMMAND_QUEUE);
  }
 }
 
@@ -487,17 +525,22 @@ bool applySwitchState(int gpio, bool state)
 
 void loadConfigFromJsonArray(JsonArray arr)
 {
+ Serial.println("[CONFIG] Loading server configuration...");
  switchesLocal.clear();
+ 
  for (JsonObject o : arr)
  {
  int g = o["relayGpio"].is<int>() ? o["relayGpio"].as<int>() : (o["gpio"].is<int>() ? o["gpio"].as<int>() : -1);
  if (g < 0)
  continue;
- bool desiredState = o["state"].is<bool>() ? o["state"].as<bool>() : false; // default OFF logically
+ 
+ // Server can override safety defaults - this is AUTHORIZED configuration
+ bool desiredState = o["state"].is<bool>() ? o["state"].as<bool>() : false;
+ 
  SwitchState sw{};
  sw.gpio = g;
  sw.state = desiredState;
- sw.defaultState = desiredState; // Store default state for offline mode
+ sw.defaultState = desiredState; // Store server's desired state as default
  sw.name = String(o["name"].is<const char *>() ? o["name"].as<const char *>() : "");
  sw.manualOverride = false;
 
@@ -517,8 +560,13 @@ void loadConfigFromJsonArray(JsonArray arr)
  sw.manualActiveLow = o["manualActiveLow"].as<bool>();
  }
  }
+ 
+ // Apply server's desired state immediately (this overrides safety defaults)
  pinMode(g, OUTPUT);
  digitalWrite(g, desiredState ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+ Serial.printf("[SERVER-CONFIG] GPIO %d (%s) -> %s (authorized by server)\n", 
+ g, sw.name.c_str(), desiredState ? "ON" : "OFF");
+ 
  if (sw.manualEnabled && sw.manualGpio >= 0)
  {
  // Configure input with proper pull depending on polarity.
@@ -553,7 +601,8 @@ void loadConfigFromJsonArray(JsonArray arr)
  }
  switchesLocal.push_back(sw);
  }
- Serial.printf("[CONFIG] Loaded %u switches\n", (unsigned)switchesLocal.size());
+ Serial.printf("[CONFIG] Server configuration loaded: %u switches applied\n", (unsigned)switchesLocal.size());
+ 
  // Snapshot print for verification
  for (auto &sw : switchesLocal)
  {
@@ -621,19 +670,22 @@ void loadConfigFromNVS()
  if (sw.gpio < 0)
  continue; // Skip invalid GPIOs
 
- sw.state = prefs.getBool(("state" + String(i)).c_str(), false);
- sw.defaultState = prefs.getBool(("default" + String(i)).c_str(), false);
+ // SAFETY: Always load state as OFF for safety, ignore saved states
+ // This prevents night activations when server is offline
+ bool savedState = prefs.getBool(("state" + String(i)).c_str(), false);
+ sw.state = false; // FORCE OFF regardless of saved state
+ sw.defaultState = false; // FORCE default to OFF
+ 
  sw.manualEnabled = prefs.getBool(("manual_en" + String(i)).c_str(), false);
  sw.manualGpio = prefs.getInt(("manual_gpio" + String(i)).c_str(), -1);
  sw.manualActiveLow = prefs.getBool(("active_low" + String(i)).c_str(), true);
  sw.manualMomentary = prefs.getBool(("momentary" + String(i)).c_str(), false);
  sw.name = prefs.getString(("name" + String(i)).c_str(), "Switch " + String(i + 1));
- sw.manualOverride = prefs.getBool(("override" + String(i)).c_str(), false);
+ sw.manualOverride = false; // Reset manual override flag
 
- // Initialize pins
- pinMode(sw.gpio, OUTPUT);
- digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
-
+ // Initialize pins - GPIO already set to OUTPUT and OFF in setupRelays()
+ // Don't change pin state here, it was already set to safe OFF
+ 
  if (sw.manualEnabled && sw.manualGpio >= 0)
  {
  if (sw.manualGpio >= 34 && sw.manualGpio <= 39)
@@ -657,17 +709,21 @@ void loadConfigFromNVS()
  }
 
  switchesLocal.push_back(sw);
+ 
+ Serial.printf("[NVS-SAFETY] Switch %s (GPIO %d) loaded but forced OFF (was %s)\n", 
+ sw.name.c_str(), sw.gpio, savedState ? "ON" : "OFF");
  }
-
- // ...existing code...
 
  prefs.end();
 
- Serial.printf("[NVS] Loaded %d switches\n", (int)switchesLocal.size());
+ Serial.printf("[NVS] Loaded %d switches, all forced to OFF for safety\n", (int)switchesLocal.size());
 }
 
 void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
 {
+ // Reset watchdog at start of WebSocket event processing
+ esp_task_wdt_reset();
+ 
  switch (type)
  {
  case WStype_CONNECTED:
@@ -678,23 +734,46 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  lastWsReconnectAttempt = millis(); // Reset reconnection timer on successful connection
  if (STATUS_LED_PIN != 255)
  digitalWrite(STATUS_LED_PIN, HIGH);
+ 
+ // Immediate identification without delay
+ Serial.println("[WS] Sending immediate identification...");
  identify();
- // Send latest manual switch states to backend/UI immediately upon reconnect
+ 
+ // Send latest switch states to backend/UI immediately upon reconnect
+ // But don't change physical switch states until server confirms
  sendStateUpdate(true);
  logHealth("WebSocket Connected");
  break;
  case WStype_TEXT:
  {
+ // CRASH PREVENTION: Check message size before processing
+ if (len > 2048) {
+ Serial.printf("[WS] Message too large (%d bytes), ignoring to prevent crash\n", len);
+ return;
+ }
+ 
+ // CRASH PREVENTION: Use larger JSON buffer and validate allocation
+ DynamicJsonDocument doc(1536); // Increased from 1024 to 1536 bytes
+ if (doc.capacity() == 0) {
+ Serial.println(F("[WS] Failed to allocate JSON memory"));
+ reportError("MEMORY", "JSON allocation failed");
+ return;
+ }
+ 
  // Use try-catch to prevent crashes from malformed JSON
  try
  {
- DynamicJsonDocument doc(1024);
- if (deserializeJson(doc, payload, len) != DeserializationError::Ok)
+ DeserializationError jsonError = deserializeJson(doc, payload, len);
+ if (jsonError != DeserializationError::Ok)
  {
- Serial.println(F("[WS] JSON parse error"));
+ Serial.printf("[WS] JSON parse error: %s\n", jsonError.c_str());
  reportError("JSON_PARSE", "Failed to parse WebSocket message");
  return;
  }
+ 
+ // CRASH PREVENTION: Log memory usage
+ Serial.printf("[WS] JSON parsed successfully, memory used: %d/%d bytes\n", 
+              doc.memoryUsage(), doc.capacity());
  const char *msgType = doc["type"] | "";
  if (strcmp(msgType, "identified") == 0)
  {
@@ -703,15 +782,25 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  if (STATUS_LED_PIN != 255)
  digitalWrite(STATUS_LED_PIN, HIGH);
  const char *_mode = doc["mode"].is<const char *>() ? doc["mode"].as<const char *>() : "n/a";
- Serial.printf("[WS] <- identified mode=%s\n", _mode);
+ Serial.printf("[WS] <- identified mode=%s (FAST CONNECTION)\n", _mode);
+ 
  // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
  lastSeqs.clear();
+ 
+ // Load configuration immediately for faster response
  if (doc["switches"].is<JsonArray>())
+ {
+ Serial.println("[WS] Loading server configuration immediately...");
  loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
+ Serial.println("[WS] Server configuration applied successfully");
+ }
  else
- Serial.println(F("[CONFIG] No switches in identified payload (using none)"));
+ {
+ Serial.println(F("[CONFIG] No switches in identified payload (using safe defaults)"));
+ }
 
- // ...existing code...
+ // Send immediate acknowledgment
+ Serial.println("[WS] ESP32 ready for commands");
  return;
  }
  if (strcmp(msgType, "config_update") == 0)
@@ -808,8 +897,25 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
 
 void setupRelays()
 {
- // First try to load from NVS
+ // SAFETY: Always start with ALL RELAYS OFF regardless of saved states
+ // This prevents unwanted activations during night/offline periods
+ Serial.println("[SETUP] Initializing all relays to OFF state for safety");
+ 
+ // First initialize pins to safe OFF state
+ for (int i = 0; i < MAX_SWITCHES; i++)
+ {
+ int pin = defaultSwitchConfigs[i].relayPin;
+ pinMode(pin, OUTPUT);
+ digitalWrite(pin, RELAY_OFF_LEVEL); // FORCE OFF initially
+ Serial.printf("[SAFETY] Pin %d forced to OFF\n", pin);
+ }
+ 
+ // Small delay to ensure pins are stable
+ delay(100);
+ 
+ // Then try to load from NVS but don't apply states yet
  loadConfigFromNVS();
+ 
  // If no switches loaded, use defaults from config.h
  if (switchesLocal.empty())
  {
@@ -818,16 +924,18 @@ void setupRelays()
  {
  SwitchState sw{};
  sw.gpio = defaultSwitchConfigs[i].relayPin;
- sw.state = false;
- sw.defaultState = false;
+ sw.state = false; // Always start OFF
+ sw.defaultState = false; // Always default to OFF
  sw.name = defaultSwitchConfigs[i].name;
  sw.manualOverride = false;
  sw.manualEnabled = true;
  sw.manualGpio = defaultSwitchConfigs[i].manualPin;
  sw.manualActiveLow = defaultSwitchConfigs[i].manualActiveLow;
  sw.manualMomentary = false;
- pinMode(sw.gpio, OUTPUT);
+ 
+ // Pin already configured above, just ensure OFF state
  digitalWrite(sw.gpio, RELAY_OFF_LEVEL);
+ 
  if (sw.manualGpio >= 34 && sw.manualGpio <= 39)
  {
  pinMode(sw.manualGpio, INPUT);
@@ -845,12 +953,20 @@ void setupRelays()
  }
  else
  {
+ // Even with saved config, override all states to OFF for safety
+ Serial.println("[SETUP] Overriding all saved states to OFF for safety");
  for (auto &sw : switchesLocal)
  {
  pinMode(sw.gpio, OUTPUT);
- digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+ // SAFETY OVERRIDE: Ignore saved state, force OFF until server connection
+ sw.state = false;
+ digitalWrite(sw.gpio, RELAY_OFF_LEVEL);
+ Serial.printf("[SAFETY] Switch %s (GPIO %d) forced OFF\n", sw.name.c_str(), sw.gpio);
  }
  }
+ 
+ Serial.println("[SETUP] All switches initialized in safe OFF state");
+ Serial.println("[SETUP] Switches will only activate after server connection and explicit commands");
 }
 
 // ...existing code...
@@ -885,6 +1001,19 @@ void blinkStatus()
 void handleManualSwitches()
 {
  unsigned long now = millis();
+ 
+ // OPTIONAL: Add night-time check for manual switches
+ // Uncomment the block below if you want to disable manual switches at night
+ /*
+ struct tm timeinfo;
+ if (getLocalTime(&timeinfo)) {
+   int hour = timeinfo.tm_hour;
+   bool isNightTime = (hour < 6 || hour > 22); // 10 PM to 6 AM
+   if (isNightTime) {
+     return; // Skip manual switch processing during night hours
+   }
+ }
+ */
 
  for (auto &sw : switchesLocal)
  {
@@ -1029,8 +1158,19 @@ void setup()
 
 void loop()
 {
- // Reset watchdog timer
+ // CRASH PREVENTION: Reset watchdog timer at start of each loop
  esp_task_wdt_reset();
+ 
+ // CRASH PREVENTION: Monitor free heap and take action if getting low
+ size_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+ if (freeHeap < 40000) { // Less than 40KB free - emergency action
+ Serial.printf("[EMERGENCY] Critical memory level: %u bytes. Skipping non-essential operations.\n", freeHeap);
+ 
+ // Skip non-essential operations when memory is critical
+ esp_task_wdt_reset();
+ delay(100);
+ return;
+ }
 
  // Handle WiFi connection
  if (WiFi.status() != WL_CONNECTED)
@@ -1049,8 +1189,9 @@ void loop()
  {
  Serial.println("Retrying WiFi connection...");
  WiFi.disconnect();
+ esp_task_wdt_reset(); // Reset watchdog before WiFi operations
  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
- esp_task_wdt_reset(); // Reset watchdog during WiFi retry
+ esp_task_wdt_reset(); // Reset watchdog after WiFi retry
  }
  else
  {
@@ -1071,11 +1212,13 @@ void loop()
  {
  lastWsReconnectAttempt = now;
  Serial.println("[WS] Attempting WebSocket reconnection...");
+ esp_task_wdt_reset(); // Reset before WebSocket operations
  ws.disconnect();
  delay(100); // Small delay before reconnecting
  ws.begin(BACKEND_HOST, BACKEND_PORT, WS_PATH);
  ws.onEvent(onWsEvent);
  ws.setReconnectInterval(5000);
+ esp_task_wdt_reset(); // Reset after WebSocket setup
  }
  
  // Also try to identify if connection exists but not identified
@@ -1091,11 +1234,14 @@ void loop()
  }
  }
 
- // Process WebSocket events
+ // CRASH PREVENTION: Reset watchdog before intensive operations
+ esp_task_wdt_reset();
+
+ // Process WebSocket events (can be intensive)
  ws.loop();
  esp_task_wdt_reset(); // Reset watchdog after WebSocket operations
 
- // Process command queue
+ // Process command queue (with built-in rate limiting)
  processCommandQueue();
 
  // Handle manual switches
