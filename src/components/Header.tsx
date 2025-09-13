@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, User, Wifi, WifiOff, Settings, LogOut, Home, Menu, Calendar, RefreshCw, Ticket } from 'lucide-react';
-import { getBackendOrigin } from '@/services/api';
+import { Bell, User, Wifi, WifiOff, Settings, LogOut, Home, Menu } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-// import { Sidebar } from './Sidebar';
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -15,238 +13,226 @@ import { useSecurityNotifications } from '@/hooks/useSecurityNotifications';
 import { navItems } from '@/nav-items';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/hooks/useAuth';
-export const Header = () => {
+import { useToast } from '@/hooks/use-toast';
+
+export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { devices } = useDevices();
   const { alerts: notifications } = useSecurityNotifications();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   const currentPage = navItems.find(item => item.to === location.pathname) || navItems[0];
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const notifRef = useRef<HTMLDivElement | null>(null);
-  const userRef = useRef<HTMLDivElement | null>(null);
-  const isMobile = useIsMobile();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  
+  const notifRef = useRef(null);
+  const userRef = useRef(null);
+  const mobileMenuRef = useRef(null);
+  const sidebarRef = useRef(null);
+  
+  // Global click handler ref
+  const isDropdownOpen = showNotifications || showUserMenu || showMobileMenu || showSidebar;
 
   const connectedDevices = devices.filter(device => device.status === 'online').length;
   const isConnected = connectedDevices > 0;
 
-  // Only one dropdown open at a time
   const handleBellClick = () => {
-    setShowNotifications((open) => {
-      if (!open) setShowUserMenu(false);
-      return !open;
-    });
+    setShowNotifications(!showNotifications);
+    if (!showNotifications) setShowUserMenu(false);
   };
+  
   const handleUserClick = () => {
-    setShowUserMenu((open) => {
-      if (!open) setShowNotifications(false);
-      return !open;
-    });
+    setShowUserMenu(!showUserMenu);
+    if (!showUserMenu) setShowNotifications(false);
   };
+  
   const closeAll = () => {
     setShowNotifications(false);
     setShowUserMenu(false);
+    setShowSidebar(false);
   };
 
   const handleRefresh = () => {
+    toast({
+      title: "Refreshing connection status",
+      description: "Checking device connectivity..."
+    });
     window.location.reload();
   };
 
-  const anyOpen = showNotifications || showUserMenu;
-
-  // Outside click & ESC close
+  // Handle click outside to close dropdowns
   useEffect(() => {
-    if (!anyOpen) return;
-    const handlePointer = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Node;
-      if (
-        notifRef.current && notifRef.current.contains(target)
-      ) return;
-      if (
-        userRef.current && userRef.current.contains(target)
-      ) return;
-      // If clicked outside both dropdown areas and their trigger buttons
-      closeAll();
+    const handleClickOutside = (event) => {
+      // Only process if at least one dropdown is open
+      if (isDropdownOpen) {
+        // Check if click is outside all dropdown areas
+        const isOutsideAll = (
+          (!notifRef.current || !notifRef.current.contains(event.target)) &&
+          (!userRef.current || !userRef.current.contains(event.target)) &&
+          (!mobileMenuRef.current || !mobileMenuRef.current.contains(event.target))
+        );
+        
+        // If click is outside all dropdowns, close them all
+        if (isOutsideAll) {
+          closeAll();
+          setShowMobileMenu(false);
+        }
+      }
     };
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeAll(); };
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('touchstart', handlePointer, { passive: true });
-    document.addEventListener('keydown', handleKey);
+    
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        closeAll();
+        setShowMobileMenu(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    
     return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('touchstart', handlePointer);
-      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
-  }, [anyOpen]);
+  }, [isDropdownOpen]);
 
   return (
-    <header className="glass border-b border-border/50 px-4 py-3 relative z-50 h-16 flex items-center">
-      {/* Left side content */}
-      <div className="flex items-center gap-4">
+    <header className="border-b px-4 py-3 relative z-50 flex items-center justify-between">
+      {/* Left side */}
+      <div className="flex items-center gap-2">
         {isMobile && (
-          <Sheet>
+          <Sheet open={showSidebar} onOpenChange={setShowSidebar}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
+              <Button variant="ghost" size="icon" className="mr-1" onClick={() => setShowSidebar(true)}>
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-72">
-              <Sidebar className="border-none" onNavigateClose={() => {
-                const active = document.querySelector('[data-state="open"][data-vaul-sheet]');
-                // Vaul Sheet close via ESC dispatch if available
-                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+            <SheetContent side="left" className="p-0" ref={sidebarRef}>
+              <Sidebar onNavigateClose={() => {
+                setShowSidebar(false);
               }} />
             </SheetContent>
           </Sheet>
         )}
-        <div>
-          <h1 className="text-2xl font-bold">{currentPage.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {location.pathname === '/' ? 'Monitor and control your IoT devices' :
-              location.pathname === '/devices' ? 'Manage your connected IoT devices' :
-                location.pathname === '/switches' ? 'Control individual switches' :
-                  location.pathname === '/master' ? 'Master control for all switches' :
-                    location.pathname === '/schedule' ? 'Automate your device schedules' :
-                      location.pathname === '/users' ? 'Manage user access and permissions' :
-                        location.pathname === '/settings' ? 'Configure system settings' :
-                          location.pathname === '/logs' ? 'Review recent device activity' :
-                            'Monitor and control your IoT devices'}
-          </p>
+        <div className={cn(isMobile && "max-w-[200px]", "overflow-hidden")}>
+          <h1 className="font-bold truncate">{currentPage.title}</h1>
+          <p className="text-sm text-muted-foreground truncate">{currentPage.description}</p>
         </div>
       </div>
 
-      {/* Right side content - positioned at rightmost */}
-      <div className="flex items-center gap-4 absolute right-4">
-        {/* Refresh Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          className="hover:bg-primary/10"
-          title="Refresh page"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
-
-        {/* Quick Ticket Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/tickets')}
-          className="hover:bg-primary/10"
-          title="Create support ticket"
-        >
-          <Ticket className="w-4 h-4" />
-        </Button>
-
-        {/* Connection Status - positioned at rightmost */}
-        <div className="flex items-center gap-2">
+      {/* Right side */}
+      <div className="flex items-center gap-2">
+        {/* Connection status */}
+        <Button variant="ghost" size="icon" onClick={handleRefresh}>
           {isConnected ? (
-            <>
-              <Wifi className="w-4 h-4 text-success animate-[pulse_2s_ease-in-out_infinite]" />
-              <Badge variant="outline" className="border-success/50 text-success bg-success/10 hover:bg-success/20">
-                {connectedDevices} devices online
-              </Badge>
-            </>
+            <Wifi className="h-5 w-5 text-green-500" />
           ) : (
-            <>
-              <WifiOff className="w-4 h-4 text-destructive animate-[pulse_2s_ease-in-out_infinite]" />
-              <Badge variant="outline" className="border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20">
-                Offline
-              </Badge>
-            </>
+            <WifiOff className="h-5 w-5 text-red-500" />
           )}
-        </div>
+        </Button>
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <Button
             variant="ghost"
-            size="sm"
-            className={`relative ${showNotifications ? 'text-blue-600' : ''}`}
+            size="icon"
             onClick={handleBellClick}
           >
-            <Bell className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full text-[10px] flex items-center justify-center text-primary-foreground">
-              {notifications.length}
-            </span>
+            <Bell className="h-5 w-5" />
+            {notifications.length > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center">
+                {notifications.length}
+              </Badge>
+            )}
           </Button>
+
           {showNotifications && (
-            <Card className="absolute right-0 mt-2 w-80 z-[60] shadow-xl">
-              <CardHeader className="pb-3">
-                <CardTitle>Notifications</CardTitle>
+            <Card className={cn(
+              "absolute shadow-lg z-50",
+              isMobile 
+                ? "right-2 mt-2 w-[calc(100vw-4rem)] max-w-[360px]" 
+                : "right-0 mt-2 w-80"
+            )}>
+              <CardHeader>
+                <CardTitle className="text-sm">Notifications</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-4 p-0">
-                <ScrollArea className="h-[300px] px-4">
+              <CardContent className="p-0">
+                <ScrollArea className="h-[300px]">
                   {notifications.length > 0 ? (
-                    <div className="grid gap-4 pb-4">
-                      {notifications.map((alert) => (
-                        <div key={alert.id} className="grid gap-1 border-b pb-3 last:border-none">
-                          <p className="text-sm font-medium">{alert.type}</p>
-                          <p className="text-sm text-muted-foreground">{alert.message}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(alert.timestamp).toLocaleString()}
-                          </p>
-                        </div>
+                    <div className="flex flex-col">
+                      {notifications.map((notification, index) => (
+                        <button
+                          key={index}
+                          className="flex items-start gap-2 p-3 text-left hover:bg-accent border-b last:border-0"
+                          onClick={() => {
+                            closeAll();
+                            navigate(`/alerts/${notification.id}`);
+                          }}
+                        >
+                          <div className="flex-1 space-y-1">
+                            <p className="text-xs font-medium">{notification.title}</p>
+                            <p className="text-xs text-muted-foreground">{notification.message}</p>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No new notifications</p>
+                    <div className="flex flex-col items-center justify-center h-full py-8 px-4 text-center">
+                      <Bell className="h-8 w-8 mb-2 opacity-50" />
+                      <p className="text-sm font-medium">No notifications</p>
+                    </div>
                   )}
                 </ScrollArea>
-                <div className="border-t px-4 py-2">
-                  <Button variant="ghost" size="sm" onClick={closeAll} className="w-full">
-                    Clear all
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* User Menu */}
+        {/* User menu */}
         <div className="relative" ref={userRef}>
-          <Button variant="ghost" size="sm" onClick={handleUserClick} className={showUserMenu ? 'text-blue-600' : ''}>
-            <User className="w-5 h-5" />
-            {user && <span className="ml-1 hidden sm:inline text-xs font-medium max-w-[90px] truncate" title={user.name}>{user.name.split(' ')[0]}</span>}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleUserClick}
+          >
+            <User className="h-5 w-5" />
           </Button>
+
           {showUserMenu && (
-            <Card className="absolute right-0 mt-2 w-48 z-[60] shadow-xl">
+            <Card className={cn(
+              "absolute shadow-lg z-50",
+              isMobile 
+                ? "right-2 mt-2 w-[calc(100vw-4rem)] max-w-[360px]" 
+                : "right-0 mt-2 w-80"
+            )}>
+              <CardHeader className="py-3 px-4">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium truncate">{user?.name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email || 'user@example.com'}</p>
+                </div>
+              </CardHeader>
               <CardContent className="p-0">
-                {user && (
-                  <div className="px-4 py-2 border-b text-left text-xs">
-                    <div className="font-medium text-sm truncate" title={user.name}>{user.name}</div>
-                    <div className="text-muted-foreground truncate" title={user.email}>{user.email}</div>
-                    <div className="mt-1 space-y-1">
-                      <div className="inline-block rounded bg-primary/10 text-primary px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                        {user.role}
-                      </div>
-                      {user.department && (
-                        <div className="inline-block rounded bg-secondary/10 text-secondary-foreground px-2 py-0.5 text-[10px] uppercase tracking-wide ml-1">
-                          {user.department}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <button
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground rounded-t-lg transition-colors"
-                  onClick={() => { closeAll(); navigate('/profile'); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+                  onClick={() => { closeAll(); navigate('/'); }}
                 >
-                  <User className="w-4 h-4" />
-                  <span>Profile</span>
+                  <Home className="w-4 h-4" />
+                  <span>Home</span>
                 </button>
                 <button
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
                   onClick={() => { closeAll(); navigate('/settings'); }}
                 >
                   <Settings className="w-4 h-4" />
                   <span>Settings</span>
                 </button>
                 <button
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-b-lg transition-colors"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
                   onClick={() => {
                     closeAll();
                     localStorage.clear();
@@ -262,9 +248,13 @@ export const Header = () => {
         </div>
       </div>
 
-      {/* Overlay for dropdowns */}
-      {/* Optional dimmed backdrop only when a dropdown open (placed after header for stacking) */}
-      {anyOpen && <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40" />}
+      {/* Backdrop */}
+      {(showNotifications || showUserMenu) && (
+        <div 
+          className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40" 
+          onClick={closeAll}
+        />
+      )}
     </header>
   );
-};
+}

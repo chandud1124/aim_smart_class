@@ -41,7 +41,8 @@
 
 // Debounce multiple rapid local state changes into one state_update
 #define STATE_DEBOUNCE_MS 200
-#define MANUAL_DEBOUNCE_MS 30
+#define MANUAL_DEBOUNCE_MS 80 // Increased debounce to 80ms for better filtering
+#define MANUAL_REPEAT_IGNORE_MS 200 // Ignore repeated toggles within 200ms
 
 // Command queue size and processing interval
 #define MAX_COMMAND_QUEUE 16
@@ -308,6 +309,7 @@ void identify()
  doc["offline_capable"] = true; // Indicate this device supports offline mode
  sendJson(doc);
  lastIdentifyAttempt = millis();
+ Serial.println("[WS] Sent identification to backend");
 }
 
 void sendStateUpdate(bool force)
@@ -477,7 +479,13 @@ void processCommandQueue()
  // CRASH PREVENTION: Add watchdog reset during command processing
  esp_task_wdt_reset();
  
- applySwitchState(cmd.gpio, cmd.state);
+ // Log command processing for debugging
+ Serial.printf("[CMD] Processing queued command: GPIO %d -> %s\n", cmd.gpio, cmd.state ? "ON" : "OFF");
+ 
+ bool success = applySwitchState(cmd.gpio, cmd.state);
+ if (!success) {
+ Serial.printf("[CMD] Failed to apply command for GPIO %d\n", cmd.gpio);
+ }
  processedCount++;
  
  // Small delay between commands to prevent rapid GPIO changes
@@ -498,18 +506,35 @@ void processCommandQueue()
  Serial.printf("[WARNING] Command queue backing up: %d/%d items\n", 
               remainingItems, MAX_COMMAND_QUEUE);
  }
+ 
+ // Log successful processing
+ if (processedCount > 0) {
+ Serial.printf("[CMD] Processed %d commands this cycle\n", processedCount);
+ }
 }
 
 bool applySwitchState(int gpio, bool state)
 {
+ // Validate GPIO pin
+ if (gpio < 0 || gpio > 39) {
+ Serial.printf("[SWITCH] Invalid GPIO %d (must be 0-39)\n", gpio);
+ return false;
+ }
+
  for (auto &sw : switchesLocal)
  {
  if (sw.gpio == gpio)
  {
+ // Check if pin is properly configured
+ if (!digitalPinIsValid(sw.gpio)) {
+ Serial.printf("[SWITCH] GPIO %d is not a valid digital pin\n", sw.gpio);
+ return false;
+ }
+
  sw.state = state;
  pinMode(sw.gpio, OUTPUT);
  digitalWrite(sw.gpio, state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
- Serial.printf("[SWITCH] GPIO %d -> %s\n", sw.gpio, state ? "ON" : "OFF");
+ Serial.printf("[SWITCH] GPIO %d -> %s (SUCCESS)\n", sw.gpio, state ? "ON" : "OFF");
 
  // Save state to NVS for offline persistence
  sw.defaultState = state;
@@ -519,7 +544,7 @@ bool applySwitchState(int gpio, bool state)
  return true;
  }
  }
- Serial.printf("[SWITCH] Unknown GPIO %d (ignored)\n", gpio);
+ Serial.printf("[SWITCH] Unknown GPIO %d (not found in switchesLocal)\n", gpio);
  return false;
 }
 
@@ -830,6 +855,12 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  Serial.printf("[CMD] Raw: %.*s\n", (int)len, payload);
  Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
 
+ // Validate command parameters
+ if (gpio < 0) {
+ Serial.printf("[CMD] Invalid GPIO %d in switch_command\n", gpio);
+ return;
+ }
+
  // Queue the command instead of executing immediately
  queueSwitchCommand(gpio, requested);
  return;
@@ -1017,60 +1048,71 @@ void handleManualSwitches()
 
  for (auto &sw : switchesLocal)
  {
- if (!sw.manualEnabled || sw.manualGpio < 0)
- continue;
+   if (!sw.manualEnabled || sw.manualGpio < 0)
+     continue;
 
- // Read current level
- int rawLevel = digitalRead(sw.manualGpio);
+   // Read current level
+   int rawLevel = digitalRead(sw.manualGpio);
 
- // If level changed, start debounce
- if (rawLevel != sw.lastManualLevel)
- {
- sw.lastManualLevel = rawLevel;
- sw.lastManualChangeMs = now;
- }
+   // If level changed, start debounce
+   if (rawLevel != sw.lastManualLevel)
+   {
+     sw.lastManualLevel = rawLevel;
+     sw.lastManualChangeMs = now;
+   }
 
- // Check if debounce period passed
- if (rawLevel != sw.stableManualLevel && (now - sw.lastManualChangeMs >= MANUAL_DEBOUNCE_MS))
- {
- // Debounced change detected
- sw.stableManualLevel = rawLevel;
- bool active = sw.manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
+   // Check if debounce period passed
+   if (rawLevel != sw.stableManualLevel && (now - sw.lastManualChangeMs >= MANUAL_DEBOUNCE_MS))
+   {
+     // Debounced change detected
+     sw.stableManualLevel = rawLevel;
+     bool active = sw.manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
 
- if (sw.manualMomentary)
- {
- // For momentary switches, toggle on active edge
- if (active && !sw.lastManualActive)
- {
- // Toggle on active edge
- bool previousState = sw.state;
- Serial.printf("[MANUAL] Momentary switch GPIO %d (pin %d) pressed - toggling %s -> %s\n", 
- sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", !previousState ? "ON" : "OFF");
- queueSwitchCommand(sw.gpio, !sw.state);
- sw.manualOverride = true;
- 
- // Send manual switch event to backend
- sendManualSwitchEvent(sw.gpio, previousState, !previousState);
- }
- }
- else
- {
- // For maintained switches, follow switch position
- if (active != sw.state)
- {
- bool previousState = sw.state;
- Serial.printf("[MANUAL] Maintained switch GPIO %d (pin %d) changed - %s -> %s\n", 
- sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", active ? "ON" : "OFF");
- queueSwitchCommand(sw.gpio, active);
- sw.manualOverride = true;
- 
- // Send manual switch event to backend
- sendManualSwitchEvent(sw.gpio, previousState, active);
- }
- }
+     // Prevent repeated toggles within MANUAL_REPEAT_IGNORE_MS
+     static unsigned long lastManualTriggerMs[MAX_SWITCHES] = {0};
+     int swIdx = &sw - &switchesLocal[0];
+     if (swIdx >= 0 && swIdx < MAX_SWITCHES) {
+       if (now - lastManualTriggerMs[swIdx] < MANUAL_REPEAT_IGNORE_MS) {
+         // Ignore repeated toggles
+         Serial.printf("[MANUAL] Ignored repeated toggle for GPIO %d within %d ms\n", sw.gpio, MANUAL_REPEAT_IGNORE_MS);
+         sw.lastManualActive = active;
+         continue;
+       }
+       lastManualTriggerMs[swIdx] = now;
+     }
 
- sw.lastManualActive = active;
- }
+     if (sw.manualMomentary)
+     {
+       // For momentary switches, toggle on active edge
+       if (active && !sw.lastManualActive)
+       {
+         // Toggle on active edge
+         bool previousState = sw.state;
+         Serial.printf("[MANUAL] Momentary switch GPIO %d (pin %d) pressed - toggling %s -> %s\n", 
+           sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", !previousState ? "ON" : "OFF");
+         queueSwitchCommand(sw.gpio, !sw.state);
+         sw.manualOverride = true;
+         // Send manual switch event to backend
+         sendManualSwitchEvent(sw.gpio, previousState, !previousState);
+       }
+     }
+     else
+     {
+       // For maintained switches, follow switch position
+       if (active != sw.state)
+       {
+         bool previousState = sw.state;
+         Serial.printf("[MANUAL] Maintained switch GPIO %d (pin %d) changed - %s -> %s\n", 
+           sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", active ? "ON" : "OFF");
+         queueSwitchCommand(sw.gpio, active);
+         sw.manualOverride = true;
+         // Send manual switch event to backend
+         sendManualSwitchEvent(sw.gpio, previousState, active);
+       }
+     }
+
+     sw.lastManualActive = active;
+   }
  }
 }
 
@@ -1243,6 +1285,17 @@ void loop()
 
  // Process command queue (with built-in rate limiting)
  processCommandQueue();
+
+ // Debug: Log queue status periodically
+ static unsigned long lastQueueDebug = 0;
+ unsigned long now = millis();
+ if (now - lastQueueDebug >= 5000) { // Every 5 seconds
+ UBaseType_t queueItems = uxQueueMessagesWaiting(cmdQueue);
+ if (queueItems > 0) {
+ Serial.printf("[DEBUG] Command queue has %d items waiting\n", queueItems);
+ }
+ lastQueueDebug = now;
+ }
 
  // Handle manual switches
  handleManualSwitches();

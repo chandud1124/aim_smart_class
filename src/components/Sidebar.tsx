@@ -108,14 +108,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
   return (
     <div className={cn(
       "glass flex flex-col transition-all duration-300 h-screen relative z-20 min-w-16 box-border opacity-100 visible rounded-r-lg",
-      collapsed ? "w-16" : "w-64",
+      collapsed ? "w-12 sm:w-16" : "w-48 sm:w-64",
       className
     )}>
       {/* Logo/Brand */}
       <div className="p-2 flex-shrink-0 h-16 relative z-10 glass">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center flex-shrink-0">
-            <Shield className="w-5 h-5 text-primary-foreground" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">

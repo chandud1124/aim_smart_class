@@ -1,23 +1,10 @@
+/* Base styles optimized for performance */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  height: 100%;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
+/* Optimize animations with hardware acceleration */
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
@@ -27,16 +14,36 @@
   }
 }
 
+/* Only apply animations when reduced motion is not preferred */
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
+  .animate-spin {
     animation: logo-spin infinite 20s linear;
   }
 }
 
-.card {
-  padding: 2em;
+/* Add responsive utilities */
+@media (max-width: 640px) {
+  .mobile-p-reduced {
+    padding: 0.5rem !important;
+  }
+  
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
 }
 
-.read-the-docs {
-  color: #888;
+/* Improve performance with contain property */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+/* Add smooth scrolling but respect user preferences */
+@media (prefers-reduced-motion: no-preference) {
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
 }
