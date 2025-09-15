@@ -46,13 +46,13 @@
 #include <mbedtls/md.h>
 #endif
 
-#define WIFI_SSID "AIMS-WIFI"
-#define WIFI_PASSWORD "Aimswifi#2025"
-#define BACKEND_HOST "172.16.3.171" // backend LAN IP
-#define BACKEND_PORT 3001
-#define WS_PATH "/esp32-ws"
+#define WIFI_SSID WIFI_SSID
+#define WIFI_PASSWORD WIFI_PASSWORD
+#define BACKEND_HOST WEBSOCKET_HOST // backend LAN IP
+#define BACKEND_PORT WEBSOCKET_PORT
+#define WS_PATH WEBSOCKET_PATH
 #define HEARTBEAT_MS 30000UL // 30s heartbeat interval
-#define DEVICE_SECRET "eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def" // device secret from backend
+#define DEVICE_SECRET DEVICE_SECRET_KEY // device secret from backend
 
 // Optional status LED (set to 255 to disable if your board lacks LED_BUILTIN)
 #ifndef STATUS_LED_PIN

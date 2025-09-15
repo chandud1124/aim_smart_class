@@ -7,7 +7,8 @@ jest.mock('mongoose', () => ({
   connect: jest.fn(),
   connection: {
     on: jest.fn(),
-    readyState: 1
+    readyState: 1,
+    close: jest.fn().mockResolvedValue(true)
   }
 }));
 

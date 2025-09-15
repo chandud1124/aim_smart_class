@@ -22,6 +22,12 @@ build/
 !*.env.example
 !backend/.env.example
 
+# Secure Configuration (NEVER commit these!)
+backend/config/
+esp32/secure_config.h
+config.key
+encrypted.env
+
 # Logs
 logs/
 *.log

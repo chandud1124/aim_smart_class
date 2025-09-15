@@ -54,11 +54,43 @@ router.get('/:deviceId', checkDeviceAccess, getDeviceById);
 router.put('/:deviceId', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), checkDeviceAccess, validateDevice, updateDevice);
 router.delete('/:deviceId', authorize('admin'), checkDeviceAccess, deleteDevice);
 
-// Switch operations - using existing role-based system for now
-router.post('/:deviceId/switches/:switchId/toggle', 
-  authorize('admin', 'principal', 'dean', 'hod', 'faculty', 'security', 'student', 'user'), 
-  checkDeviceAccess,
+// Switch operations with enhanced permission checking
+router.post('/:deviceId/switches/:switchId/toggle',
+  checkDevicePermission('canTurnOn'), // Requires canTurnOn permission
+  incrementUsage, // Track usage
   toggleSwitch
+);
+
+// Device control with specific permissions
+router.post('/:deviceId/control',
+  checkDevicePermission('canModifySettings'),
+  checkValueLimits, // Check brightness/speed limits
+  incrementUsage,
+  require('../controllers/deviceController').controlDevice
+);
+
+// Device scheduling
+router.post('/:deviceId/schedule',
+  checkDevicePermission('canSchedule'),
+  require('../controllers/deviceController').scheduleDevice
+);
+
+// Device history access
+router.get('/:deviceId/history',
+  checkDevicePermission('canViewHistory'),
+  require('../controllers/deviceController').getDeviceHistory
+);
+
+// PIR sensor configuration
+router.post('/:deviceId/pir/configure',
+  checkDevicePermission('canConfigurePir'),
+  require('../controllers/deviceController').configurePir
+);
+
+// PIR sensor data access
+router.get('/:deviceId/pir/data',
+  checkDevicePermission('canViewPirData'),
+  require('../controllers/deviceController').getPirData
 );
 
 module.exports = router;

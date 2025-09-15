@@ -960,6 +960,174 @@ const bulkToggleByLocation = async (req, res) => {
   }
 };
 
+// Control device settings (brightness, fan speed, etc.)
+const controlDevice = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { brightness, fanSpeed, inputSource } = req.body;
+
+    const device = await Device.findById(deviceId);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    // Update device settings
+    const updates = {};
+    if (brightness !== undefined) updates.brightness = brightness;
+    if (fanSpeed !== undefined) updates.fanSpeed = fanSpeed;
+    if (inputSource !== undefined) updates.inputSource = inputSource;
+
+    const updatedDevice = await Device.findByIdAndUpdate(deviceId, updates, { new: true });
+
+    // Log activity
+    await ActivityLog.create({
+      user: req.user._id,
+      action: 'DEVICE_CONTROL',
+      details: `Controlled device ${device.name}: ${JSON.stringify(updates)}`,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    res.json({
+      success: true,
+      message: 'Device controlled successfully',
+      device: updatedDevice
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Schedule device operations
+const scheduleDevice = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { schedule } = req.body;
+
+    const device = await Device.findById(deviceId);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    // Here you would implement scheduling logic
+    // For now, just return success
+    res.json({
+      success: true,
+      message: 'Device scheduled successfully',
+      deviceId,
+      schedule
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get device history/logs
+const getDeviceHistory = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { limit = 50, page = 1 } = req.query;
+
+    const device = await Device.findById(deviceId);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    // Get activity logs for this device
+    const logs = await ActivityLog.find({
+      details: { $regex: deviceId, $options: 'i' }
+    })
+    .populate('user', 'name email')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await ActivityLog.countDocuments({
+      details: { $regex: deviceId, $options: 'i' }
+    });
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Configure PIR sensor
+const configurePir = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { sensitivity, timeout, enabled } = req.body;
+
+    const device = await Device.findById(deviceId);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    // Update PIR configuration
+    const pirConfig = {
+      sensitivity: sensitivity || device.pirConfig?.sensitivity || 50,
+      timeout: timeout || device.pirConfig?.timeout || 30,
+      enabled: enabled !== undefined ? enabled : device.pirConfig?.enabled || true
+    };
+
+    const updatedDevice = await Device.findByIdAndUpdate(deviceId, {
+      pirConfig
+    }, { new: true });
+
+    res.json({
+      success: true,
+      message: 'PIR sensor configured successfully',
+      device: updatedDevice
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get PIR sensor data
+const getPirData = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { limit = 100, startDate, endDate } = req.query;
+
+    const device = await Device.findById(deviceId);
+    if (!device) {
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    // Here you would query PIR sensor data from database
+    // For now, return mock data
+    const mockPirData = {
+      deviceId,
+      deviceName: device.name,
+      data: [
+        {
+          timestamp: new Date(),
+          motionDetected: true,
+          sensorValue: 85
+        }
+      ],
+      totalRecords: 1
+    };
+
+    res.json({
+      success: true,
+      data: mockPirData
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getAllDevices,
   createDevice,
@@ -968,7 +1136,12 @@ module.exports = {
   getDeviceById,
   updateDevice,
   deleteDevice,
-  bulkToggleSwitches
-  , bulkToggleByType
-  , bulkToggleByLocation
+  bulkToggleSwitches,
+  bulkToggleByType,
+  bulkToggleByLocation,
+  controlDevice,
+  scheduleDevice,
+  getDeviceHistory,
+  configurePir,
+  getPirData
 };

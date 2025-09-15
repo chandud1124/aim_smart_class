@@ -10,6 +10,21 @@ const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 const { logger } = require('./middleware/logger');
 const routeMonitor = require('./middleware/routeMonitor');
 
+// Load secure configuration if available
+let secureConfig = {};
+try {
+    const SecureConfigManager = require('./scripts/secure-config');
+    const configManager = new SecureConfigManager();
+    secureConfig = configManager.loadSecureConfig();
+    console.log('✅ Secure configuration loaded successfully');
+} catch (error) {
+    console.log('⚠️  Secure configuration not available, using environment variables');
+    console.log('   Run: node scripts/secure-config.js setup');
+}
+
+// Merge secure config with environment variables
+process.env = { ...process.env, ...secureConfig };
+
 // Initialize error tracking
 process.on('uncaughtException', (error) => {
   if (error.code === 'EPIPE') {
