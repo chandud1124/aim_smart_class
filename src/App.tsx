@@ -10,6 +10,7 @@ import { PrivateRoute } from "./components/PrivateRoute";
 import { GlobalLoadingProvider } from '@/hooks/useGlobalLoading';
 import { GlobalLoadingOverlay } from '@/components/GlobalLoadingOverlay';
 import { DevicesProvider } from '@/hooks/useDevices';
+import { SocketProvider } from '@/context/SocketContext';
 
 // Lazy load components for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -56,62 +57,62 @@ const PageLoader = () => (
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <GlobalLoadingProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true
-          }}>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/register" element={<Register />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password/:resetToken" element={<ResetPassword />} />
+      <SocketProvider>
+        <GlobalLoadingProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password/:resetToken" element={<ResetPassword />} />
 
-                {/* Protected Routes */}
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute>
-                      <DevicesProvider>
-                        <Layout />
-                      </DevicesProvider>
-                    </PrivateRoute>
-                  }
-                >
-                  <Route index element={<Index />} />
-                  <Route path="devices" element={<Devices />} />
-                  <Route path="switches" element={<Switches />} />
-                  <Route path="master" element={<Master />} />
-                  <Route path="schedule" element={<Schedule />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="profile" element={<UserProfile />} />
-                  <Route path="permissions" element={<PermissionManagement />} />
-                  <Route path="roles" element={<RoleManagement />} />
-                  <Route path="facility-access" element={<FacilityAccessPage />} />
-                  <Route path="classroom-access" element={<Navigate to="/facility-access" replace />} />
-                  <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
-                  <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
-                  <Route path="activity-stats" element={<ActivityStatisticsPage />} />
-                  <Route path="bulk-operations" element={<BulkOperationsPage />} />
-                  <Route path="security" element={<SecurityDashboardPage />} />
-                  <Route path="system-health" element={<SystemHealthPage />} />
-                  <Route path="tickets" element={<Tickets />} />
-                </Route>
+                  {/* Protected Routes */}
+                  <Route
+                    path="/"
+                    element={
+                      <PrivateRoute>
+                        <DevicesProvider>
+                          <Layout />
+                        </DevicesProvider>
+                      </PrivateRoute>
+                    }
+                  >
+                    <Route index element={<Index />} />
+                    <Route path="devices" element={<Devices />} />
+                    <Route path="switches" element={<Switches />} />
+                    <Route path="master" element={<Master />} />
+                    <Route path="schedule" element={<Schedule />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="profile" element={<UserProfile />} />
+                    <Route path="permissions" element={<PermissionManagement />} />
+                    <Route path="roles" element={<RoleManagement />} />
+                    <Route path="facility-access" element={<FacilityAccessPage />} />
+                    <Route path="classroom-access" element={<Navigate to="/facility-access" replace />} />
+                    <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
+                    <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
+                    <Route path="activity-stats" element={<ActivityStatisticsPage />} />
+                    <Route path="bulk-operations" element={<BulkOperationsPage />} />
+                    <Route path="security" element={<SecurityDashboardPage />} />
+                    <Route path="system-health" element={<SystemHealthPage />} />
+                    <Route path="tickets" element={<Tickets />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-          <GlobalLoadingOverlay />
-        </TooltipProvider>
-      </GlobalLoadingProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+            <GlobalLoadingOverlay />
+          </TooltipProvider>
+        </GlobalLoadingProvider>
+      </SocketProvider>
     </QueryClientProvider>
   );
-};
-
-export default App;
+};export default App;

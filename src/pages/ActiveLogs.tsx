@@ -62,26 +62,6 @@ interface LocalActivityLog {
   context?: any;
 }
 
-interface ErrorLog {
-  id: string;
-  timestamp: string | number | Date;
-  errorType: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  message: string;
-  deviceId?: string;
-  deviceName?: string;
-  userId?: string;
-  userName?: string;
-  resolved: boolean;
-  resolvedBy?: string;
-  resolvedAt?: Date;
-  notes?: string;
-  details?: any;
-  stackTrace?: string;
-  endpoint?: string;
-  method?: string;
-}
-
 interface ManualSwitchLog {
   id: string;
   timestamp: string | number | Date;
@@ -135,12 +115,11 @@ interface DeviceStatusLog {
 
 interface LogStats {
   activities: { total: number; today: number };
-  errors: { total: number; today: number; unresolved: number };
   manualSwitches: { total: number; today: number; conflicts: number };
   deviceStatus: { total: number; today: number };
 }
 
-type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
+type LogType = 'activities' | 'manual-switches' | 'device-status';
 
   // Safe rendering of statistics cards
   const renderStatsCard = (title: string, icon: React.ReactNode, value: number, subtitle: string) => (
@@ -167,7 +146,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
   // Data states
   // State for different log types
   const [activityLogs, setActivityLogs] = useState<LocalActivityLog[]>([]);
-  const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [manualSwitchLogs, setManualSwitchLogs] = useState<ManualSwitchLog[]>([]);
   const [deviceStatusLogs, setDeviceStatusLogs] = useState<DeviceStatusLog[]>([]);
 
@@ -207,9 +185,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
         case 'activities':
           endpoint = '/logs/activities';
           break;
-        case 'errors':
-          endpoint = '/logs/errors';
-          break;
         case 'manual-switches':
           endpoint = '/logs/manual-switches';
           break;
@@ -235,9 +210,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
         case 'activities':
           setActivityLogs(Array.isArray(data) ? data : []);
           break;
-        case 'errors':
-          setErrorLogs(Array.isArray(data) ? data : []);
-          break;
         case 'manual-switches':
           setManualSwitchLogs(Array.isArray(data) ? data : []);
           break;
@@ -261,7 +233,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
       // Set default stats structure to prevent undefined errors
       setStats({
         activities: { total: 0, today: 0 },
-        errors: { total: 0, today: 0, unresolved: 0 },
         manualSwitches: { total: 0, today: 0, conflicts: 0 },
         deviceStatus: { total: 0, today: 0 }
       });
@@ -329,7 +300,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
   const getTabIcon = (tab: LogType) => {
     switch (tab) {
       case 'activities': return <Activity className="w-4 h-4" />;
-      case 'errors': return <AlertTriangle className="w-4 h-4" />;
       case 'manual-switches': return <Zap className="w-4 h-4" />;
       case 'device-status': return <Monitor className="w-4 h-4" />;
     }
@@ -355,12 +325,11 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
     let data: any[] = [];
     switch (activeTab) {
       case 'activities': data = activityLogs; break;
-      case 'errors': data = errorLogs; break;
       case 'manual-switches': data = manualSwitchLogs; break;
       case 'device-status': data = deviceStatusLogs; break;
     }
     return data;
-  }, [activeTab, activityLogs, errorLogs, manualSwitchLogs, deviceStatusLogs]);
+  }, [activeTab, activityLogs, manualSwitchLogs, deviceStatusLogs]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -373,7 +342,7 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
   return (
     <div className="w-full max-w-7xl mx-auto mt-4 space-y-6">
       {/* Statistics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -385,21 +354,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                   </p>
                 </div>
                 <Activity className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Error Logs</p>
-                  <p className="text-2xl font-bold">{safe(stats, 'errors.total', 0)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {safe(stats, 'errors.unresolved', 0)} unresolved
-                  </p>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-red-600" />
               </div>
             </CardContent>
           </Card>
@@ -527,49 +481,16 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                   {/* Device options will be populated dynamically */}
                 </SelectContent>
               </Select>
-
-              {activeTab === 'errors' && (
-                <Select value={severityFilter} onValueChange={setSeverityFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Severities</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-
-              {activeTab === 'errors' && (
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="unresolved">Unresolved</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
             </div>
           </div>
 
           {/* Tabbed Interface */}
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LogType)}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="activities" className="flex items-center gap-2">
                 {getTabIcon('activities')}
                 <span className="hidden md:inline">Activity Logs</span>
                 <span className="md:hidden">Activity</span>
-              </TabsTrigger>
-              <TabsTrigger value="errors" className="flex items-center gap-2">
-                {getTabIcon('errors')}
-                <span className="hidden md:inline">Error Logs</span>
-                <span className="md:hidden">Errors</span>
               </TabsTrigger>
               <TabsTrigger value="manual-switches" className="flex items-center gap-2">
                 {getTabIcon('manual-switches')}
@@ -640,83 +561,6 @@ type LogType = 'activities' | 'errors' | 'manual-switches' | 'device-status';
                             </td>
                             <td className="px-4 py-2 text-xs text-muted-foreground">
                               {log.location || log.facility || '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* Error Logs */}
-            <TabsContent value="errors">
-              <div className="space-y-4">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="animate-spin w-6 h-6 mr-2" />
-                    Loading error logs...
-                  </div>
-                ) : paginatedData.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No error logs found.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="px-4 py-2 text-left">Time</th>
-                          <th className="px-4 py-2 text-left">Severity</th>
-                          <th className="px-4 py-2 text-left">Error Type</th>
-                          <th className="px-4 py-2 text-left">Message</th>
-                          <th className="px-4 py-2 text-left">Source</th>
-                          <th className="px-4 py-2 text-left">Status</th>
-                          <th className="px-4 py-2 text-left">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(paginatedData as ErrorLog[]).map((log) => (
-                          <tr key={log.id} className="border-b hover:bg-muted/50">
-                            <td className="px-4 py-2 whitespace-nowrap">
-                              {format(new Date(log.timestamp), 'MMM dd, HH:mm:ss')}
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge className={getSeverityBadge(log.severity || 'low')}>
-                                {(log.severity || 'unknown').toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2">
-                              <div>
-                                <div className="font-medium">{log.errorType || 'Unknown'}</div>
-                                <div className="text-xs text-muted-foreground">Error Type</div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2">
-                              <div className="max-w-md">
-                                <div className="truncate">{log.message || 'No message available'}</div>
-                                {log.deviceName && (
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    Device: {log.deviceName}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 text-xs">
-                              {log.endpoint ? `${log.method || 'GET'} ${log.endpoint}` : (log.deviceName ? 'Device' : 'System')}
-                            </td>
-                            <td className="px-4 py-2">
-                              <Badge className={getStatusBadge(log.resolved)}>
-                                {log.resolved ? (
-                                  <><CheckCircle className="w-3 h-3 mr-1" /> Resolved</>
-                                ) : (
-                                  <><Clock className="w-3 h-3 mr-1" /> Open</>
-                                )}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2">
-                              {/* Error resolution dialog removed */}
                             </td>
                           </tr>
                         ))}

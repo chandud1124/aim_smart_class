@@ -22,6 +22,7 @@ import { DeviceConfigDialog } from '@/components/DeviceConfigDialog';
 import DeleteDeviceDialog from '@/components/DeleteDeviceDialog';
 import { Device } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useSocketConnection, useDeviceNotifications } from '@/hooks/useSocket';
 
 type ViewMode = 'grid' | 'list';
 type FilterStatus = 'all' | 'online' | 'offline' | 'warning';
@@ -43,8 +44,33 @@ const Devices = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Socket.IO hooks
+  const { isConnected, connectionError } = useSocketConnection();
+  const { notifications } = useDeviceNotifications();
+
+  // Update connection status based on socket connection
+  const connectionStatus = isConnected ? 'connected' : connectionError ? 'disconnected' : 'connecting';
+
+  // Update last update time when receiving real-time notifications
+  useEffect(() => {
+    if (notifications.length > 0) {
+      setLastUpdate(new Date());
+    }
+  }, [notifications]);
+
+  // Show toast notifications for real-time device events
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const latestNotification = notifications[0];
+      toast({
+        title: "Device Update",
+        description: latestNotification.message,
+        duration: 3000,
+      });
+    }
+  }, [notifications, toast]);
 
   // Filtered and grouped devices
   const filteredAndGroupedDevices = useMemo(() => {
