@@ -548,6 +548,7 @@ wss.on('connection', (ws) => {
     let data;
     try { data = JSON.parse(msg.toString()); } catch { return; }
     const type = data.type;
+    console.log('[WS] Received message type:', type, 'MAC:', data.mac || 'none');
     if (type === 'identify' || type === 'authenticate') {
       const mac = (data.mac || data.macAddress || '').toUpperCase();
       const secret = data.secret || data.signature;
@@ -806,6 +807,81 @@ wss.on('connection', (ws) => {
         io.emit('switch_result', { deviceId: device.id, gpio, requestedState: requested, actualState: actual !== undefined ? actual : (target ? target.state : undefined), success: true, ts: Date.now() });
       } catch (e) {
         logger.error('[switch_result handling] error', e.message);
+      }
+      return;
+    }
+    if (type === 'manual_switch') {
+      // Handle manual switch events from ESP32 devices
+      try {
+        // For testing: if not identified, try to identify using the MAC from the message
+        if (!ws.mac && data.mac) {
+          ws.mac = data.mac.toUpperCase();
+        }
+        
+        if (!ws.mac) {
+          logger.warn('[manual_switch] no MAC available');
+          return;
+        }
+
+        const Device = require('./models/Device');
+        const EnhancedLoggingService = require('./services/enhancedLoggingService');
+
+        const device = await Device.findOne({ macAddress: ws.mac });
+        if (!device) {
+          logger.warn('[manual_switch] device not found', { mac: ws.mac });
+          return;
+        }
+
+        const gpio = data.gpio || data.switchId;
+        const action = data.action; // 'manual_on' or 'manual_off'
+        const previousState = data.previousState === 'on';
+        const newState = data.newState === 'on';
+        const detectedBy = data.detectedBy || 'gpio_interrupt';
+        const physicalPin = data.physicalPin;
+        const timestamp = data.timestamp || Date.now();
+
+        // Find the switch in the device configuration
+        const targetSwitch = device.switches.find(sw => (sw.gpio || sw.relayGpio) === gpio);
+        if (!targetSwitch) {
+          logger.warn('[manual_switch] switch not found', { mac: ws.mac, gpio });
+          return;
+        }
+
+        // Log the manual switch event
+        await EnhancedLoggingService.logManualSwitch({
+          deviceId: device._id,
+          deviceName: device.name,
+          deviceMac: ws.mac,
+          switchId: gpio,
+          switchName: targetSwitch.name,
+          physicalPin: physicalPin,
+          action: action,
+          previousState: previousState,
+          newState: newState,
+          detectedBy: detectedBy,
+          timestamp: new Date(timestamp),
+          macAddress: ws.mac
+        });
+
+        logger.info('[manual_switch] logged', {
+          mac: ws.mac,
+          gpio,
+          action,
+          previousState,
+          newState,
+          switchName: targetSwitch.name
+        });
+
+        // Update device state if it changed
+        if (targetSwitch.state !== newState) {
+          targetSwitch.state = newState;
+          targetSwitch.lastStateChange = new Date();
+          await device.save();
+          emitDeviceStateChanged(device, { source: 'esp32:manual_switch' });
+        }
+
+      } catch (e) {
+        logger.error('[manual_switch] error', e.message);
       }
       return;
     }

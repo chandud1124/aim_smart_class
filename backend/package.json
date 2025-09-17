@@ -17,6 +17,7 @@
     "test:ci": "jest --coverage --watchAll=false --passWithNoTests"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "axios": "^1.4.0",
     "bcryptjs": "^2.4.3",
     "better-queue": "^3.8.12",

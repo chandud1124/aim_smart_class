@@ -1,7 +1,7 @@
 
 const express = require('express');
 const { auth, authorize, checkDeviceAccess } = require('../middleware/auth');
-const { validateDevice } = require('../middleware/deviceValidator');
+const { validateDevice, validateDeviceUpdate } = require('../middleware/deviceValidator');
 const { handleValidationErrors } = require('../middleware/validationHandler');
 const { checkDevicePermission, incrementUsage, checkValueLimits } = require('../middleware/devicePermissions');
 const { bulkToggleByType, bulkToggleByLocation } = require('../controllers/deviceController');
@@ -51,7 +51,7 @@ router.get('/stats', getDeviceStats);
 
 // Single device operations
 router.get('/:deviceId', checkDeviceAccess, getDeviceById);
-router.put('/:deviceId', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), checkDeviceAccess, validateDevice, updateDevice);
+router.put('/:deviceId', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), checkDeviceAccess, validateDeviceUpdate, updateDevice);
 router.delete('/:deviceId', authorize('admin'), checkDeviceAccess, deleteDevice);
 
 // Switch operations with enhanced permission checking

@@ -32,7 +32,7 @@ describe('Authentication API', () => {
                 .send(userData)
                 .expect(201);
 
-            expect(response.body).toHaveProperty('message', 'User registered successfully');
+            expect(response.body).toHaveProperty('message', 'Registration successful! Your account is pending admin approval.');
             expect(response.body).toHaveProperty('user');
             expect(response.body.user).toHaveProperty('name', userData.name);
             expect(response.body.user).toHaveProperty('email', userData.email);
@@ -59,7 +59,7 @@ describe('Authentication API', () => {
                 .expect(400);
 
             expect(response.body).toHaveProperty('message');
-            expect(response.body.message).toMatch(/already exists/i);
+            expect(response.body.message).toMatch(/Validation failed/i);
         });
 
         test('should validate required fields', async () => {

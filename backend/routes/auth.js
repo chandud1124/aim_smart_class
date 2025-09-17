@@ -5,6 +5,7 @@ const {
   login,
   getProfile,
   updateProfile,
+  changePassword,
   forgotPassword,
   resetPassword,
   getPendingPermissionRequests,
@@ -64,6 +65,7 @@ router.post('/register',
 router.post('/login', loginValidation, handleValidationErrors, login);
 router.get('/profile', auth, getProfile);
 router.put('/profile', auth, updateProfile);
+router.put('/change-password', auth, changePassword);
 router.post('/forgot-password',
   [body('email').isEmail().withMessage('Please provide a valid email')],
   handleValidationErrors,

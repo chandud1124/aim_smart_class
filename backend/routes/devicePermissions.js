@@ -13,7 +13,7 @@ const {
 // Grant device permission to user
 router.post('/grant',
     auth,
-    authorize('admin', 'principal', 'dean', 'hod', 'faculty'),
+    authorize('admin', 'principal', 'dean', 'hod'),
     grantDevicePermission
 );
 

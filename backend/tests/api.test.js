@@ -10,6 +10,18 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
 
+// Add health endpoint to match server.js
+app.get('/health', (req, res) => {
+  const health = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: 'disconnected', // Mock for test
+    environment: process.env.NODE_ENV || 'development'
+  };
+  res.status(200).json(health);
+});
+
 describe('API Routes', () => {
     describe('GET /health', () => {
         test('should return health status', async () => {

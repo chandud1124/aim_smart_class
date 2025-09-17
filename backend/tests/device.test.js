@@ -116,10 +116,12 @@ describe('Device API', () => {
                 .set('Authorization', `Bearer ${adminToken}`)
                 .expect(200);
 
-            expect(response.body).toHaveProperty('name', 'Test Classroom Device');
-            expect(response.body).toHaveProperty('macAddress', 'AA:BB:CC:DD:EE:FF');
-            expect(response.body).toHaveProperty('switches');
-            expect(Array.isArray(response.body.switches)).toBe(true);
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('name', 'Test Classroom Device');
+            expect(response.body.data).toHaveProperty('macAddress', 'AA:BB:CC:DD:EE:FF');
+            expect(response.body.data).toHaveProperty('switches');
+            expect(Array.isArray(response.body.data.switches)).toBe(true);
         });
 
         test('should return 404 for non-existent device', async () => {
@@ -145,8 +147,8 @@ describe('Device API', () => {
                 .expect(200);
 
             expect(response.body).toHaveProperty('success', true);
-            expect(response.body).toHaveProperty('message');
-            expect(response.body.message).toMatch(/toggled/i);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body).toHaveProperty('hardwareDispatch');
         });
 
         test('should handle switch toggle with state parameter', async () => {
@@ -167,6 +169,7 @@ describe('Device API', () => {
                 .expect(200);
 
             expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('data');
         });
 
         test('should reject toggle for invalid device', async () => {
@@ -196,8 +199,11 @@ describe('Device API', () => {
                 .send(updateData)
                 .expect(200);
 
-            expect(response.body).toHaveProperty('name', 'Updated Device Name');
-            expect(response.body).toHaveProperty('location', 'Updated Location');
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('message', 'Device updated successfully');
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('name', 'Updated Device Name');
+            expect(response.body.data).toHaveProperty('location', 'Updated Location');
         });
 
         test('should reject update for non-admin', async () => {
@@ -243,6 +249,7 @@ describe('Device API', () => {
                 macAddress: 'BB:CC:DD:EE:FF:AA',
                 ipAddress: '192.168.1.101',
                 classroom: 'Test Room 2',
+                location: 'Building A',
                 type: 'switch',
                 switches: [
                     {
@@ -260,8 +267,10 @@ describe('Device API', () => {
                 .send(newDeviceData)
                 .expect(201);
 
-            expect(response.body).toHaveProperty('name', 'New Test Device');
-            expect(response.body).toHaveProperty('macAddress', 'BB:CC:DD:EE:FF:AA');
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('name', 'New Test Device');
+            expect(response.body.data).toHaveProperty('macAddress', 'BB:CC:DD:EE:FF:AA');
         });
 
         test('should reject device creation for non-admin', async () => {
@@ -289,9 +298,11 @@ describe('Device API', () => {
                 .set('Authorization', `Bearer ${adminToken}`)
                 .expect(200);
 
-            expect(response.body).toHaveProperty('totalDevices');
-            expect(response.body).toHaveProperty('onlineDevices');
-            expect(response.body).toHaveProperty('offlineDevices');
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('totalDevices');
+            expect(response.body.data).toHaveProperty('onlineDevices');
+            expect(response.body.data).toHaveProperty('totalSwitches');
         });
     });
 });

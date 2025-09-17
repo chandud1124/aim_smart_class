@@ -128,6 +128,7 @@ describe('Device Permission API', () => {
             await DevicePermission.create({
                 user: studentUser._id,
                 device: testDevice._id,
+                classroom: testDevice.classroom,
                 permissions: { canTurnOn: true },
                 grantedBy: adminUser._id,
                 isActive: true
@@ -211,6 +212,7 @@ describe('Device Permission API', () => {
             testPermission = await DevicePermission.create({
                 user: studentUser._id,
                 device: testDevice._id,
+                classroom: testDevice.classroom,
                 permissions: { canTurnOn: true },
                 grantedBy: adminUser._id,
                 isActive: true
@@ -262,6 +264,7 @@ describe('Device Permission API', () => {
             testPermission = await DevicePermission.create({
                 user: studentUser._id,
                 device: testDevice._id,
+                classroom: testDevice.classroom,
                 permissions: { canTurnOn: true },
                 grantedBy: adminUser._id,
                 isActive: true
@@ -343,6 +346,7 @@ describe('Device Permission API', () => {
             testPermission = await DevicePermission.create({
                 user: studentUser._id,
                 device: testDevice._id,
+                classroom: testDevice.classroom,
                 permissions: { canTurnOn: false }, // Restricted permission
                 grantedBy: adminUser._id,
                 isActive: true
