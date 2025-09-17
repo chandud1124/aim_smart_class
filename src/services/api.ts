@@ -322,4 +322,322 @@ export const bulkAPI = {
   updateDevices: (updates: any[]) => api.put('/bulk/devices', { updates }),
 };
 
+export const rolePermissionsAPI = {
+  // Get all role permissions
+  getAllRolePermissions: () => api.get('/role-permissions'),
+
+  // Get permissions for a specific role
+  getRolePermissions: (role: string) => api.get(`/role-permissions/${role}`),
+
+  // Create new role permissions
+  createRolePermissions: (data: {
+    role: string;
+    userManagement?: any;
+    deviceManagement?: any;
+    classroomManagement?: any;
+    scheduleManagement?: any;
+    activityManagement?: any;
+    securityManagement?: any;
+    ticketManagement?: any;
+    systemManagement?: any;
+    extensionManagement?: any;
+    calendarIntegration?: any;
+    esp32Management?: any;
+    bulkOperations?: any;
+    departmentRestrictions?: any;
+    timeRestrictions?: any;
+    notifications?: any;
+    apiAccess?: any;
+    audit?: any;
+    metadata?: any;
+  }) => api.post('/role-permissions', data),
+
+  // Update permissions for a specific role
+  updateRolePermissions: (role: string, updates: any) =>
+    api.put(`/role-permissions/${role}`, updates),
+
+  // Partially update permissions for a specific role
+  patchRolePermissions: (role: string, updates: any) =>
+    api.patch(`/role-permissions/${role}`, updates),
+
+  // Delete permissions for a specific role
+  deleteRolePermissions: (role: string) => api.delete(`/role-permissions/${role}`),
+
+  // Reset permissions to defaults for a specific role
+  resetRolePermissions: (role: string) => api.post(`/role-permissions/${role}/reset`),
+
+  // Initialize default permissions for all roles
+  initializeRolePermissions: () => api.post('/role-permissions/initialize'),
+
+  // Check if a role has a specific permission
+  checkPermission: (role: string, category: string, permission: string) =>
+    api.get(`/role-permissions/check/${role}/${category}/${permission}`),
+};
+
+export const classroomAPI = {
+  // Get classrooms summary
+  getClassroomsSummary: () => api.get('/facility/summary'),
+
+  // Get all classroom access records
+  getAllClassroomAccess: () => api.get('/facility/all'),
+
+  // Get user's classroom access
+  getUserClassroomAccess: (userId: string) => api.get(`/facility/user/${userId}`),
+
+  // Grant classroom access
+  grantClassroomAccess: (data: {
+    userId: string;
+    classroom: string;
+    permissions: {
+      canControlDevices: boolean;
+      canViewSensors: boolean;
+      canModifySchedule: boolean;
+      canAccessAfterHours: boolean;
+      canOverrideSecurity: boolean;
+    };
+    timeRestrictions?: {
+      enabled: boolean;
+      allowedDays: string[];
+      startTime: string;
+      endTime: string;
+    };
+    expiresAt?: string;
+    reason: string;
+  }) => api.post('/facility/grant', data),
+
+  // Revoke classroom access
+  revokeClassroomAccess: (accessId: string) => api.delete(`/facility/${accessId}`),
+};
+
+export const googleCalendarAPI = {
+  // Get Google OAuth authorization URL
+  getAuthUrl: (state?: string) => api.get('/google-calendar/auth-url', { params: { state } }),
+
+  // Get Google Calendar events
+  getEvents: () => api.get('/google-calendar/events'),
+
+  // Get Google Calendar connection status
+  getStatus: () => api.get('/google-calendar/status'),
+
+  // Disconnect from Google Calendar
+  disconnect: () => api.post('/google-calendar/disconnect'),
+};
+
+export const devicePermissionsAPI = {
+  // Grant device permission to user
+  grantDevicePermission: (data: {
+    userId: string;
+    deviceId: string;
+    permissions?: {
+      canTurnOn?: boolean;
+      canTurnOff?: boolean;
+      canViewStatus?: boolean;
+      canSchedule?: boolean;
+      canModifySettings?: boolean;
+      canViewHistory?: boolean;
+      canAdjustBrightness?: boolean;
+      canAdjustSpeed?: boolean;
+      canChangeInput?: boolean;
+      canConfigurePir?: boolean;
+      canViewPirData?: boolean;
+      canDisablePir?: boolean;
+    };
+    restrictions?: {
+      maxUsesPerDay?: number;
+      allowedTimeSlots?: string[];
+      maxBrightnessLevel?: number;
+      maxFanSpeed?: number;
+      allowedInputSources?: string[];
+    };
+    expiresAt?: string;
+    reason?: string;
+  }) => api.post('/device-permissions/grant', data),
+
+  // Get user's device permissions
+  getUserDevicePermissions: (userId: string) => api.get(`/device-permissions/user/${userId}`),
+
+  // Update device permission
+  updateDevicePermission: (permissionId: string, data: {
+    permissions?: any;
+    restrictions?: any;
+    expiresAt?: string;
+    reason?: string;
+  }) => api.put(`/device-permissions/${permissionId}`, data),
+
+  // Revoke device permission
+  revokeDevicePermission: (permissionId: string) => api.delete(`/device-permissions/${permissionId}`),
+
+  // Get device permissions summary
+  getDevicePermissionsSummary: (classroom?: string) =>
+    api.get('/device-permissions/summary', { params: { classroom } }),
+
+  // Grant temporary override
+  grantTemporaryOverride: (permissionId: string, data: {
+    durationMinutes?: number;
+    reason?: string;
+  }) => api.post(`/device-permissions/${permissionId}/override`, data),
+};
+
+export const usersAPI = {
+  // Get all users with pagination and filtering
+  getUsers: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: string;
+    department?: string;
+    status?: string;
+  }) => api.get('/users', { params }),
+
+  // Create new user
+  createUser: (data: {
+    name: string;
+    email: string;
+    password?: string;
+    role: string;
+    department?: string;
+    accessLevel?: string;
+  }) => api.post('/users', data),
+
+  // Get single user
+  getUser: (userId: string) => api.get(`/users/${userId}`),
+
+  // Update user
+  updateUser: (userId: string, data: {
+    name?: string;
+    email?: string;
+    role?: string;
+    department?: string;
+    accessLevel?: string;
+    assignedDevices?: string[];
+    isActive?: boolean;
+  }) => api.put(`/users/${userId}`, data),
+
+  // Delete user
+  deleteUser: (userId: string) => api.delete(`/users/${userId}`),
+
+  // Reset user password
+  resetUserPassword: (userId: string, data: { password: string }) =>
+    api.patch(`/users/${userId}/password`, data),
+
+  // Toggle user active status
+  toggleUserStatus: (userId: string, data: { isActive: boolean }) =>
+    api.post(`/users/${userId}/status`, data),
+
+  // Get online users
+  getOnlineUsers: () => api.get('/users/online'),
+
+  // Self-service password change
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.patch('/users/me/password', data),
+
+  // Get user flags (like first login reset required)
+  getUserFlags: () => api.get('/users/me/flags'),
+};
+
+export const settingsAPI = {
+  // Get system settings
+  getSettings: () => api.get<Settings>('/settings'),
+
+  // Update system settings
+  updateSettings: (settings: Partial<Settings>) =>
+    api.put<Settings>('/settings', settings),
+};
+
+export const esp32API = {
+  // Get device configuration for ESP32
+  getDeviceConfig: (macAddress: string) => api.get(`/esp32/config/${macAddress}`),
+
+  // Update device status from ESP32
+  updateDeviceStatus: (macAddress: string, data: {
+    switchId?: string;
+    state?: boolean;
+    switches?: Array<{ id: string; state: boolean }>;
+    heartbeat?: boolean;
+  }) => api.post(`/esp32/state/${macAddress}`, data),
+
+  // Send command to ESP32 device
+  sendCommand: (macAddress: string, command: any) =>
+    api.post(`/esp32/command/${macAddress}`, { command }),
+};
+
+export const activityLogsAPI = {
+  // Get activity logs with filtering
+  getLogs: (params?: {
+    deviceId?: string;
+    userId?: string;
+    classroom?: string;
+    limit?: number;
+  }) => api.get('/activity-logs', { params }),
+};
+
+export const enhancedLogsAPI = {
+  // Get activity logs with advanced filtering
+  getActivityLogs: (params?: {
+    page?: number;
+    limit?: number;
+    deviceId?: string;
+    switchId?: string;
+    action?: string;
+    triggeredBy?: string;
+    userId?: string;
+    classroom?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) => api.get('/enhanced-logs/activities', { params }),
+
+  // Get error logs with advanced filtering
+  getErrorLogs: (params?: {
+    page?: number;
+    limit?: number;
+    errorType?: string;
+    severity?: string;
+    resolved?: boolean;
+    deviceId?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) => api.get('/enhanced-logs/errors', { params }),
+
+  // Get manual switch logs
+  getManualSwitchLogs: (params?: {
+    page?: number;
+    limit?: number;
+    deviceId?: string;
+    switchId?: string;
+    action?: string;
+    hasConflict?: boolean;
+    startDate?: string;
+    endDate?: string;
+  }) => api.get('/enhanced-logs/manual-switches', { params }),
+
+  // Get device status logs
+  getDeviceStatusLogs: (params?: {
+    page?: number;
+    limit?: number;
+    deviceId?: string;
+    checkType?: string;
+    hasInconsistencies?: boolean;
+    startDate?: string;
+    endDate?: string;
+  }) => api.get('/enhanced-logs/device-status', { params }),
+
+  // Export logs to Excel
+  exportLogs: (data: {
+    logType: 'activities' | 'errors' | 'manual-switches' | 'device-status';
+    filters?: any;
+    includeColumns?: string[];
+  }) => api.post('/enhanced-logs/export/excel', data),
+
+  // Mark error as resolved
+  resolveError: (errorId: string, data?: { notes?: string }) =>
+    api.patch(`/enhanced-logs/errors/${errorId}/resolve`, data),
+
+  // Get log statistics
+  getLogStats: (timeframe?: string) =>
+    api.get('/enhanced-logs/stats', { params: { timeframe } }),
+};
+
 export default api;

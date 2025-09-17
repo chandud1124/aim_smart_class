@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, getSettings, updateSettings } from '../services/api';
+import { Settings, settingsAPI } from '../services/api';
 import { useToast } from './use-toast';
 
 export const useSettings = () => {
@@ -11,7 +11,7 @@ export const useSettings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await getSettings();
+      const response = await settingsAPI.getSettings();
       setSettings(response.data);
       setError(null);
     } catch (err) {
@@ -29,7 +29,7 @@ export const useSettings = () => {
   const updateAllSettings = async (newSettings: Partial<Settings>) => {
     try {
       setLoading(true);
-      const response = await updateSettings(newSettings);
+      const response = await settingsAPI.updateSettings(newSettings);
       setSettings(response.data);
       toast({
         title: 'Success',

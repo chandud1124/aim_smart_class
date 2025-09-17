@@ -77,15 +77,26 @@ class SocketService {
         console.log('[Socket.IO] Connecting to:', backendUrl);
 
         this.socket = io(backendUrl, {
-          transports: ['websocket', 'polling'],
+          // Start with polling transport to avoid WebSocket upgrade issues
+          transports: ['polling', 'websocket'],
           timeout: 20000,
           forceNew: true,
           reconnection: true,
           reconnectionAttempts: this.maxReconnectAttempts,
           reconnectionDelay: 1000,
+          // Disable perMessageDeflate to avoid frame corruption
+          perMessageDeflate: false,
+          // Add upgrade timeout to prevent hanging
+          upgradeTimeout: 10000,
+          // Force polling initially, then allow upgrade
+          rememberUpgrade: true,
+          // Add auth token if available
           auth: {
             token: localStorage.getItem('auth_token')
-          }
+          },
+          // Additional options for stability
+          allowEIO3: true,
+          maxHttpBufferSize: 1e8
         });
 
         this.setupEventListeners();

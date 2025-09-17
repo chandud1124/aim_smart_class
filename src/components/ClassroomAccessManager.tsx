@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Users, Clock, Shield, AlertTriangle, RefreshCw } from 'lucide-react';
-import api from '@/services/api';
+import { classroomAPI, usersAPI } from '@/services/api';
 
 interface ClassroomAccess {
     _id: string;
@@ -93,9 +93,9 @@ export const ClassroomAccessManager: React.FC = () => {
             }
 
             const [classroomsRes, usersRes, accessRes] = await Promise.all([
-                api.get('/facility/summary'),
-                api.get('/users'),
-                api.get('/facility/all')
+                classroomAPI.getClassroomsSummary(),
+                usersAPI.getUsers(),
+                classroomAPI.getAllClassroomAccess()
             ]);
 
             console.log('Classrooms response:', classroomsRes.data);
@@ -124,7 +124,7 @@ export const ClassroomAccessManager: React.FC = () => {
 
         try {
             setGranting(true);
-            await api.post('/facility/grant', {
+            await classroomAPI.grantClassroomAccess({
                 userId: selectedUser,
                 classroom: selectedClassroom,
                 permissions,
@@ -164,7 +164,7 @@ export const ClassroomAccessManager: React.FC = () => {
     const handleRevokeAccess = async (accessId: string) => {
         try {
             setRevoking(accessId);
-            await api.delete(`/facility/${accessId}`);
+            await classroomAPI.revokeClassroomAccess(accessId);
             loadData();
         } catch (error) {
             console.error('Error revoking access:', error);

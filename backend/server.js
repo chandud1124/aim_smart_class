@@ -214,7 +214,7 @@ app.use((req, res, next) => {
     }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     // Silenced verbose preflight logging
     return res.status(204).end();
   }
@@ -278,34 +278,94 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize main Socket.IO instance
 const io = socketIo(server, {
   cors: {
-    origin: '*', // Allow all origins in development
+    origin: function (origin, callback) {
+      // Allow requests from localhost, LAN IPs, and your remote frontend
+      const allowed = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
+        'http://192.168.1.100:5173', // Example extra network host
+        'http://192.168.0.108:5173', // New IP for your network
+        'http://172.16.3.171:5173', // Your remote frontend
+        'http://172.16.3.171:5174', // Alternative port
+      ];
+      // Dynamically add LAN IPs for multiple ports
+      const os = require('os');
+      const nets = os.networkInterfaces();
+      const ports = [5173, 5174, 3000, 8080];
+      Object.values(nets).forEach(ifaces => {
+        ifaces.forEach(iface => {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            ports.forEach(port => {
+              allowed.push(`http://${iface.address}:${port}`);
+            });
+          }
+        });
+      });
+
+      console.log(`[DEBUG] Socket.IO CORS check - Origin: ${origin}`);
+
+      if (!origin) {
+        callback(null, true); // Allow requests with no origin (curl, mobile apps, etc)
+      } else if (allowed.includes(origin)) {
+        callback(null, origin); // Echo allowed origin for credentials
+      } else {
+        console.log(`[ERROR] Socket.IO CORS blocked origin: ${origin}, allowed: ${allowed.slice(0, 5).join(', ')}...`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   },
   // WebSocket configuration to prevent frame corruption
   perMessageDeflate: false,
-  allowEIO3: false,
-  // Force polling transport to avoid WebSocket upgrade issues
+  allowEIO3: true,
+  // Force polling transport initially, then allow WebSocket upgrade
   transports: ['polling', 'websocket'],
   // Additional settings for stability
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 30000,
-  maxHttpBufferSize: 1e8
+  maxHttpBufferSize: 1e8,
+  // Disable compression to avoid frame issues
+  httpCompression: false,
+  // Force new connection
+  forceNew: true
 });
 
 io.engine.on('connection_error', (err) => {
   logger.error('[engine] connection_error', {
     code: err.code,
     message: err.message,
-    context: err.context
+    context: err.context,
+    type: err.type,
+    description: err.description
   });
 });
 
 // Log unexpected upgrade attempts that may corrupt websocket frames
-server.on('upgrade', (req, socket) => {
+server.on('upgrade', (req, socket, head) => {
   const url = req.url || '';
-  if (url.startsWith('/socket.io/') || url.startsWith('/esp32-ws')) return; // expected, handled elsewhere
+  if (url.startsWith('/socket.io/')) {
+    logger.info('[upgrade] Socket.IO upgrade request', {
+      url,
+      headers: req.headers,
+      remoteAddress: req.socket.remoteAddress
+    });
+    return; // Let Socket.IO handle this
+  }
+  if (url.startsWith('/esp32-ws')) {
+    logger.info('[upgrade] ESP32 WebSocket upgrade request', {
+      url,
+      headers: req.headers,
+      remoteAddress: req.socket.remoteAddress
+    });
+    return; // Let WebSocketServer handle this
+  }
   logger.warn('[upgrade] unexpected websocket upgrade path', { url });
   // Do not write to socket, just let it close if not handled
 });
@@ -315,25 +375,52 @@ server.on('upgrade', (req, socket) => {
 io.engine.on('initial_headers', (headers, req) => {
   logger.info('[engine] initial_headers', {
     ua: req.headers['user-agent'],
-    url: req.url
+    url: req.url,
+    transport: req._query && req._query.transport,
+    sid: req._query && req._query.sid
   });
 });
 io.engine.on('headers', (headers, req) => {
-  // This fires on each HTTP longΓÇæpolling request; keep it quiet in production
+  // This fires on each HTTP long-polling request; keep it quiet in production
   if (process.env.NODE_ENV === 'development') {
-    logger.debug('[engine] headers', { transport: req._query && req._query.transport, sid: req._query && req._query.sid });
+    logger.debug('[engine] headers', {
+      transport: req._query && req._query.transport,
+      sid: req._query && req._query.sid,
+      upgrade: req._query && req._query.upgrade
+    });
   }
 });
 io.engine.on('connection', (rawSocket) => {
-  logger.info('[engine] connection', { id: rawSocket.id, transport: rawSocket.transport.name });
+  logger.info('[engine] connection', {
+    id: rawSocket.id,
+    transport: rawSocket.transport ? rawSocket.transport.name : 'unknown',
+    remoteAddress: rawSocket.request?.socket?.remoteAddress
+  });
   rawSocket.on('upgrade', (newTransport) => {
-    logger.info('[engine] transport upgrade', { id: rawSocket.id, from: rawSocket.transport.name, to: newTransport && newTransport.name });
+    logger.info('[engine] transport upgrade', {
+      id: rawSocket.id,
+      from: rawSocket.transport ? rawSocket.transport.name : 'unknown',
+      to: newTransport && newTransport.name
+    });
   });
   rawSocket.on('transport', (t) => {
-    logger.info('[engine] transport set', { id: rawSocket.id, transport: t && t.name });
+    logger.info('[engine] transport set', {
+      id: rawSocket.id,
+      transport: t && t.name
+    });
   });
   rawSocket.on('close', (reason) => {
-    logger.info('[engine] connection closed', { id: rawSocket.id, reason });
+    logger.info('[engine] connection closed', {
+      id: rawSocket.id,
+      reason
+    });
+  });
+  rawSocket.on('error', (error) => {
+    logger.error('[engine] socket error', {
+      id: rawSocket.id,
+      error: error.message,
+      transport: rawSocket.transport ? rawSocket.transport.name : 'unknown'
+    });
   });
 });
 
