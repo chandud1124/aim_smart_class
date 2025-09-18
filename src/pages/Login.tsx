@@ -61,6 +61,10 @@ const Login: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-primary">aim_smart_class</h1>
+        <p className="text-lg text-muted-foreground">Smart Classroom Automation System</p>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome back</CardTitle>
