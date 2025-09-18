@@ -79,6 +79,7 @@ const securityRoutes = require('./routes/security');
 const settingsRoutes = require('./routes/settings');
 const ticketRoutes = require('./routes/tickets');
 const devicePermissionRoutes = require('./routes/devicePermissions');
+const deviceCategoryRoutes = require('./routes/deviceCategories');
 
 // Import services (only those actively used)
 const scheduleService = require('./services/scheduleService');
@@ -214,7 +215,7 @@ app.use((req, res, next) => {
     }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, User-Agent, DNT, Cache-Control, X-Mx-ReqToken, Keep-Alive, X-Requested-With, If-Modified-Since, X-CSRF-Token');
     // Silenced verbose preflight logging
     return res.status(204).end();
   }
@@ -264,7 +265,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token']
 }));
 
 
@@ -278,48 +279,10 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize main Socket.IO instance
 const io = socketIo(server, {
   cors: {
-    origin: function (origin, callback) {
-      // Allow requests from localhost, LAN IPs, and your remote frontend
-      const allowed = [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
-        'http://192.168.1.100:5173', // Example extra network host
-        'http://192.168.0.108:5173', // New IP for your network
-        'http://172.16.3.171:5173', // Your remote frontend
-        'http://172.16.3.171:5174', // Alternative port
-      ];
-      // Dynamically add LAN IPs for multiple ports
-      const os = require('os');
-      const nets = os.networkInterfaces();
-      const ports = [5173, 5174, 3000, 8080];
-      Object.values(nets).forEach(ifaces => {
-        ifaces.forEach(iface => {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            ports.forEach(port => {
-              allowed.push(`http://${iface.address}:${port}`);
-            });
-          }
-        });
-      });
-
-      console.log(`[DEBUG] Socket.IO CORS check - Origin: ${origin}`);
-
-      if (!origin) {
-        callback(null, true); // Allow requests with no origin (curl, mobile apps, etc)
-      } else if (allowed.includes(origin)) {
-        callback(null, origin); // Echo allowed origin for credentials
-      } else {
-        console.log(`[ERROR] Socket.IO CORS blocked origin: ${origin}, allowed: ${allowed.slice(0, 5).join(', ')}...`);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: "*", // Allow all origins for development
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token']
   },
   // WebSocket configuration to prevent frame corruption
   perMessageDeflate: false,
@@ -470,6 +433,7 @@ apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
 apiRouter.use('/facility', apiLimiter, require('./routes/classroom'));
 apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
+apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
 
 // Mount all routes under /api
 // Health check endpoint
@@ -671,6 +635,8 @@ wss.on('connection', (ws) => {
         wsDevices.set(mac, ws);
         device.status = 'online';
         device.lastSeen = new Date();
+        device.isIdentified = true;
+        device.connectionStatus = 'online';
         await device.save();
         if (process.env.NODE_ENV !== 'production') {
           logger.info('[identify] device marked online', { mac, lastSeen: device.lastSeen.toISOString() });
@@ -745,14 +711,25 @@ wss.on('connection', (ws) => {
         const Device = require('./models/Device');
         const device = await Device.findOne({ macAddress: ws.mac });
         if (device) {
+          const wasOffline = device.status !== 'online';
           device.lastSeen = new Date();
           device.status = 'online';
+          device.connectionStatus = 'online';
           await device.save();
+
+          // If device was previously offline, emit state change
+          if (wasOffline) {
+            emitDeviceStateChanged(device, { source: 'esp32:heartbeat' });
+            logger.info(`[heartbeat] device came online: ${ws.mac}`);
+          }
+
           if (process.env.NODE_ENV !== 'production') {
             console.log('[heartbeat] updated lastSeen', { mac: ws.mac, lastSeen: device.lastSeen.toISOString() });
           }
         }
-      } catch (e) { /* silent */ }
+      } catch (e) {
+        logger.error('[heartbeat] error', e.message);
+      }
       return;
     }
     if (type === 'state_update') {
@@ -810,6 +787,8 @@ wss.on('connection', (ws) => {
           device.pirSensorLastTriggered = new Date();
         }
         device.lastSeen = new Date();
+        device.status = 'online';
+        device.connectionStatus = 'online';
         await device.save();
         emitDeviceStateChanged(device, { source: 'esp32:state_update' });
         ws.send(JSON.stringify({ type: 'state_ack', ts: Date.now(), changed }));
@@ -985,8 +964,11 @@ wss.on('connection', (ws) => {
           const d = await Device.findOne({ macAddress: ws.mac });
           if (d && d.status !== 'offline') {
             d.status = 'offline';
+            d.connectionStatus = 'disconnected';
+            d.isIdentified = false;
             await d.save();
             emitDeviceStateChanged(d, { source: 'esp32:ws_close' });
+            logger.info(`[ws close] marked device offline: ${ws.mac}`);
           }
         } catch (e) {
           logger.error('[ws close offline update] error', e.message);
@@ -1008,11 +990,9 @@ setInterval(() => {
 setInterval(async () => {
   try {
     const Device = require('./models/Device');
-    const Settings = require('./models/Settings');
 
-    // Get configured threshold (default 300 seconds = 5 minutes)
-    const settings = await Settings.findOne();
-    const thresholdSeconds = settings?.security?.deviceOfflineThreshold || 300;
+    // Use consistent 2-minute threshold to match monitoring service
+    const thresholdSeconds = 120; // 2 minutes (consistent with monitoring service)
     const cutoff = Date.now() - (thresholdSeconds * 1000);
 
     const stale = await Device.find({ lastSeen: { $lt: new Date(cutoff) }, status: { $ne: 'offline' } });
@@ -1020,6 +1000,11 @@ setInterval(async () => {
       d.status = 'offline';
       await d.save();
       emitDeviceStateChanged(d, { source: 'offline-scan' });
+      logger.info(`[offline-scan] marked device offline: ${d.macAddress} (lastSeen: ${d.lastSeen})`);
+    }
+
+    if (stale.length > 0) {
+      logger.info(`[offline-scan] marked ${stale.length} devices as offline`);
     }
   } catch (e) {
     logger.error('[offline-scan] error', e.message);

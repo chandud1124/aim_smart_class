@@ -520,8 +520,34 @@ const toggleSwitch = async (req, res) => {
       return res.status(404).json({ message: 'Device not found' });
     }
 
+    // Check device connectivity with consistent logic
+    const isDeviceOnline = () => {
+      // First check WebSocket connection (most reliable)
+      if (process.env.NODE_ENV !== 'test') {
+        try {
+          const ws = global.wsDevices && device.macAddress ? global.wsDevices.get(device.macAddress.toUpperCase()) : null;
+          if (ws && ws.readyState === 1) {
+            return true; // WebSocket is connected
+          }
+        } catch (e) {
+          console.warn('[toggleSwitch] WebSocket check error:', e.message);
+        }
+      }
+
+      // Fallback to database status with time-based validation
+      if (device.status === 'online' && device.lastSeen) {
+        const timeSinceLastSeen = Date.now() - new Date(device.lastSeen).getTime();
+        const offlineThreshold = 2 * 60 * 1000; // 2 minutes
+        return timeSinceLastSeen < offlineThreshold;
+      }
+
+      return false;
+    };
+
+    const deviceOnline = isDeviceOnline();
+
     // Block toggle if device is offline to ensure consistency with UI
-    if (device.status && device.status !== 'online') {
+    if (!deviceOnline) {
       // queue intent instead of hard blocking
       const targetSw = device.switches.find(sw => sw._id.toString() === switchId);
       if (!targetSw) return res.status(404).json({ message: 'Switch not found' });
@@ -532,26 +558,12 @@ const toggleSwitch = async (req, res) => {
       await device.save();
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[toggleSwitch] queued intent while offline', {
-          deviceId: device._id.toString(), mac: device.macAddress, switchId, desired
+          deviceId: device._id.toString(), mac: device.macAddress, switchId, desired,
+          lastSeen: device.lastSeen, status: device.status
         });
       }
       try { req.app.get('io').emit('device_toggle_queued', { deviceId, switchId, desired }); } catch { }
       return res.status(202).json({ message: 'Device offline. Toggle queued.', queued: true });
-    }
-
-    // If marked online but not identified through raw WS, block with 409
-    // Skip this check in test environment to allow testing without WebSocket connections
-    if (process.env.NODE_ENV !== 'test') {
-      try {
-        const ws = global.wsDevices && device.macAddress ? global.wsDevices.get(device.macAddress.toUpperCase()) : null;
-        if (!ws || ws.readyState !== 1) {
-          return res.status(409).json({
-            success: false,
-            code: 'device_not_identified',
-            message: 'Device is not identified/connected. Please wait for the device to connect and try again.'
-          });
-        }
-      } catch { }
     }
 
     const switchIndex = device.switches.findIndex(sw => sw._id.toString() === switchId);
@@ -880,51 +892,67 @@ const bulkToggleByType = async (req, res) => {
       match._id = { $in: req.user.assignedDevices };
     }
     const devices = await Device.find(match);
+    logger.info(`[bulkToggleByType] Found ${devices.length} devices for type ${type}, state ${state}`);
     let switchesChanged = 0;
+    let devicesModified = 0;
     for (const device of devices) {
-      let modified = false;
-      device.switches.forEach(sw => {
-        if (sw.type === type && sw.state !== state) {
-          sw.state = state;
-          switchesChanged++;
-          modified = true;
-        }
-      });
-      if (modified) {
-        await device.save();
-        try {
-          await ActivityLog.create({
-            deviceId: device._id,
-            deviceName: device.name,
-            action: state ? 'bulk_on' : 'bulk_off',
-            triggeredBy: 'user',
-            userId: req.user.id,
-            userName: req.user.name,
-            classroom: device.classroom,
-            location: device.location
-          });
-        } catch { }
-        // Do NOT emit device_state_changed here; wait for hardware confirmation
-        // Push commands to ESP32 so physical relays reflect type-based bulk change
-        try {
-          if (global.wsDevices && device.macAddress) {
-            const ws = global.wsDevices.get(device.macAddress.toUpperCase());
-            if (ws && ws.readyState === 1) {
-              for (const sw of device.switches.filter(sw => sw.type === type)) {
-                const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
-                ws.send(JSON.stringify(payload));
+      try {
+        let modified = false;
+        device.switches.forEach(sw => {
+          if (sw.type === type && sw.state !== state) {
+            sw.state = state;
+            switchesChanged++;
+            modified = true;
+          }
+        });
+        if (modified) {
+          await device.save();
+          devicesModified++;
+          try {
+            await ActivityLog.create({
+              deviceId: device._id,
+              deviceName: device.name,
+              action: state ? 'bulk_on' : 'bulk_off',
+              triggeredBy: 'user',
+              userId: req.user.id,
+              userName: req.user.name,
+              classroom: device.classroom,
+              location: device.location
+            });
+          } catch (logErr) {
+            logger.warn(`[bulkToggleByType] Activity log failed for device ${device._id}: ${logErr.message}`);
+          }
+          // Do NOT emit device_state_changed here; wait for hardware confirmation
+          // Push commands to ESP32 so physical relays reflect type-based bulk change
+          try {
+            if (global.wsDevices && device.macAddress) {
+              const ws = global.wsDevices.get(device.macAddress.toUpperCase());
+              if (ws && ws.readyState === 1) {
+                for (const sw of device.switches.filter(sw => sw.type === type)) {
+                  const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
+                  ws.send(JSON.stringify(payload));
+                }
               }
             }
+          } catch (e) {
+            logger.warn(`[bulkToggleByType] WS push failed for device ${device.macAddress}: ${e.message}`);
           }
-        } catch (e) { if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleByType push failed]', e.message); }
+        }
+      } catch (deviceErr) {
+        logger.error(`[bulkToggleByType] Error processing device ${device._id}: ${deviceErr.message}`);
+        // Continue with other devices
       }
     }
     try {
       const ids = devices.map(d => d.id);
       req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: ids, filter: { type }, ts: Date.now() });
-    } catch { }
-    res.json({ success: true, type, state, switchesChanged });
+    } catch (emitErr) {
+      logger.warn(`[bulkToggleByType] Emit failed: ${emitErr.message}`);
+    }
+    logger.info(`[bulkToggleByType] Completed: ${devicesModified} devices modified, ${switchesChanged} switches changed`);
+    res.json({ success: true, type, state, switchesChanged, devicesModified });
   } catch (error) {
+    logger.error(`[bulkToggleByType] Error: ${error.message}`);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

@@ -157,6 +157,10 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showCalendar, setShowCalendar] = useState(false);
 
+  // Device list state
+  const [devices, setDevices] = useState<any[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
@@ -176,6 +180,26 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
     }, 500);
     return () => clearTimeout(delayedLoad);
   }, [searchTerm, deviceFilter, severityFilter, statusFilter, dateRange, currentPage]);
+
+  // Fetch devices on component mount
+  useEffect(() => {
+    loadDevices();
+  }, []);
+
+  const loadDevices = async () => {
+    setIsLoadingDevices(true);
+    try {
+      const response = await api.get('/device-categories/categories?showAllDevices=true');
+      if (response.data.success && response.data.allDevices) {
+        setDevices(response.data.allDevices);
+      }
+    } catch (error) {
+      console.error('Error loading devices:', error);
+      setDevices([]);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -246,12 +270,13 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
     try {
       const params = new URLSearchParams();
       params.set('type', activeTab);
-      if (searchTerm) params.set('search', searchTerm);
-      if (deviceFilter !== 'all') params.set('deviceId', deviceFilter);
-      if (severityFilter !== 'all') params.set('severity', severityFilter);
-      if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (dateRange.from) params.set('startDate', dateRange.from.toISOString());
-      if (dateRange.to) params.set('endDate', dateRange.to.toISOString());
+      // Export ALL reports - remove filters to get complete dataset
+      // if (searchTerm) params.set('search', searchTerm);
+      // if (deviceFilter !== 'all') params.set('deviceId', deviceFilter);
+      // if (severityFilter !== 'all') params.set('severity', severityFilter);
+      // if (statusFilter !== 'all') params.set('status', statusFilter);
+      // if (dateRange.from) params.set('startDate', dateRange.from.toISOString());
+      // if (dateRange.to) params.set('endDate', dateRange.to.toISOString());
 
       const response = await api.post(`/logs/export/excel?${params.toString()}`, {}, {
         responseType: 'blob'
@@ -417,7 +442,7 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
                 disabled={isExporting}
               >
                 <Download className={`h-4 w-4 mr-2 ${isExporting ? 'animate-spin' : ''}`} />
-                Export Excel
+                Export All Excel
               </Button>
               
               <Button
@@ -473,12 +498,24 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
               </Popover>
 
               <Select value={deviceFilter} onValueChange={setDeviceFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Device" />
+                <SelectTrigger className="min-w-[200px] w-full">
+                  <SelectValue placeholder="Select Device" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[200px]">
                   <SelectItem value="all">All Devices</SelectItem>
-                  {/* Device options will be populated dynamically */}
+                  {devices.map((device) => (
+                    <SelectItem key={device.id} value={device.id} className="py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="font-medium text-sm truncate">{device.name}</span>
+                        <Badge
+                          variant={device.status === 'online' ? 'default' : 'secondary'}
+                          className="text-xs px-2 py-0.5 flex-shrink-0"
+                        >
+                          {device.status}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

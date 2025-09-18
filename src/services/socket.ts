@@ -85,18 +85,13 @@ class SocketService {
           reconnectionAttempts: this.maxReconnectAttempts,
           reconnectionDelay: 1000,
           // Disable perMessageDeflate to avoid frame corruption
-          perMessageDeflate: false,
-          // Add upgrade timeout to prevent hanging
-          upgradeTimeout: 10000,
+          perMessageDeflate: { threshold: 0 },
           // Force polling initially, then allow upgrade
           rememberUpgrade: true,
           // Add auth token if available
           auth: {
             token: localStorage.getItem('auth_token')
-          },
-          // Additional options for stability
-          allowEIO3: true,
-          maxHttpBufferSize: 1e8
+          }
         });
 
         this.setupEventListeners();
@@ -256,7 +251,7 @@ class SocketService {
   }
 
   // Send events to server
-  emit(event: string, data: any) {
+  emit(event: string, data?: any) {
     if (this.socket?.connected) {
       this.socket.emit(event, data);
     } else {
@@ -302,7 +297,7 @@ class SocketService {
     if (callback) {
       this.emit('ping_test', callback);
     } else {
-      this.emit('ping_test');
+      this.emit('ping_test', { timestamp: Date.now() });
     }
   }
 

@@ -202,22 +202,25 @@ const useDevicesInternal = () => {
     socketService.onDevicePirTriggered(handleDevicePirTriggered);
     // When a device reconnects, flush queued toggles for it
     const handleConnected = (data: { deviceId: string }) => {
-      setToggleQueue(prev => prev); // trigger state reference
-      const toProcess = toggleQueue.filter(t => t.deviceId === data.deviceId);
-      if (toProcess.length) {
-        // Process sequentially to maintain order
-        (async () => {
-          for (const intent of toProcess) {
-            try {
-              await toggleSwitch(intent.deviceId, intent.switchId);
-            } catch (e) {
-              console.warn('Failed to flush queued toggle', intent, e);
+      setToggleQueue(prev => {
+        const toProcess = prev.filter(t => t.deviceId === data.deviceId);
+        if (toProcess.length > 0) {
+          console.log(`[useDevices] flushing ${toProcess.length} queued toggles for device ${data.deviceId}`);
+          // Process sequentially to maintain order
+          (async () => {
+            for (const intent of toProcess) {
+              try {
+                console.log(`[useDevices] processing queued toggle:`, intent);
+                await toggleSwitch(intent.deviceId, intent.switchId);
+              } catch (e) {
+                console.warn('[useDevices] failed to flush queued toggle', intent, e);
+              }
             }
-          }
-          // Remove processed intents
-          setToggleQueue(prev => prev.filter(t => t.deviceId !== data.deviceId));
-        })();
-      }
+          })();
+        }
+        // Remove processed intents
+        return prev.filter(t => t.deviceId !== data.deviceId);
+      });
     };
     socketService.onDeviceConnected(handleConnected);
     const handleToggleBlocked = (payload: any) => {

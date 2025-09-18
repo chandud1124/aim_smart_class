@@ -48,7 +48,6 @@ const navigationSections = [
       { name: 'Users', icon: Users, href: '/users', current: false, requiresPermission: 'canManageUsers' },
       { name: 'Role Management', icon: Shield, href: '/roles', current: false, requiresPermission: 'canManageUsers' },
       { name: 'Permissions', icon: UserCheck, href: '/permissions', current: false, requiresPermission: 'canApproveUsers' },
-      { name: 'Classroom Access', icon: Shield, href: '/classroom-access', current: false, requiresPermission: 'canApproveUsers' },
     ]
   },
   {

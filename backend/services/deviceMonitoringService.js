@@ -171,7 +171,7 @@ class DeviceMonitoringService {
     try {
       const now = new Date();
       const timeSinceLastSeen = device.lastSeen ? now - device.lastSeen : Infinity;
-      const isOnline = timeSinceLastSeen < (2 * 60 * 1000); // Consider offline if no contact for 2 minutes
+      const isOnline = timeSinceLastSeen < (2 * 60 * 1000); // 2 minutes (consistent with server offline detection)
 
       return {
         isOnline: isOnline,

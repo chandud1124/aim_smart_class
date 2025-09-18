@@ -339,7 +339,7 @@ router.get('/device-status', auth, async (req, res) => {
 // Export logs to Excel
 router.post('/export/excel', auth, async (req, res) => {
   try {
-    const { logType, filters = {}, includeColumns = [] } = req.body;
+    const { type: logType, search, deviceId, severity, status, startDate, endDate } = req.query;
     
     let Model;
     let defaultColumns = [];
@@ -347,54 +347,74 @@ router.post('/export/excel', auth, async (req, res) => {
     switch (logType) {
       case 'activities':
         Model = ActivityLog;
-        defaultColumns = ['timestamp', 'deviceName', 'switchName', 'action', 'triggeredBy', 'userName', 'classroom'];
-        break;
-      case 'errors':
-        Model = ErrorLog;
-        defaultColumns = ['timestamp', 'errorType', 'severity', 'message', 'deviceName', 'userName', 'resolved'];
+        defaultColumns = ['timestamp', 'deviceName', 'switchName', 'action', 'triggeredBy', 'userName', 'location', 'facility'];
         break;
       case 'manual-switches':
         Model = ManualSwitchLog;
-        defaultColumns = ['timestamp', 'deviceName', 'switchName', 'action', 'previousState', 'newState', 'detectedBy'];
+        defaultColumns = ['timestamp', 'deviceName', 'switchName', 'action', 'previousState', 'newState', 'detectedBy', 'responseTime', 'location', 'facility'];
         break;
       case 'device-status':
         Model = DeviceStatusLog;
-        defaultColumns = ['timestamp', 'deviceName', 'checkType', 'totalSwitchesOn', 'totalSwitchesOff', 'inconsistenciesFound'];
+        defaultColumns = ['timestamp', 'deviceName', 'deviceMac', 'checkType', 'deviceStatus.isOnline', 'deviceStatus.wifiSignalStrength', 'deviceStatus.temperature', 'summary.totalSwitchesOn', 'summary.totalSwitchesOff', 'deviceStatus.responseTime', 'location', 'facility'];
         break;
       default:
         return res.status(400).json({ error: 'Invalid log type' });
     }
     
-    const columns = includeColumns.length > 0 ? includeColumns : defaultColumns;
-    
-    // Apply filters (same logic as GET endpoints)
+    // Build query with filters
     const query = {};
-    if (filters.startDate || filters.endDate) {
+    
+    // Date range filter
+    if (startDate || endDate) {
       query.timestamp = {};
-      if (filters.startDate) query.timestamp.$gte = new Date(filters.startDate);
-      if (filters.endDate) query.timestamp.$lte = new Date(filters.endDate);
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
     }
     
-    // Add other filters based on log type
-    Object.keys(filters).forEach(key => {
-      if (key !== 'startDate' && key !== 'endDate' && filters[key]) {
-        query[key] = filters[key];
-      }
-    });
+    // Search filter (search in device names, switch names, etc.)
+    if (search) {
+      query.$or = [
+        { deviceName: { $regex: search, $options: 'i' } },
+        { switchName: { $regex: search, $options: 'i' } },
+        { userName: { $regex: search, $options: 'i' } },
+        { action: { $regex: search, $options: 'i' } },
+        { triggeredBy: { $regex: search, $options: 'i' } }
+      ];
+    }
     
+    // Device filter
+    if (deviceId && deviceId !== 'all') {
+      query.deviceId = deviceId;
+    }
+    
+    // Severity filter (for activities)
+    if (severity && severity !== 'all') {
+      query.severity = severity;
+    }
+    
+    // Status filter (for resolved/unresolved)
+    if (status && status !== 'all') {
+      query.resolved = status === 'resolved';
+    }
+    
+    console.log('[EXPORT] Query:', JSON.stringify(query, null, 2));
+    
+    // Get all matching logs (no pagination for export)
     const logs = await Model.find(query)
-      .populate('deviceId', 'name classroom location')
+      .populate('deviceId', 'name location facility')
       .populate('userId', 'username role')
       .sort({ timestamp: -1 })
-      .limit(5000); // Limit to prevent memory issues
+      .limit(10000); // Allow up to 10k records for export
+    
+    console.log(`[EXPORT] Found ${logs.length} ${logType} logs to export`);
     
     // Create Excel workbook
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`${logType.charAt(0).toUpperCase() + logType.slice(1)} Logs`);
     
     // Add headers
-    const headers = columns.map(col => ({
-      header: col.charAt(0).toUpperCase() + col.slice(1).replace(/([A-Z])/g, ' $1'),
+    const headers = defaultColumns.map(col => ({
+      header: col.split('.').pop().charAt(0).toUpperCase() + col.split('.').pop().slice(1).replace(/([A-Z])/g, ' $1'),
       key: col,
       width: 20
     }));
@@ -411,24 +431,36 @@ router.post('/export/excel', auth, async (req, res) => {
     // Add data rows
     logs.forEach(log => {
       const row = {};
-      columns.forEach(col => {
-        let value = log[col];
+      defaultColumns.forEach(col => {
+        let value = '';
         
         // Handle nested properties
         if (col.includes('.')) {
           const parts = col.split('.');
           value = parts.reduce((obj, part) => obj && obj[part], log);
+        } else {
+          value = log[col];
         }
         
-        // Handle special cases
-        if (col === 'timestamp' && value) {
-          value = new Date(value).toLocaleString();
-        } else if (col === 'deviceName' && log.deviceId?.name) {
+        // Handle populated fields
+        if (col === 'deviceName' && log.deviceId?.name) {
           value = log.deviceId.name;
         } else if (col === 'userName' && log.userId?.username) {
           value = log.userId.username;
-        } else if (col === 'classroom' && (log.classroom || log.deviceId?.classroom)) {
-          value = log.classroom || log.deviceId?.classroom;
+        } else if (col === 'location' && (log.location || log.deviceId?.location)) {
+          value = log.location || log.deviceId?.location;
+        } else if (col === 'facility' && (log.facility || log.deviceId?.facility)) {
+          value = log.facility || log.deviceId?.facility;
+        }
+        
+        // Format timestamp
+        if (col === 'timestamp' && value) {
+          value = new Date(value).toLocaleString();
+        }
+        
+        // Handle boolean values
+        if (typeof value === 'boolean') {
+          value = value ? 'Yes' : 'No';
         }
         
         row[col] = value || '';
@@ -438,7 +470,12 @@ router.post('/export/excel', auth, async (req, res) => {
     
     // Auto-fit columns
     worksheet.columns.forEach(column => {
-      column.width = Math.max(column.width, 15);
+      let maxLength = column.header.length;
+      column.eachCell({ includeEmpty: true }, cell => {
+        const cellValue = cell.value ? cell.value.toString() : '';
+        maxLength = Math.max(maxLength, cellValue.length);
+      });
+      column.width = Math.min(Math.max(maxLength + 2, 15), 50); // Min 15, max 50
     });
     
     // Generate filename
@@ -447,10 +484,17 @@ router.post('/export/excel', auth, async (req, res) => {
     const filepath = path.join(__dirname, '../exports', filename);
     
     // Ensure exports directory exists
-    await fs.mkdir(path.dirname(filepath), { recursive: true });
+    const exportsDir = path.dirname(filepath);
+    try {
+      await fs.access(exportsDir);
+    } catch {
+      await fs.mkdir(exportsDir, { recursive: true });
+    }
     
     // Write file
     await workbook.xlsx.writeFile(filepath);
+    
+    console.log(`[EXPORT] Excel file created: ${filepath}`);
     
     // Send file
     res.download(filepath, filename, async (err) => {
@@ -463,11 +507,14 @@ router.post('/export/excel', auth, async (req, res) => {
           details: { filename, error: err.message },
           userId: req.user?.id
         });
+      } else {
+        console.log(`[EXPORT] File downloaded successfully: ${filename}`);
       }
       
       // Clean up file after download
       try {
         await fs.unlink(filepath);
+        console.log(`[EXPORT] Temporary file cleaned up: ${filepath}`);
       } catch (cleanupErr) {
         console.error('[CLEANUP-ERROR]', cleanupErr);
       }
@@ -483,7 +530,8 @@ router.post('/export/excel', auth, async (req, res) => {
         exportType: 'excel',
         logType,
         recordCount: logs.length,
-        filename
+        filename,
+        filters: { search, deviceId, severity, status, startDate, endDate }
       }
     });
     
@@ -493,11 +541,11 @@ router.post('/export/excel', auth, async (req, res) => {
       errorType: 'system_error',
       severity: 'medium',
       message: 'Failed to export logs to Excel',
-      details: { error: error.message },
+      details: { error: error.message, stack: error.stack },
       userId: req.user?.id,
       endpoint: req.originalUrl
     });
-    res.status(500).json({ error: 'Failed to export logs' });
+    res.status(500).json({ error: 'Failed to export logs to Excel' });
   }
 });
 
