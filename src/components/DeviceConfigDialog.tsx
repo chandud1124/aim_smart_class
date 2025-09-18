@@ -305,10 +305,17 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                       return <XCircle className="w-4 h-4 text-danger" />;
                     };
 
+                    const getPinStatusDot = (pin: GpioPinInfo) => {
+                      const dotClass = "w-2 h-2 rounded-full flex-shrink-0";
+                      if (pin.status === 'safe') return <div className={`${dotClass} bg-success`} />;
+                      if (pin.status === 'problematic') return <div className={`${dotClass} bg-warning`} />;
+                      return <div className={`${dotClass} bg-danger`} />;
+                    };
+
                     const getPinStatusColor = (pin: GpioPinInfo) => {
-                      if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
-                      if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
-                      return 'text-white bg-danger/90 border-danger/70';
+                      if (pin.status === 'safe') return 'text-foreground hover:bg-accent';
+                      if (pin.status === 'problematic') return 'text-foreground hover:bg-accent';
+                      return 'text-foreground hover:bg-accent';
                     };
 
                     const getPirPinRecommendation = (pin: GpioPinInfo) => {
@@ -338,6 +345,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                                 disabled={pin.status !== 'safe'}
                               >
                                 <div className="flex items-center gap-2">
+                                  {getPinStatusDot(pin)}
                                   {getPinStatusIcon(pin)}
                                   <span>GPIO {pin.pin}</span>
                                   {pin.status === 'safe' && (
@@ -465,10 +473,17 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                         return <XCircle className="w-4 h-4 text-danger" />;
                       };
 
+                      const getPinStatusDot = (pin: GpioPinInfo) => {
+                        const dotClass = "w-2 h-2 rounded-full flex-shrink-0";
+                        if (pin.status === 'safe') return <div className={`${dotClass} bg-success`} />;
+                        if (pin.status === 'problematic') return <div className={`${dotClass} bg-warning`} />;
+                        return <div className={`${dotClass} bg-danger`} />;
+                      };
+
                       const getPinStatusColor = (pin: GpioPinInfo) => {
-                        if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
-                        if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
-                        return 'text-white bg-danger/90 border-danger/70';
+                        if (pin.status === 'safe') return 'text-foreground hover:bg-accent';
+                        if (pin.status === 'problematic') return 'text-foreground hover:bg-accent';
+                        return 'text-foreground hover:bg-accent';
                       };
 
                       const getPinRecommendation = (pin: GpioPinInfo) => {
@@ -497,6 +512,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                                   disabled={pin.status !== 'safe'}
                                 >
                                   <div className="flex items-center gap-2">
+                                    {getPinStatusDot(pin)}
                                     {getPinStatusIcon(pin)}
                                     <span>GPIO {pin.pin}</span>
                                     {pin.status === 'safe' && (
@@ -588,10 +604,17 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                             return <XCircle className="w-4 h-4 text-danger" />;
                           };
 
+                          const getPinStatusDot = (pin: GpioPinInfo) => {
+                            const dotClass = "w-2 h-2 rounded-full flex-shrink-0";
+                            if (pin.status === 'safe') return <div className={`${dotClass} bg-success`} />;
+                            if (pin.status === 'problematic') return <div className={`${dotClass} bg-warning`} />;
+                            return <div className={`${dotClass} bg-danger`} />;
+                          };
+
                           const getPinStatusColor = (pin: GpioPinInfo) => {
-                            if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
-                            if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
-                            return 'text-white bg-danger/90 border-danger/70';
+                            if (pin.status === 'safe') return 'text-foreground hover:bg-accent';
+                            if (pin.status === 'problematic') return 'text-foreground hover:bg-accent';
+                            return 'text-foreground hover:bg-accent';
                           };
 
                           const getPinRecommendation = (pin: GpioPinInfo) => {
@@ -623,6 +646,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                                       disabled={pin.status !== 'safe'}
                                     >
                                       <div className="flex items-center gap-2">
+                                        {getPinStatusDot(pin)}
                                         {getPinStatusIcon(pin)}
                                         <span>GPIO {pin.pin}</span>
                                         {pin.status === 'safe' && (

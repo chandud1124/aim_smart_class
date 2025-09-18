@@ -13,19 +13,19 @@
 
 // Log levels
 typedef enum {
-    LOG_NONE = 0,   // No logging
-    LOG_ERROR = 1,  // Only errors
-    LOG_WARN = 2,   // Errors and warnings
-    LOG_INFO = 3,   // Errors, warnings, and info
-    LOG_DEBUG = 4,  // All including debug
-    LOG_TRACE = 5   // Everything including trace
+    LOG_LEVEL_NONE = 0,   // No logging
+    LOG_LEVEL_ERROR = 1,  // Only errors
+    LOG_LEVEL_WARN = 2,   // Errors and warnings
+    LOG_LEVEL_INFO = 3,   // Errors, warnings, and info
+    LOG_LEVEL_DEBUG = 4,  // All including debug
+    LOG_LEVEL_TRACE = 5   // Everything including trace
 } LogLevel;
 
 // Current log level (can be changed at runtime)
 extern LogLevel CURRENT_LOG_LEVEL;
 
 // Initialize logging system
-inline void initLogging(LogLevel level = LOG_INFO) {
+inline void initLogging(LogLevel level = LOG_LEVEL_INFO) {
     CURRENT_LOG_LEVEL = level;
 }
 
@@ -72,7 +72,7 @@ inline void logMessage(LogLevel level, const char* levelStr, const char* format,
 inline void LOG_ERROR(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    logMessage(LOG_ERROR, "ERROR", format, args);
+    logMessage(LOG_LEVEL_ERROR, "ERROR", format, args);
     va_end(args);
 }
 
@@ -80,7 +80,7 @@ inline void LOG_ERROR(const char* format, ...) {
 inline void LOG_WARN(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    logMessage(LOG_WARN, "WARN", format, args);
+    logMessage(LOG_LEVEL_WARN, "WARN", format, args);
     va_end(args);
 }
 
@@ -88,7 +88,7 @@ inline void LOG_WARN(const char* format, ...) {
 inline void LOG_INFO(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    logMessage(LOG_INFO, "INFO", format, args);
+    logMessage(LOG_LEVEL_INFO, "INFO", format, args);
     va_end(args);
 }
 
@@ -96,7 +96,7 @@ inline void LOG_INFO(const char* format, ...) {
 inline void LOG_DEBUG(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    logMessage(LOG_DEBUG, "DEBUG", format, args);
+    logMessage(LOG_LEVEL_DEBUG, "DEBUG", format, args);
     va_end(args);
 }
 
@@ -104,13 +104,13 @@ inline void LOG_DEBUG(const char* format, ...) {
 inline void LOG_TRACE(const char* format, ...) {
     va_list args;
     va_start(args, format);
-    logMessage(LOG_TRACE, "TRACE", format, args);
+    logMessage(LOG_LEVEL_TRACE, "TRACE", format, args);
     va_end(args);
 }
 
 // Health logging (always shown regardless of level)
 inline void LOG_HEALTH(LogLevel level, const char* format, ...) {
-    if (level > CURRENT_LOG_LEVEL && level != LOG_ERROR) return;
+    if (level > CURRENT_LOG_LEVEL && level != LOG_LEVEL_ERROR) return;
 
     va_list args;
     va_start(args, format);

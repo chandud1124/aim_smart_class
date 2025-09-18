@@ -12,6 +12,10 @@ static bool memoryMonitorInitialized = false;
 static MemoryPool* stringPool = nullptr;
 static MemoryPool* jsonPool = nullptr;
 
+// Heap tracing for memory leak detection
+#define HEAP_TRACE_BUFFER_SIZE 100
+static heap_trace_record_t heapTraceBuffer[HEAP_TRACE_BUFFER_SIZE];
+
 // Memory allocation tracking
 #define MAX_MEMORY_BLOCKS 100
 static MemoryBlock memoryBlocks[MAX_MEMORY_BLOCKS];
@@ -33,7 +37,7 @@ void initMemoryMonitor() {
     jsonPool = new MemoryPool(256, 10);    // 256-byte blocks for JSON
 
     // Initialize heap tracing for leak detection
-    heap_trace_init_standalone(g_memoryStats.heap_corruption_count, 100);
+    heap_trace_init_standalone(heapTraceBuffer, HEAP_TRACE_BUFFER_SIZE);
 
     // Get initial stack information
     initialStackHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
