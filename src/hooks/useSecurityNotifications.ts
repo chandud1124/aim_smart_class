@@ -11,7 +11,7 @@ interface SecurityAlert {
   location: string;
   message: string;
   timestamp: Date;
-  type: 'timeout' | 'unauthorized_access' | 'device_offline' | 'pir_triggered' | 'user_created' | 'user_updated' | 'user_deleted' | 'device_created' | 'device_updated' | 'device_deleted' | 'system_alert';
+  type: 'timeout' | 'unauthorized_access' | 'device_offline' | 'pir_triggered' | 'user_registration' | 'user_created' | 'user_updated' | 'user_deleted' | 'device_created' | 'device_updated' | 'device_deleted' | 'system_alert';
   acknowledged: boolean;
   severity?: string;
   metadata?: Record<string, any>;
@@ -47,6 +47,7 @@ export const useSecurityNotifications = () => {
 
   const getNotificationTitle = (type: string) => {
     switch (type) {
+      case 'user_registration': return '👤 New User Registration';
       case 'user_created': return '👤 New User Created';
       case 'user_updated': return '👤 User Updated';
       case 'user_deleted': return '👤 User Deleted';
@@ -115,6 +116,21 @@ export const useSecurityNotifications = () => {
       }
 
       // Handle general notifications (new functionality)
+      else if (payload.type === 'user_registration') {
+        // Only admins should see user registration notifications
+        if (['super-admin', 'admin'].includes(user.role)) {
+          addAlert({
+            deviceId: '',
+            deviceName: '',
+            location: '',
+            message: payload.message,
+            type: 'user_registration',
+            severity: 'medium',
+            metadata: payload.metadata
+          });
+        }
+      }
+
       else if (payload.type === 'user_created' || payload.type === 'user_updated' || payload.type === 'user_deleted') {
         // Only admins should see user management notifications
         if (user.role === 'admin') {
@@ -132,7 +148,7 @@ export const useSecurityNotifications = () => {
 
       else if (payload.type === 'device_created' || payload.type === 'device_updated' || payload.type === 'device_deleted') {
         // Admins and faculty should see device management notifications
-        if (user.role === 'admin' || user.role === 'faculty' || user.role === 'hod') {
+        if (['super-admin', 'admin', 'faculty'].includes(user.role)) {
           addAlert({
             deviceId: payload.deviceId || '',
             deviceName: payload.deviceName || '',

@@ -54,71 +54,240 @@ const register = async (req, res) => {
       }
     }
 
-    // Set default permissions based on role
+    // Set default permissions based on role (now handled by User model pre-save hook)
+    // The User model will automatically assign permissions based on role
     const rolePermissions = {
-      admin: {
-        canRequestExtensions: true,
-        canApproveExtensions: true,
+      'super-admin': {
         canManageUsers: true,
+        canApproveUsers: true,
+        canManageDevices: true,
         canViewReports: true,
-        canControlDevices: true,
-        canAccessSecurity: true
-      },
-      principal: {
+        canManageSchedule: true,
         canRequestExtensions: true,
         canApproveExtensions: true,
-        canManageUsers: false,
-        canViewReports: true,
-        canControlDevices: true,
-        canAccessSecurity: true
+        canViewSecurityAlerts: true,
+        canAccessAllClassrooms: true,
+        canBypassTimeRestrictions: true,
+        hasEmergencyAccess: true,
+        hasDepartmentOverride: true,
+        canAccessSecurityDevices: true,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: true,
+        canDeleteUsers: true,
+        canResetPasswords: true,
+        canManageRoles: true,
+        canViewAuditLogs: true,
+        canManageSettings: true,
+        canCreateSchedules: true,
+        canModifySchedules: true,
+        canOverrideSchedules: true,
+        canViewAllSchedules: true,
+        canSendNotifications: true,
+        canReceiveAlerts: true,
+        canManageAnnouncements: true
       },
-      dean: {
+      'dean': {
+        canManageUsers: true,
+        canApproveUsers: true,
+        canManageDevices: true,
+        canViewReports: true,
+        canManageSchedule: true,
         canRequestExtensions: true,
         canApproveExtensions: true,
-        canManageUsers: false,
-        canViewReports: true,
-        canControlDevices: true,
-        canAccessSecurity: false
+        canViewSecurityAlerts: true,
+        canAccessAllClassrooms: true,
+        canBypassTimeRestrictions: true,
+        hasEmergencyAccess: true,
+        hasDepartmentOverride: true,
+        canAccessSecurityDevices: false,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: true,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: true,
+        canManageSettings: false,
+        canCreateSchedules: true,
+        canModifySchedules: true,
+        canOverrideSchedules: true,
+        canViewAllSchedules: true,
+        canSendNotifications: true,
+        canReceiveAlerts: true,
+        canManageAnnouncements: true
       },
-      hod: {
+      'admin': {
+        canManageUsers: true,
+        canApproveUsers: true,
+        canManageDevices: true,
+        canViewReports: true,
+        canManageSchedule: true,
         canRequestExtensions: true,
         canApproveExtensions: true,
-        canManageUsers: false,
-        canViewReports: false,
-        canControlDevices: true,
-        canAccessSecurity: false
+        canViewSecurityAlerts: true,
+        canAccessAllClassrooms: true,
+        canBypassTimeRestrictions: true,
+        hasEmergencyAccess: true,
+        hasDepartmentOverride: false,
+        canAccessSecurityDevices: true,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: true,
+        canDeleteUsers: true,
+        canResetPasswords: true,
+        canManageRoles: false,
+        canViewAuditLogs: true,
+        canManageSettings: true,
+        canCreateSchedules: true,
+        canModifySchedules: true,
+        canOverrideSchedules: true,
+        canViewAllSchedules: true,
+        canSendNotifications: true,
+        canReceiveAlerts: true,
+        canManageAnnouncements: true
       },
-      faculty: {
+      'faculty': {
+        canManageUsers: false,
+        canApproveUsers: false,
+        canManageDevices: true,
+        canViewReports: true,
+        canManageSchedule: true,
+        canRequestExtensions: true,
+        canApproveExtensions: true,
+        canViewSecurityAlerts: false,
+        canAccessAllClassrooms: false,
+        canBypassTimeRestrictions: false,
+        hasEmergencyAccess: false,
+        hasDepartmentOverride: true,
+        canAccessSecurityDevices: false,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: true,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+        canCreateSchedules: true,
+        canModifySchedules: true,
+        canOverrideSchedules: false,
+        canViewAllSchedules: false,
+        canSendNotifications: true,
+        canReceiveAlerts: true,
+        canManageAnnouncements: false
+      },
+      'teacher': {
+        canManageUsers: false,
+        canApproveUsers: false,
+        canManageDevices: true,
+        canViewReports: false,
+        canManageSchedule: true,
         canRequestExtensions: true,
         canApproveExtensions: false,
-        canManageUsers: false,
-        canViewReports: false,
-        canControlDevices: true,
-        canAccessSecurity: false
+        canViewSecurityAlerts: false,
+        canAccessAllClassrooms: false,
+        canBypassTimeRestrictions: false,
+        hasEmergencyAccess: false,
+        hasDepartmentOverride: false,
+        canAccessSecurityDevices: false,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: true,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+        canCreateSchedules: true,
+        canModifySchedules: true,
+        canOverrideSchedules: false,
+        canViewAllSchedules: false,
+        canSendNotifications: false,
+        canReceiveAlerts: true,
+        canManageAnnouncements: false
       },
-      security: {
+      'student': {
+        canManageUsers: false,
+        canApproveUsers: false,
+        canManageDevices: false,
+        canViewReports: false,
+        canManageSchedule: false,
         canRequestExtensions: false,
         canApproveExtensions: false,
-        canManageUsers: false,
-        canViewReports: false,
-        canControlDevices: false,
-        canAccessSecurity: true
+        canViewSecurityAlerts: false,
+        canAccessAllClassrooms: false,
+        canBypassTimeRestrictions: false,
+        hasEmergencyAccess: false,
+        hasDepartmentOverride: false,
+        canAccessSecurityDevices: false,
+        canAccessStudentDevices: true,
+        canAccessGuestDevices: false,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+        canCreateSchedules: false,
+        canModifySchedules: false,
+        canOverrideSchedules: false,
+        canViewAllSchedules: false,
+        canSendNotifications: false,
+        canReceiveAlerts: true,
+        canManageAnnouncements: false
       },
-      student: {
+      'security': {
+        canManageUsers: false,
+        canApproveUsers: false,
+        canManageDevices: false,
+        canViewReports: false,
+        canManageSchedule: false,
         canRequestExtensions: false,
         canApproveExtensions: false,
-        canManageUsers: false,
-        canViewReports: false,
-        canControlDevices: false,
-        canAccessSecurity: false
+        canViewSecurityAlerts: true,
+        canAccessAllClassrooms: false,
+        canBypassTimeRestrictions: false,
+        hasEmergencyAccess: true,
+        hasDepartmentOverride: false,
+        canAccessSecurityDevices: true,
+        canAccessStudentDevices: false,
+        canAccessGuestDevices: false,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+        canCreateSchedules: false,
+        canModifySchedules: false,
+        canOverrideSchedules: false,
+        canViewAllSchedules: false,
+        canSendNotifications: true,
+        canReceiveAlerts: true,
+        canManageAnnouncements: false
       },
-      user: {
+      'guest': {
+        canManageUsers: false,
+        canApproveUsers: false,
+        canManageDevices: false,
+        canViewReports: false,
+        canManageSchedule: false,
         canRequestExtensions: false,
         canApproveExtensions: false,
-        canManageUsers: false,
-        canViewReports: false,
-        canControlDevices: false,
-        canAccessSecurity: false
+        canViewSecurityAlerts: false,
+        canAccessAllClassrooms: false,
+        canBypassTimeRestrictions: false,
+        hasEmergencyAccess: false,
+        hasDepartmentOverride: false,
+        canAccessSecurityDevices: false,
+        canAccessStudentDevices: false,
+        canAccessGuestDevices: true,
+        canDeleteUsers: false,
+        canResetPasswords: false,
+        canManageRoles: false,
+        canViewAuditLogs: false,
+        canManageSettings: false,
+        canCreateSchedules: false,
+        canModifySchedules: false,
+        canOverrideSchedules: false,
+        canViewAllSchedules: false,
+        canSendNotifications: false,
+        canReceiveAlerts: false,
+        canManageAnnouncements: false
       }
     };
 
@@ -127,20 +296,68 @@ const register = async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: role || 'user',
+      role: role || 'student',
       department: department ? department.trim() : '',
       employeeId: employeeId ? employeeId.trim() : undefined,
       phone: phone ? phone.trim() : undefined,
       designation: designation ? designation.trim() : undefined,
       registrationReason: reason ? reason.trim() : undefined,
-            // isApproved and isActive remain false until admin approval
-      ...rolePermissions[role] || rolePermissions.user
+      // Permissions will be automatically assigned by User model pre-save hook based on role
+      // isApproved and isActive remain false until admin approval
     });
 
     // Save user (password will be hashed by pre-save hook)
     await user.save();
 
     logger.info(`New user registered: ${user.name} (${user.email}) - Role: ${user.role}`);
+
+    // Send notifications to all admins about new registration
+    try {
+      const adminRoles = ['super-admin', 'admin'];
+      const admins = await User.find({
+        role: { $in: adminRoles },
+        isActive: true,
+        isApproved: true
+      }).select('_id name email');
+
+      logger.info(`Sending registration notifications to ${admins.length} admins`);
+
+      // Create notifications for each admin
+      const notificationPromises = admins.map(admin =>
+        Notification.createUserRegistrationNotification({
+          recipient: admin._id,
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          department: user.department
+        })
+      );
+
+      // Save all notifications
+      await Promise.all(notificationPromises);
+
+      // Send real-time notifications via Socket.IO if available
+      if (req.app.get('io')) {
+        admins.forEach(admin => {
+          req.app.get('io').to(`user_${admin._id}`).emit('notification', {
+            type: 'user_registration',
+            title: 'New User Registration',
+            message: `${user.name} (${user.role}) has registered and is pending approval`,
+            userId: user._id,
+            userName: user.name,
+            userRole: user.role,
+            department: user.department,
+            timestamp: new Date()
+          });
+        });
+      }
+
+      logger.info(`Registration notifications sent to ${admins.length} admins`);
+    } catch (notificationError) {
+      logger.error('Error sending registration notifications:', notificationError);
+      // Don't fail registration if notifications fail
+    }
 
     // Return success response
     res.status(201).json({
@@ -512,11 +729,11 @@ const approvePermissionRequest = async (req, res) => {
     user.approvedAt = new Date();
 
     // Set additional permissions based on role
-    if (user.role === 'faculty' || user.role === 'hod' || user.role === 'dean' || user.role === 'principal') {
+    if (['faculty', 'teacher', 'dean', 'admin', 'super-admin'].includes(user.role)) {
       user.canRequestExtensions = true;
     }
 
-    if (['admin', 'principal', 'dean', 'hod'].includes(user.role)) {
+    if (['admin', 'dean', 'faculty', 'super-admin'].includes(user.role)) {
       user.canApproveExtensions = true;
     }
 
@@ -630,7 +847,7 @@ const requestClassExtension = async (req, res) => {
     }
 
     // Check if user owns this schedule or is authorized
-    if (schedule.facultyId.toString() !== req.user.id && !['admin', 'principal', 'dean', 'hod'].includes(req.user.role)) {
+    if (schedule.facultyId.toString() !== req.user.id && !['admin', 'dean', 'faculty', 'super-admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'You can only request extensions for your own classes' });
     }
 
@@ -650,7 +867,7 @@ const requestClassExtension = async (req, res) => {
 
     // Notify approvers
     const approvers = await User.find({
-      role: { $in: ['hod', 'dean', 'principal', 'admin'] },
+      role: { $in: ['faculty', 'dean', 'admin', 'super-admin'] },
       department: req.user.department,
       isActive: true,
       canApproveExtensions: true

@@ -80,6 +80,7 @@ const settingsRoutes = require('./routes/settings');
 const ticketRoutes = require('./routes/tickets');
 const devicePermissionRoutes = require('./routes/devicePermissions');
 const deviceCategoryRoutes = require('./routes/deviceCategories');
+const classExtensionRoutes = require('./routes/classExtensions');
 
 // Import services (only those actively used)
 const scheduleService = require('./services/scheduleService');
@@ -265,7 +266,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token', 'access-control-allow-origin', 'access-control-allow-headers', 'access-control-allow-methods']
 }));
 
 
@@ -279,10 +280,45 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize main Socket.IO instance
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Allow all origins for development
+    origin: function (origin, callback) {
+      // Use the same CORS logic as Express
+      const allowed = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
+        'http://192.168.1.100:5173', // Example extra network host
+        'http://192.168.0.108:5173', // New IP for your network
+        'http://172.16.3.171:5173', // Your remote frontend
+        'http://172.16.3.171:5174', // Alternative port
+      ];
+      // Dynamically add LAN IPs for multiple ports
+      const os = require('os');
+      const nets = os.networkInterfaces();
+      const ports = [5173, 5174, 3000, 8080];
+      Object.values(nets).forEach(ifaces => {
+        ifaces.forEach(iface => {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            ports.forEach(port => {
+              allowed.push(`http://${iface.address}:${port}`);
+            });
+          }
+        });
+      });
+
+      if (!origin) {
+        callback(null, true); // Allow requests with no origin
+      } else if (allowed.includes(origin)) {
+        callback(null, origin); // Echo allowed origin for credentials
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token', 'access-control-allow-origin', 'access-control-allow-headers', 'access-control-allow-methods']
   },
   // WebSocket configuration to prevent frame corruption
   perMessageDeflate: false,
@@ -434,6 +470,8 @@ apiRouter.use('/tickets', apiLimiter, ticketRoutes);
 apiRouter.use('/facility', apiLimiter, require('./routes/classroom'));
 apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
+apiRouter.use('/class-extensions', apiLimiter, classExtensionRoutes);
+apiRouter.use('/role-permissions', apiLimiter, require('./routes/rolePermissions'));
 
 // Mount all routes under /api
 // Health check endpoint

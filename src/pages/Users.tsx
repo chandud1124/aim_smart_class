@@ -16,15 +16,20 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'manager' | 'supervisor' | 'technician' | 'operator' | 'security' | 'user';
+  role: 'super-admin' | 'dean' | 'admin' | 'faculty' | 'teacher' | 'student' | 'security' | 'guest';
+  roleLevel: number;
   isActive: boolean;
+  isApproved: boolean;
   lastLogin: Date;
   assignedDevices: string[];
   department?: string;
-  accessLevel: 'full' | 'limited' | 'readonly';
+  employeeId?: string;
+  designation?: string;
+  phone?: string;
+  assignedRooms: string[];
+  permissions: any;
   isOnline?: boolean;
   lastSeen?: Date;
-  isApproved?: boolean;
   registrationDate?: string;
 }
 
@@ -253,11 +258,20 @@ const Users = () => {
         name: raw.name,
         email: raw.email,
         role: raw.role,
+        roleLevel: raw.roleLevel || 3,
         isActive: raw.isActive,
+        isApproved: raw.isApproved || false,
         lastLogin: raw.lastLogin ? new Date(raw.lastLogin) : new Date(),
         assignedDevices: raw.assignedDevices || [],
         department: raw.department,
-        accessLevel: raw.accessLevel || 'limited'
+        employeeId: raw.employeeId,
+        designation: raw.designation,
+        phone: raw.phone,
+        assignedRooms: raw.assignedRooms || [],
+        permissions: raw.permissions || {},
+        isOnline: raw.isOnline,
+        lastSeen: raw.lastSeen ? new Date(raw.lastSeen) : undefined,
+        registrationDate: raw.registrationDate
       };
       setUsers(prev => [mapped, ...prev]);
       toast({ title: 'User Added', description: `${userData.name} added successfully` });
@@ -278,11 +292,20 @@ const Users = () => {
         name: updated.name,
         email: updated.email,
         role: updated.role,
+        roleLevel: updated.roleLevel || 3,
         isActive: updated.isActive,
+        isApproved: updated.isApproved || false,
         lastLogin: updated.lastLogin ? new Date(updated.lastLogin) : new Date(),
         assignedDevices: updated.assignedDevices || [],
         department: updated.department,
-        accessLevel: updated.accessLevel || 'limited'
+        employeeId: updated.employeeId,
+        designation: updated.designation,
+        phone: updated.phone,
+        assignedRooms: updated.assignedRooms || [],
+        permissions: updated.permissions || {},
+        isOnline: updated.isOnline,
+        lastSeen: updated.lastSeen ? new Date(updated.lastSeen) : undefined,
+        registrationDate: updated.registrationDate
       } : u));
       setEditingUser(null);
       toast({ title: 'User Updated', description: `${userData.name} updated successfully` });
@@ -329,11 +352,20 @@ const Users = () => {
           name: updated.name,
           email: updated.email,
           role: updated.role,
+          roleLevel: updated.roleLevel || 3,
           isActive: updated.isActive,
+          isApproved: updated.isApproved || false,
           lastLogin: updated.lastLogin ? new Date(updated.lastLogin) : new Date(),
           assignedDevices: updated.assignedDevices || [],
           department: updated.department,
-          accessLevel: updated.accessLevel || 'limited'
+          employeeId: updated.employeeId,
+          designation: updated.designation,
+          phone: updated.phone,
+          assignedRooms: updated.assignedRooms || [],
+          permissions: updated.permissions || {},
+          isOnline: updated.isOnline,
+          lastSeen: updated.lastSeen ? new Date(updated.lastSeen) : undefined,
+          registrationDate: updated.registrationDate
         } : u));
         toast({ title: 'Status Updated', description: `User ${updated.isActive ? 'activated' : 'deactivated'} successfully` });
         return;
@@ -348,11 +380,20 @@ const Users = () => {
               name: updated.name,
               email: updated.email,
               role: updated.role,
+              roleLevel: updated.roleLevel || 3,
               isActive: updated.isActive,
+              isApproved: updated.isApproved || false,
               lastLogin: updated.lastLogin ? new Date(updated.lastLogin) : new Date(),
               assignedDevices: updated.assignedDevices || [],
               department: updated.department,
-              accessLevel: updated.accessLevel || 'limited'
+              employeeId: updated.employeeId,
+              designation: updated.designation,
+              phone: updated.phone,
+              assignedRooms: updated.assignedRooms || [],
+              permissions: updated.permissions || {},
+              isOnline: updated.isOnline,
+              lastSeen: updated.lastSeen ? new Date(updated.lastSeen) : undefined,
+              registrationDate: updated.registrationDate
             } : u));
             toast({ title: 'Status Updated (Fallback)', description: `User ${updated.isActive ? 'activated' : 'deactivated'} successfully` });
             return;
@@ -437,13 +478,14 @@ const Users = () => {
         />
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="border rounded px-2 py-1 bg-primary/10 text-primary focus:ring-2 focus:ring-primary">
           <option value="all" className="bg-background text-primary">All Roles</option>
-          <option value="admin" className="bg-background text-primary">Admin</option>
-          <option value="manager" className="bg-background text-primary">Manager</option>
-          <option value="supervisor" className="bg-background text-primary">Supervisor</option>
-          <option value="technician" className="bg-background text-primary">Technician</option>
-          <option value="operator" className="bg-background text-primary">Operator</option>
+          <option value="super-admin" className="bg-background text-primary">Super Admin</option>
+          <option value="dean" className="bg-background text-primary">Dean</option>
+          <option value="admin" className="bg-background text-primary">Administrator</option>
+          <option value="faculty" className="bg-background text-primary">Faculty</option>
+          <option value="teacher" className="bg-background text-primary">Teacher</option>
+          <option value="student" className="bg-background text-primary">Student</option>
           <option value="security" className="bg-background text-primary">Security</option>
-          <option value="user" className="bg-background text-primary">General Staff</option>
+          <option value="guest" className="bg-background text-primary">Guest</option>
         </select>
         <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="border rounded px-2 py-1 bg-primary/10 text-primary focus:ring-2 focus:ring-primary">
           {departmentOptions.map(opt => (
@@ -553,8 +595,8 @@ const Users = () => {
                     {/* Online status badge removed as requested */}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Access:</span>
-                    <Badge variant="outline" className="capitalize">{user.accessLevel}</Badge>
+                    <span className="text-sm font-medium">Level:</span>
+                    <Badge variant="outline" className="capitalize">{user.roleLevel}</Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Last Login:</span>

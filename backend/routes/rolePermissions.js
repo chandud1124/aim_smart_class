@@ -64,7 +64,7 @@ router.get('/:role', async (req, res) => {
   try {
     const { role } = req.params;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
@@ -170,7 +170,7 @@ router.put('/:role', async (req, res) => {
     const { role } = req.params;
     const updates = req.body;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
@@ -227,7 +227,7 @@ router.patch('/:role', async (req, res) => {
     const { role } = req.params;
     const updates = req.body;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
@@ -283,18 +283,18 @@ router.delete('/:role', async (req, res) => {
   try {
     const { role } = req.params;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
       });
     }
 
-    // Prevent deletion of admin role permissions
-    if (role === 'admin') {
+    // Prevent deletion of admin and super-admin role permissions
+    if (['admin', 'super-admin'].includes(role)) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot delete admin role permissions'
+        message: 'Cannot delete admin or super-admin role permissions'
       });
     }
 
@@ -339,7 +339,7 @@ router.post('/:role/reset', async (req, res) => {
   try {
     const { role } = req.params;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'
@@ -382,11 +382,19 @@ router.post('/:role/reset', async (req, res) => {
 });
 
 // POST /api/role-permissions/initialize - Initialize default permissions for all roles
-router.post('/initialize', async (req, res) => {
+router.post('/initialize', auth, authorize('admin'), async (req, res) => {
   try {
-    const roles = ['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'];
+    // Clear all existing role permissions first
+    await RolePermissions.deleteMany({});
+    console.log('Cleared all existing role permissions');
+
+    const roles = ['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'];
     const created = [];
     const updated = [];
+
+    // Use default admin user ID if req.user is not available
+    const userId = req.user ? req.user.id : null;
+    const userName = req.user ? req.user.name : 'System';
 
     for (const role of roles) {
       let rolePermissions = await RolePermissions.findOne({ role });
@@ -396,24 +404,36 @@ router.post('/initialize', async (req, res) => {
         rolePermissions = new RolePermissions({
           role,
           metadata: {
-            createdBy: req.user.id,
-            lastModifiedBy: req.user.id
+            createdBy: userId,
+            lastModifiedBy: userId,
+            isSystemRole: ['super-admin', 'admin'].includes(role)
           }
         });
+        // Set default permissions for the new role
+        rolePermissions.setDefaultPermissionsForRole();
+
+        // Also manually set some key permissions to ensure they work
+        if (role === 'super-admin') {
+          rolePermissions.userManagement.canViewUsers = true;
+          rolePermissions.deviceManagement.canViewDevices = true;
+        }
+
         await rolePermissions.save();
         created.push(role);
       } else if (!rolePermissions.metadata.isActive) {
-        // Reactivate existing permissions
+        // Reactivate existing permissions and reset to defaults
         rolePermissions.metadata.isActive = true;
-        rolePermissions.metadata.lastModifiedBy = req.user.id;
+        rolePermissions.metadata.lastModifiedBy = userId;
+        // Reset to default permissions
+        rolePermissions.setDefaultPermissionsForRole();
         await rolePermissions.save();
         updated.push(role);
       }
     }
 
     logger.info(`[ROLE_PERMISSIONS] Initialized permissions - Created: ${created.join(', ')}, Updated: ${updated.join(', ')}`, {
-      userId: req.user.id,
-      userName: req.user.name
+      userId: userId,
+      userName: userName
     });
 
     res.json({
@@ -440,7 +460,7 @@ router.get('/check/:role/:category/:permission', async (req, res) => {
   try {
     const { role, category, permission } = req.params;
 
-    if (!['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'].includes(role)) {
+    if (!['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role specified'

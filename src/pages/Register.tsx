@@ -29,52 +29,52 @@ const departments = [
 
 const roles = [
   {
+    value: 'super-admin',
+    label: 'Super Administrator',
+    description: 'Complete system access with all permissions and administrative control',
+    permissions: { canManageUsers: true, canApproveExtensions: true, canViewReports: true, canManageSettings: true, canViewAuditLogs: true }
+  },
+  {
+    value: 'dean',
+    label: 'Dean',
+    description: 'Academic leadership with organization-wide oversight and approval permissions',
+    permissions: { canApproveExtensions: true, canViewReports: true, canManageUsers: true, canViewAuditLogs: true }
+  },
+  {
     value: 'admin',
     label: 'Administrator',
-    description: 'Full system access, user management, and approval permissions',
-    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: true, canViewReports: true }
+    description: 'Administrative control with user management and system configuration',
+    permissions: { canManageUsers: true, canApproveExtensions: true, canViewReports: true, canManageSettings: true }
   },
   {
-    value: 'principal',
-    label: 'Principal',
-    description: 'Organization-wide oversight and approval permissions',
-    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
+    value: 'faculty',
+    label: 'Faculty',
+    description: 'Academic staff with teaching permissions and departmental oversight',
+    permissions: { canRequestExtensions: true, canApproveExtensions: true, canViewReports: true, canCreateSchedules: true }
   },
   {
-    value: 'supervisor',
-    label: 'Supervisor',
-    description: 'Team oversight and departmental approval permissions',
-    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: true }
+    value: 'teacher',
+    label: 'Teacher',
+    description: 'Teaching staff with classroom management and extension request permissions',
+    permissions: { canRequestExtensions: true, canApproveExtensions: false, canCreateSchedules: true, canModifySchedules: true }
   },
   {
-    value: 'technician',
-    label: 'Technician',
-    description: 'Equipment maintenance and technical operations',
-    permissions: { canRequestExtensions: true, canApproveExtensions: true, canManageUsers: false, canViewReports: false }
-  },
-  {
-    value: 'operator',
-    label: 'Operator',
-    description: 'Can control devices and request power extensions',
-    permissions: { canRequestExtensions: true, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+    value: 'student',
+    label: 'Student',
+    description: 'Student access with basic classroom and device permissions',
+    permissions: { canRequestExtensions: false, canAccessStudentDevices: true, canReceiveAlerts: true }
   },
   {
     value: 'security',
     label: 'Security Personnel',
-    description: 'Security monitoring and access control',
-    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+    description: 'Security monitoring and access control with specialized permissions',
+    permissions: { canAccessSecurityDevices: true, canViewSecurityAlerts: true, canReceiveAlerts: true }
   },
   {
-    value: 'user',
-    label: 'General User',
-    description: 'Access to basic facility monitoring',
-    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
-  },
-  {
-    value: 'user',
-    label: 'General Staff',
-    description: 'Limited access to system features',
-    permissions: { canRequestExtensions: false, canApproveExtensions: false, canManageUsers: false, canViewReports: false }
+    value: 'guest',
+    label: 'Guest',
+    description: 'Limited guest access for visitors and temporary users',
+    permissions: { canAccessGuestDevices: true, canReceiveAlerts: false }
   }
 ];
 

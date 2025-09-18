@@ -193,7 +193,7 @@ export const FacilityAccessManager: React.FC = () => {
 
     if (!hasManagementAccess) {
         return (
-            <RoleGuard roles={['admin', 'manager']}>
+            <RoleGuard roles={['admin', 'faculty']}>
                 <div className="p-6">
                     <Alert>
                         <AlertTriangle className="h-4 w-4" />
@@ -218,7 +218,7 @@ export const FacilityAccessManager: React.FC = () => {
     }
 
     return (
-        <RoleGuard roles={['admin', 'manager']}>
+        <RoleGuard roles={['admin', 'faculty']}>
             <div className="container mx-auto px-4 py-6 space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">

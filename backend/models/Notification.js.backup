@@ -411,6 +411,53 @@ notificationSchema.statics.createUserRegistrationNotification = async function (
 
 // Static method to get unread notifications for a user
 notificationSchema.statics.getUnreadForUser = function (userId, limit = 50) {
+        userId,
+        userName,
+        userEmail,
+        userRole,
+        department
+    } = data;
+
+    const notification = new this({
+        recipient,
+        type: 'user_registration',
+        title: 'New User Registration',
+        message: `${userName} (${userRole}) has registered and is pending approval`,
+        priority: 'medium',
+        relatedEntity: {
+            model: 'User',
+            id: userId
+        },
+        metadata: {
+            userId,
+            userName,
+            userEmail,
+            userRole,
+            department,
+            registrationDate: new Date()
+        },
+        actions: [
+            {
+                label: 'Review Registration',
+                action: 'review_user',
+                url: `/admin/users/${userId}`
+            },
+            {
+                label: 'Approve User',
+                action: 'approve_user',
+                url: `/admin/users/${userId}/approve`
+            }
+        ]
+    });
+
+    await notification.save();
+    await notification.sendEmail();
+
+    return notification;
+};
+
+// Static method to get unread notifications for a user
+notificationSchema.statics.getUnreadForUser = function (userId, limit = 50) {
     return this.find({
         recipient: userId,
         isRead: false

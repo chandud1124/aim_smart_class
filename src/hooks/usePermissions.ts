@@ -5,38 +5,64 @@ export const usePermissions = () => {
     const { user } = useAuth();
 
     const role = user?.role || '';
+    const roleLevel = (user as any)?.roleLevel || 0;
     const isApproved = (user as any)?.isApproved || false;
     const isActive = (user as any)?.isActive || false;
+    const permissions = (user as any)?.permissions || {};
 
-    // Role hierarchy
-    const isAdmin = role === 'admin';
-    const isPrincipal = role === 'principal';
+    // New role hierarchy
+    const isSuperAdmin = role === 'super-admin';
     const isDean = role === 'dean';
-    const isHOD = role === 'hod';
+    const isAdmin = role === 'admin';
     const isFaculty = role === 'faculty';
-    const isSecurity = role === 'security';
+    const isTeacher = role === 'teacher';
     const isStudent = role === 'student';
+    const isSecurity = role === 'security';
+    const isGuest = role === 'guest';
 
-    // Permission groups
-    const hasManagementAccess = isAdmin || isPrincipal || isDean || isHOD;
-    const hasStaffAccess = hasManagementAccess || isFaculty || isSecurity;
-    const hasFullAccess = hasManagementAccess || isAdmin;
+    // Permission groups based on role hierarchy
+    const hasSuperAccess = isSuperAdmin;
+    const hasAdminAccess = hasSuperAccess || isAdmin;
+    const hasManagementAccess = hasAdminAccess || isDean;
+    const hasStaffAccess = hasManagementAccess || isFaculty || isTeacher || isSecurity;
+    const hasBasicAccess = hasStaffAccess || isStudent || isGuest;
 
-    // Specific permissions
-    const canApproveUsers = hasManagementAccess;
-    const canManageDevices = hasStaffAccess;
-    const canViewReports = hasManagementAccess;
-    const canManageSchedule = hasStaffAccess;
-    const canRequestExtensions = isFaculty;
-    const canApproveExtensions = hasManagementAccess;
-    const canViewSecurityAlerts = isSecurity || hasManagementAccess;
-    const canManageUsers = hasManagementAccess;
+    // Specific permissions from user permissions object
+    const canManageUsers = permissions.canManageUsers || hasAdminAccess;
+    const canApproveUsers = permissions.canApproveUsers || hasManagementAccess;
+    const canManageDevices = permissions.canManageDevices || hasStaffAccess;
+    const canViewReports = permissions.canViewReports || hasManagementAccess;
+    const canManageSchedule = permissions.canManageSchedule || hasStaffAccess;
+    const canRequestExtensions = permissions.canRequestExtensions || isTeacher || isFaculty;
+    const canApproveExtensions = permissions.canApproveExtensions || hasManagementAccess;
+    const canViewSecurityAlerts = permissions.canViewSecurityAlerts || isSecurity || hasManagementAccess;
+    const canAccessAllClassrooms = permissions.canAccessAllClassrooms || hasManagementAccess;
+    const canBypassTimeRestrictions = permissions.canBypassTimeRestrictions || hasManagementAccess;
+    const hasEmergencyAccess = permissions.hasEmergencyAccess || hasManagementAccess;
+    const hasDepartmentOverride = permissions.hasDepartmentOverride || hasManagementAccess;
 
-    // Classroom-specific permissions
-    const canAccessAllClassrooms = (user as any)?.classroomPermissions?.canAccessAllClassrooms || false;
-    const canBypassTimeRestrictions = (user as any)?.classroomPermissions?.bypassTimeRestrictions || false;
-    const hasEmergencyAccess = (user as any)?.classroomPermissions?.emergencyAccess || false;
-    const hasDepartmentOverride = (user as any)?.classroomPermissions?.departmentOverride || false;
+    // Device-specific permissions
+    const canAccessSecurityDevices = permissions.canAccessSecurityDevices || isSecurity || hasManagementAccess;
+    const canAccessStudentDevices = permissions.canAccessStudentDevices || isStudent || hasStaffAccess;
+    const canAccessGuestDevices = permissions.canAccessGuestDevices || isGuest || hasBasicAccess;
+
+    // Administrative permissions
+    const canDeleteUsers = permissions.canDeleteUsers || hasAdminAccess;
+    const canResetPasswords = permissions.canResetPasswords || hasAdminAccess;
+    const canManageRoles = permissions.canManageRoles || hasSuperAccess;
+    const canViewAuditLogs = permissions.canViewAuditLogs || hasManagementAccess;
+    const canManageSettings = permissions.canManageSettings || hasAdminAccess;
+
+    // Classroom and scheduling permissions
+    const canCreateSchedules = permissions.canCreateSchedules || hasStaffAccess;
+    const canModifySchedules = permissions.canModifySchedules || hasManagementAccess;
+    const canOverrideSchedules = permissions.canOverrideSchedules || hasManagementAccess;
+    const canViewAllSchedules = permissions.canViewAllSchedules || hasManagementAccess;
+
+    // Communication permissions
+    const canSendNotifications = permissions.canSendNotifications || hasStaffAccess;
+    const canReceiveAlerts = permissions.canReceiveAlerts || hasBasicAccess;
+    const canManageAnnouncements = permissions.canManageAnnouncements || hasManagementAccess;
 
     return {
         // User status
@@ -45,33 +71,67 @@ export const usePermissions = () => {
 
         // Roles
         role,
-        isAdmin,
-        isPrincipal,
+        roleLevel,
+        isSuperAdmin,
         isDean,
-        isHOD,
+        isAdmin,
         isFaculty,
-        isSecurity,
+        isTeacher,
         isStudent,
+        isSecurity,
+        isGuest,
 
         // Permission groups
+        hasSuperAccess,
+        hasAdminAccess,
         hasManagementAccess,
         hasStaffAccess,
-        hasFullAccess,
+        hasBasicAccess,
 
-        // Specific permissions
+        // User management permissions
+        canManageUsers,
         canApproveUsers,
+        canDeleteUsers,
+        canResetPasswords,
+        canManageRoles,
+        canViewAuditLogs,
+
+        // Device permissions
         canManageDevices,
+        canAccessSecurityDevices,
+        canAccessStudentDevices,
+        canAccessGuestDevices,
+
+        // Reporting and monitoring
         canViewReports,
+        canViewSecurityAlerts,
+        canReceiveAlerts,
+
+        // Schedule management
         canManageSchedule,
+        canCreateSchedules,
+        canModifySchedules,
+        canOverrideSchedules,
+        canViewAllSchedules,
+
+        // Class extension permissions
         canRequestExtensions,
         canApproveExtensions,
-        canViewSecurityAlerts,
-        canManageUsers,
+
+        // System settings
+        canManageSettings,
+
+        // Communication
+        canSendNotifications,
+        canManageAnnouncements,
 
         // Classroom-specific permissions
         canAccessAllClassrooms,
         canBypassTimeRestrictions,
         hasEmergencyAccess,
         hasDepartmentOverride,
+
+        // Raw permissions object for advanced checks
+        permissions
     };
 };

@@ -30,10 +30,7 @@ class SocketService {
       upgrade: true, // Allow transport upgrades
       rememberUpgrade: false, // Don't remember upgrades to avoid header issues
       path: '/socket.io',
-      withCredentials: false, // Disable credentials to avoid CORS issues
-      extraHeaders: {
-        'Access-Control-Allow-Origin': '*'
-      }
+      withCredentials: true // Enable credentials for CORS
     });
 
     // Quick version / debug info

@@ -17,7 +17,8 @@ import {
     Shield,
     Calendar,
     FileText,
-    X
+    X,
+    UserPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { authAPI } from '@/services/api';
@@ -138,6 +139,8 @@ const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
             case 'security_alert':
             case 'unauthorized_access':
                 return <Shield className="w-4 h-4 text-red-500" />;
+            case 'user_registration':
+                return <UserPlus className="w-4 h-4 text-blue-500" />;
             case 'extension_request':
             case 'permission_request':
                 return <UserCheck className="w-4 h-4 text-blue-500" />;

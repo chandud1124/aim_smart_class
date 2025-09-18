@@ -12,13 +12,13 @@ import { useToast } from '@/hooks/use-toast';
 interface UserData {
   name: string;
   email: string;
-  role: 'admin' | 'principal' | 'dean' | 'hod' | 'faculty' | 'security' | 'student' | 'user';
+  role: 'super-admin' | 'dean' | 'admin' | 'faculty' | 'teacher' | 'student' | 'security' | 'guest';
   assignedDevices: string[];
   department?: string;
   employeeId?: string;
   designation?: string;
-  accessLevel: 'full' | 'limited' | 'readonly';
-  // phone?: string; // Removed phone number field
+  phone?: string;
+  assignedRooms: string[];
 }
 
 interface UserDialogProps {
@@ -40,12 +40,13 @@ export const UserDialog: React.FC<UserDialogProps> = ({
   const [formData, setFormData] = useState<UserData>({
     name: user?.name || '',
     email: user?.email || '',
-    role: user?.role || 'user',
+    role: user?.role || 'student',
     assignedDevices: user?.assignedDevices || [],
     department: user?.department || '',
     employeeId: user?.employeeId || '',
     designation: user?.designation || '',
-    accessLevel: user?.accessLevel || 'limited'
+    phone: user?.phone || '',
+    assignedRooms: user?.assignedRooms || []
   });
 
   // Keep form in sync when switching between add/edit or reopening dialog
@@ -55,23 +56,25 @@ export const UserDialog: React.FC<UserDialogProps> = ({
         setFormData({
           name: user.name || '',
           email: user.email || '',
-          role: user.role || 'user',
+          role: user.role || 'student',
           assignedDevices: user.assignedDevices || [],
           department: user.department || '',
           employeeId: user.employeeId || '',
           designation: user.designation || '',
-          accessLevel: user.accessLevel || 'limited'
+          phone: user.phone || '',
+          assignedRooms: user.assignedRooms || []
         });
       } else {
         setFormData({
           name: '',
           email: '',
-          role: 'user',
+          role: 'student',
           assignedDevices: [],
           department: '',
           employeeId: '',
           designation: '',
-          accessLevel: 'limited'
+          phone: '',
+          assignedRooms: []
         });
       }
     }
@@ -103,10 +106,13 @@ export const UserDialog: React.FC<UserDialogProps> = ({
       setFormData({
         name: '',
         email: '',
-        role: 'user',
+        role: 'student',
         assignedDevices: [],
         department: '',
-        accessLevel: 'limited'
+        employeeId: '',
+        designation: '',
+        phone: '',
+        assignedRooms: []
       });
     }
   };
@@ -151,14 +157,14 @@ export const UserDialog: React.FC<UserDialogProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="principal">Principal</SelectItem>
+                  <SelectItem value="super-admin">Super Administrator</SelectItem>
                   <SelectItem value="dean">Dean</SelectItem>
-                  <SelectItem value="hod">Head of Department</SelectItem>
-                  <SelectItem value="faculty">Faculty/Teacher</SelectItem>
-                  <SelectItem value="security">Security Personnel</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="faculty">Faculty</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
                   <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="user">General Staff</SelectItem>
+                  <SelectItem value="security">Security Personnel</SelectItem>
+                  <SelectItem value="guest">Guest</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -194,20 +200,6 @@ export const UserDialog: React.FC<UserDialogProps> = ({
             </div>
           </div>
           {/* Phone number field removed from profile UI */}
-
-          <div>
-            <Label htmlFor="access">Access Level</Label>
-            <Select value={formData.accessLevel} onValueChange={(value) => setFormData(prev => ({ ...prev, accessLevel: value as any }))}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full">Full Control</SelectItem>
-                <SelectItem value="limited">Limited Control</SelectItem>
-                <SelectItem value="readonly">View Only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div>
             <Label>Assigned Devices/Classrooms</Label>

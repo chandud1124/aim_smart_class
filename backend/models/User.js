@@ -23,9 +23,41 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'],
-    default: 'user',
+    enum: ['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'],
+    default: 'student',
     index: true // Index for role-based queries
+  },
+  roleLevel: {
+    type: Number,
+    default: function() {
+      const roleLevels = {
+        'super-admin': 10,
+        'dean': 9,
+        'admin': 8,
+        'faculty': 7,
+        'teacher': 6,
+        'security': 5,
+        'student': 4,
+        'guest': 3
+      };
+      return roleLevels[this.role] || 3;
+    }
+  },
+  permissions: {
+    canManageAdmins: { type: Boolean, default: false },
+    canManageUsers: { type: Boolean, default: false },
+    canConfigureDevices: { type: Boolean, default: false },
+    canControlDevices: { type: Boolean, default: false },
+    canViewAllReports: { type: Boolean, default: false },
+    canViewAssignedReports: { type: Boolean, default: false },
+    canApproveRequests: { type: Boolean, default: false },
+    canScheduleAutomation: { type: Boolean, default: false },
+    canRequestDeviceControl: { type: Boolean, default: false },
+    canMonitorSecurity: { type: Boolean, default: false },
+    canViewPublicDashboard: { type: Boolean, default: true },
+    canApproveExtensions: { type: Boolean, default: false },
+    canRequestExtensions: { type: Boolean, default: false },
+    emergencyOverride: { type: Boolean, default: false }
   },
   department: {
     type: String,
@@ -98,7 +130,7 @@ const userSchema = new mongoose.Schema({
   },
   canApproveExtensions: {
     type: Boolean,
-    default: false // Admin, Principal, Dean, HOD can approve
+    default: false // Admin, Dean, Faculty, Super Admin can approve
   },
   notificationPreferences: {
     email: { type: Boolean, default: true },
@@ -131,6 +163,157 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.pre('save', async function (next) {
+  // Set permissions based on role
+  const rolePermissions = {
+    'super-admin': {
+      canManageAdmins: true,
+      canManageUsers: true,
+      canConfigureDevices: true,
+      canControlDevices: true,
+      canViewAllReports: true,
+      canViewAssignedReports: true,
+      canApproveRequests: true,
+      canScheduleAutomation: true,
+      canRequestDeviceControl: true,
+      canMonitorSecurity: true,
+      canViewPublicDashboard: true,
+      canApproveExtensions: true,
+      canRequestExtensions: true,
+      emergencyOverride: true
+    },
+    'dean': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: false,
+      canViewAllReports: true,
+      canViewAssignedReports: true,
+      canApproveRequests: true,
+      canScheduleAutomation: false,
+      canRequestDeviceControl: false,
+      canMonitorSecurity: true,
+      canViewPublicDashboard: true,
+      canApproveExtensions: true,
+      canRequestExtensions: true,
+      emergencyOverride: false
+    },
+    'admin': {
+      canManageAdmins: false,
+      canManageUsers: true,
+      canConfigureDevices: true,
+      canControlDevices: true,
+      canViewAllReports: true,
+      canViewAssignedReports: true,
+      canApproveRequests: true,
+      canScheduleAutomation: true,
+      canRequestDeviceControl: true,
+      canMonitorSecurity: false,
+      canViewPublicDashboard: true,
+      canApproveExtensions: true,
+      canRequestExtensions: true,
+      emergencyOverride: false
+    },
+    'faculty': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: true,
+      canViewAllReports: false,
+      canViewAssignedReports: true,
+      canApproveRequests: true,
+      canScheduleAutomation: true,
+      canRequestDeviceControl: true,
+      canMonitorSecurity: false,
+      canViewPublicDashboard: true,
+      canApproveExtensions: true,
+      canRequestExtensions: true,
+      emergencyOverride: false
+    },
+    'teacher': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: true,
+      canViewAllReports: false,
+      canViewAssignedReports: true,
+      canApproveRequests: false,
+      canScheduleAutomation: true,
+      canRequestDeviceControl: true,
+      canMonitorSecurity: false,
+      canViewPublicDashboard: true,
+      canApproveExtensions: true,
+      canRequestExtensions: true,
+      emergencyOverride: false
+    },
+    'student': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: false,
+      canViewAllReports: false,
+      canViewAssignedReports: false,
+      canApproveRequests: false,
+      canScheduleAutomation: false,
+      canRequestDeviceControl: true,
+      canMonitorSecurity: false,
+      canViewPublicDashboard: true,
+      canApproveExtensions: false,
+      canRequestExtensions: true,
+      emergencyOverride: false
+    },
+    'security': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: false,
+      canViewAllReports: false,
+      canViewAssignedReports: false,
+      canApproveRequests: false,
+      canScheduleAutomation: false,
+      canRequestDeviceControl: false,
+      canMonitorSecurity: true,
+      canViewPublicDashboard: true,
+      canApproveExtensions: false,
+      canRequestExtensions: false,
+      emergencyOverride: true
+    },
+    'guest': {
+      canManageAdmins: false,
+      canManageUsers: false,
+      canConfigureDevices: false,
+      canControlDevices: false,
+      canViewAllReports: false,
+      canViewAssignedReports: false,
+      canApproveRequests: false,
+      canScheduleAutomation: false,
+      canRequestDeviceControl: false,
+      canMonitorSecurity: false,
+      canViewPublicDashboard: true,
+      canApproveExtensions: false,
+      canRequestExtensions: false,
+      emergencyOverride: false
+    }
+  };
+
+  // Set permissions based on role
+  if (rolePermissions[this.role]) {
+    this.permissions = { ...this.permissions, ...rolePermissions[this.role] };
+  }
+
+  // Set role level
+  const roleLevels = {
+    'super-admin': 10,
+    'dean': 9,
+    'admin': 8,
+    'faculty': 7,
+    'teacher': 6,
+    'security': 5,
+    'student': 4,
+    'guest': 3
+  };
+  this.roleLevel = roleLevels[this.role] || 3;
+
+  // Handle password hashing
   if (!this.isModified('password')) return next();
 
   const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 12);

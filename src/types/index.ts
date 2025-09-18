@@ -70,12 +70,50 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'manager' | 'supervisor' | 'technician' | 'operator' | 'security' | 'user';
-  department: string;
-  accessLevel: 'full' | 'limited';
+  role: 'super-admin' | 'dean' | 'admin' | 'faculty' | 'teacher' | 'student' | 'security' | 'guest';
+  roleLevel: number;
+  department?: string;
+  employeeId?: string;
+  designation?: string;
+  phone?: string;
+  accessLevel: 'full' | 'limited' | 'readonly';
   isActive: boolean;
+  isApproved: boolean;
   assignedDevices: string[];
+  assignedRooms: string[];
+  permissions: {
+    canManageUsers: boolean;
+    canApproveUsers: boolean;
+    canManageDevices: boolean;
+    canViewReports: boolean;
+    canManageSchedule: boolean;
+    canRequestExtensions: boolean;
+    canApproveExtensions: boolean;
+    canViewSecurityAlerts: boolean;
+    canAccessAllClassrooms: boolean;
+    canBypassTimeRestrictions: boolean;
+    hasEmergencyAccess: boolean;
+    hasDepartmentOverride: boolean;
+    canAccessSecurityDevices: boolean;
+    canAccessStudentDevices: boolean;
+    canAccessGuestDevices: boolean;
+    canDeleteUsers: boolean;
+    canResetPasswords: boolean;
+    canManageRoles: boolean;
+    canViewAuditLogs: boolean;
+    canManageSettings: boolean;
+    canCreateSchedules: boolean;
+    canModifySchedules: boolean;
+    canOverrideSchedules: boolean;
+    canViewAllSchedules: boolean;
+    canSendNotifications: boolean;
+    canReceiveAlerts: boolean;
+    canManageAnnouncements: boolean;
+  };
   lastLogin: Date;
+  registrationDate: string;
+  isOnline?: boolean;
+  lastSeen?: Date;
 }
 
 export interface ActivityLog {

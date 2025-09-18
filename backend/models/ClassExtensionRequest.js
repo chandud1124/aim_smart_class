@@ -59,8 +59,8 @@ const classExtensionRequestSchema = new mongoose.Schema({
     },
     approvalLevel: {
         type: String,
-        enum: ['faculty', 'hod', 'dean', 'principal', 'admin'],
-        default: 'hod' // Default approval level
+        enum: ['teacher', 'faculty', 'dean', 'admin', 'super-admin'],
+        default: 'faculty' // Default approval level
     },
     roomNumber: {
         type: String,
@@ -137,13 +137,13 @@ classExtensionRequestSchema.pre('save', function (next) {
 
         // Set approval level based on extension duration
         if (this.extensionDuration <= 15) {
-            this.approvalLevel = 'faculty'; // Short extensions can be auto-approved or faculty approved
+            this.approvalLevel = 'teacher'; // Short extensions can be auto-approved or teacher approved
         } else if (this.extensionDuration <= 30) {
-            this.approvalLevel = 'hod';
+            this.approvalLevel = 'faculty';
         } else if (this.extensionDuration <= 60) {
             this.approvalLevel = 'dean';
         } else {
-            this.approvalLevel = 'principal'; // Long extensions need higher approval
+            this.approvalLevel = 'admin'; // Long extensions need admin approval
         }
 
         // Set priority based on duration
@@ -161,11 +161,11 @@ classExtensionRequestSchema.pre('save', function (next) {
 // Instance method to check if extension can be approved by a user
 classExtensionRequestSchema.methods.canBeApprovedBy = function (approverRole) {
     const approvalHierarchy = {
-        'faculty': ['faculty', 'hod', 'dean', 'principal', 'admin'],
-        'hod': ['hod', 'dean', 'principal', 'admin'],
-        'dean': ['dean', 'principal', 'admin'],
-        'principal': ['principal', 'admin'],
-        'admin': ['admin']
+        'teacher': ['teacher', 'faculty', 'dean', 'admin', 'super-admin'],
+        'faculty': ['faculty', 'dean', 'admin', 'super-admin'],
+        'dean': ['dean', 'admin', 'super-admin'],
+        'admin': ['admin', 'super-admin'],
+        'super-admin': ['super-admin']
     };
 
     return approvalHierarchy[this.approvalLevel]?.includes(approverRole) || false;
@@ -196,26 +196,21 @@ classExtensionRequestSchema.statics.getPendingRequestsForApproval = function (us
 
     // Filter based on user's approval permissions and department
     if (userRole === 'faculty') {
-        query.approvalLevel = 'faculty';
+        query.approvalLevel = { $in: ['teacher', 'faculty'] };
         if (userDepartment) {
             // Faculty can only approve extensions in their department
             query['classDetails.department'] = userDepartment;
         }
-    } else if (userRole === 'hod') {
-        query.approvalLevel = { $in: ['faculty', 'hod'] };
-        if (userDepartment) {
-            query['classDetails.department'] = userDepartment;
-        }
     } else if (userRole === 'dean') {
-        query.approvalLevel = { $in: ['faculty', 'hod', 'dean'] };
-    } else if (userRole === 'principal') {
-        query.approvalLevel = { $in: ['faculty', 'hod', 'dean', 'principal'] };
+        query.approvalLevel = { $in: ['teacher', 'faculty', 'dean'] };
     } else if (userRole === 'admin') {
-        // Admins can see all
+        query.approvalLevel = { $in: ['teacher', 'faculty', 'dean', 'admin'] };
+    } else if (userRole === 'super-admin') {
+        // Super admins can see all
     }
 
     return this.find(query)
-        .populate('requestedBy', 'name email department')
+        .populate('requestedBy', 'name email department role')
         .populate('scheduleId', 'subject startTime endTime')
         .sort({ priority: -1, createdAt: -1 });
 };

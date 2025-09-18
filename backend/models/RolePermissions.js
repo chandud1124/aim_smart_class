@@ -5,7 +5,7 @@ const rolePermissionsSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    enum: ['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user'],
+    enum: ['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest'],
     index: true
   },
 
@@ -215,7 +215,7 @@ rolePermissionsSchema.pre('save', function (next) {
 // Instance method to set default permissions based on role
 rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
   const roleDefaults = {
-    admin: {
+    'super-admin': {
       userManagement: {
         canViewUsers: true, canCreateUsers: true, canEditUsers: true, canDeleteUsers: true,
         canApproveRegistrations: true, canChangeUserRoles: true, canResetPasswords: true, canViewUserActivity: true
@@ -273,50 +273,7 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
         receiveActivityReports: true, receiveMaintenanceAlerts: true
       }
     },
-    principal: {
-      userManagement: {
-        canViewUsers: true, canCreateUsers: true, canEditUsers: true,
-        canApproveRegistrations: true, canChangeUserRoles: true, canViewUserActivity: true
-      },
-      deviceManagement: {
-        canViewDevices: true, canCreateDevices: true, canEditDevices: true,
-        canControlDevices: true, canBulkControlDevices: true, canAssignDevices: true, canViewDeviceLogs: true
-      },
-      classroomManagement: {
-        canViewClassrooms: true, canCreateClassrooms: true, canEditClassrooms: true,
-        canAccessAllClassrooms: true, canOverrideDepartmentRestrictions: true, canEmergencyAccess: true
-      },
-      scheduleManagement: {
-        canViewSchedules: true, canCreateSchedules: true, canEditSchedules: true,
-        canRunSchedulesManually: true, canToggleSchedules: true, canViewScheduleHistory: true
-      },
-      activityManagement: {
-        canViewActivities: true, canExportActivities: true, canViewLogs: true, canExportLogs: true
-      },
-      securityManagement: {
-        canViewSecurityAlerts: true, canAcknowledgeAlerts: true, canResolveAlerts: true,
-        canViewSecurityMetrics: true
-      },
-      ticketManagement: {
-        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true,
-        canAssignTickets: true, canCloseTickets: true, canViewAllTickets: true, canViewTicketStats: true
-      },
-      systemManagement: {
-        canViewSettings: true, canEditSettings: true, canViewSystemHealth: true, canViewSystemLogs: true
-      },
-      extensionManagement: {
-        canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true
-      },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true, canEditCalendarEvents: true,
-        canSyncCalendar: true
-      },
-      bulkOperations: {
-        canPerformBulkDeviceControl: true, canBulkUpdateDevices: true, canBulkCreateDevices: true
-      },
-      apiAccess: { canAccessAPI: true, apiRateLimit: 500 }
-    },
-    dean: {
+    'dean': {
       userManagement: {
         canViewUsers: true, canEditUsers: true, canApproveRegistrations: true, canViewUserActivity: true
       },
@@ -349,38 +306,65 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       },
       apiAccess: { canAccessAPI: true, apiRateLimit: 300 }
     },
-    hod: {
+    'admin': {
       userManagement: {
-        canViewUsers: true, canEditUsers: true, canViewUserActivity: true
+        canViewUsers: true, canCreateUsers: true, canEditUsers: true, canDeleteUsers: true,
+        canApproveRegistrations: true, canChangeUserRoles: true, canResetPasswords: true, canViewUserActivity: true
       },
       deviceManagement: {
-        canViewDevices: true, canEditDevices: true, canControlDevices: true, canAssignDevices: true
+        canViewDevices: true, canCreateDevices: true, canEditDevices: true, canDeleteDevices: true,
+        canControlDevices: true, canBulkControlDevices: true, canAssignDevices: true,
+        canViewDeviceLogs: true, canConfigureDeviceSettings: true
       },
       classroomManagement: {
-        canViewClassrooms: true, canEditClassrooms: true
+        canViewClassrooms: true, canCreateClassrooms: true, canEditClassrooms: true, canDeleteClassrooms: true,
+        canAccessAllClassrooms: true, canOverrideDepartmentRestrictions: true,
+        canBypassTimeRestrictions: true, canEmergencyAccess: true
       },
       scheduleManagement: {
-        canViewSchedules: true, canCreateSchedules: true, canEditSchedules: true
+        canViewSchedules: true, canCreateSchedules: true, canEditSchedules: true, canDeleteSchedules: true,
+        canRunSchedulesManually: true, canToggleSchedules: true, canViewScheduleHistory: true
       },
       activityManagement: {
-        canViewActivities: true, canViewLogs: true
+        canViewActivities: true, canExportActivities: true, canViewLogs: true,
+        canExportLogs: true, canDeleteOldLogs: true, canViewSystemLogs: true
+      },
+      securityManagement: {
+        canViewSecurityAlerts: true, canAcknowledgeAlerts: true, canResolveAlerts: true,
+        canCreateAlerts: true, canViewBlacklist: true, canManageBlacklist: true,
+        canViewSecurityMetrics: true, canConfigureSecuritySettings: true
       },
       ticketManagement: {
-        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true, canAssignTickets: true
+        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true, canDeleteTickets: true,
+        canAssignTickets: true, canCloseTickets: true, canViewAllTickets: true, canViewTicketStats: true
+      },
+      systemManagement: {
+        canViewSettings: true, canEditSettings: true, canViewSystemHealth: true,
+        canRestartServices: true, canViewSystemLogs: true, canExportData: true,
+        canImportData: true, canBackupData: true
       },
       extensionManagement: {
-        canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true
+        canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true, canCancelExtensions: true
       },
       calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true
+        canViewCalendar: true, canCreateCalendarEvents: true, canEditCalendarEvents: true,
+        canDeleteCalendarEvents: true, canSyncCalendar: true, canManageCalendarSettings: true
+      },
+      esp32Management: {
+        canViewESP32Devices: true, canConfigureESP32: true, canUpdateESP32Firmware: true,
+        canMonitorESP32Status: true, canDebugESP32: true
       },
       bulkOperations: {
-        canPerformBulkDeviceControl: true
+        canPerformBulkDeviceControl: true, canBulkUpdateDevices: true,
+        canBulkCreateDevices: true, canBulkDeleteDevices: true
       },
-      departmentRestrictions: { restrictedToDepartment: true },
-      apiAccess: { canAccessAPI: true, apiRateLimit: 200 }
+      apiAccess: { canAccessAPI: true, apiRateLimit: 1000 },
+      notifications: {
+        receiveSecurityAlerts: true, receiveSystemAlerts: true,
+        receiveActivityReports: true, receiveMaintenanceAlerts: true
+      }
     },
-    faculty: {
+    'faculty': {
       userManagement: {
         canViewUsers: true
       },
@@ -409,70 +393,36 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '18:00' },
       apiAccess: { canAccessAPI: true, apiRateLimit: 100 }
     },
-    supervisor: {
+    'teacher': {
+      userManagement: {
+        canViewUsers: true
+      },
       deviceManagement: {
-        canViewDevices: true, canControlDevices: true, canViewDeviceLogs: true
+        canViewDevices: true, canControlDevices: true
       },
       classroomManagement: {
         canViewClassrooms: true
       },
       scheduleManagement: {
-        canViewSchedules: true, canRunSchedulesManually: true
-      },
-      activityManagement: {
-        canViewActivities: true, canViewLogs: true
-      },
-      ticketManagement: {
-        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true
-      },
-      bulkOperations: {
-        canPerformBulkDeviceControl: true
-      },
-      timeRestrictions: { restrictedHours: true, allowedStartTime: '06:00', allowedEndTime: '22:00' },
-      apiAccess: { canAccessAPI: true, apiRateLimit: 150 }
-    },
-    technician: {
-      deviceManagement: {
-        canViewDevices: true, canEditDevices: true, canControlDevices: true, canConfigureDeviceSettings: true, canViewDeviceLogs: true
-      },
-      classroomManagement: {
-        canViewClassrooms: true
-      },
-      activityManagement: {
-        canViewActivities: true, canViewLogs: true
-      },
-      ticketManagement: {
-        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true, canCloseTickets: true
-      },
-      esp32Management: {
-        canViewESP32Devices: true, canConfigureESP32: true, canMonitorESP32Status: true
-      },
-      timeRestrictions: { restrictedHours: true, allowedStartTime: '07:00', allowedEndTime: '19:00' },
-      apiAccess: { canAccessAPI: true, apiRateLimit: 100 }
-    },
-    operator: {
-      deviceManagement: {
-        canViewDevices: true, canControlDevices: true, canBulkControlDevices: true
-      },
-      classroomManagement: {
-        canViewClassrooms: true
-      },
-      scheduleManagement: {
-        canViewSchedules: true, canRunSchedulesManually: true
+        canViewSchedules: true, canCreateSchedules: true, canEditSchedules: true
       },
       activityManagement: {
         canViewActivities: true
       },
       ticketManagement: {
-        canViewTickets: true, canCreateTickets: true
+        canViewTickets: true, canCreateTickets: true, canUpdateTickets: true
       },
-      bulkOperations: {
-        canPerformBulkDeviceControl: true
+      extensionManagement: {
+        canRequestExtensions: true, canViewExtensionRequests: true
       },
-      timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '20:00' },
+      calendarIntegration: {
+        canViewCalendar: true, canCreateCalendarEvents: true
+      },
+      departmentRestrictions: { restrictedToDepartment: true },
+      timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '18:00' },
       apiAccess: { canAccessAPI: true, apiRateLimit: 100 }
     },
-    security: {
+    'security': {
       deviceManagement: {
         canViewDevices: true, canControlDevices: true
       },
@@ -494,7 +444,7 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       timeRestrictions: { restrictedHours: true, allowedStartTime: '00:00', allowedEndTime: '23:59', allowedDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] },
       apiAccess: { canAccessAPI: true, apiRateLimit: 100 }
     },
-    student: {
+    'student': {
       deviceManagement: {
         canViewDevices: true
       },
@@ -507,7 +457,7 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '17:00', allowedDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] },
       apiAccess: { canAccessAPI: true, apiRateLimit: 50 }
     },
-    user: {
+    'guest': {
       deviceManagement: {
         canViewDevices: true
       },
@@ -526,9 +476,8 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
     Object.keys(defaults).forEach(category => {
       if (this[category] && typeof defaults[category] === 'object') {
         Object.keys(defaults[category]).forEach(permission => {
-          if (this[category][permission] === undefined) {
-            this[category][permission] = defaults[category][permission];
-          }
+          // Always set the default value, overriding any existing false values
+          this[category][permission] = defaults[category][permission];
         });
       }
     });

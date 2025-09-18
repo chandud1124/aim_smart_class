@@ -1,11 +1,12 @@
 const nodemailer = require('nodemailer');
 
-// Detect whether email is properly configured
-const emailConfigured = !!(process.env.EMAIL_USERNAME && process.env.EMAIL_PASSWORD && process.env.EMAIL_FROM);
+// Detect whether email is properly configured and not disabled
+const emailDisabled = process.env.EMAIL_DISABLED === 'true';
+const emailConfigured = !!(process.env.EMAIL_USERNAME && process.env.EMAIL_PASSWORD && process.env.EMAIL_FROM) && !emailDisabled;
 
 let transporter = null;
 if (emailConfigured) {
-  transporter = nodemailer.createTransport({
+  transporter = nodemailer.createTransporter({
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth: {
       user: process.env.EMAIL_USERNAME,
@@ -22,7 +23,11 @@ if (emailConfigured) {
   });
 } else {
   if (process.env.NODE_ENV !== 'production') {
-    console.warn('[email] Email credentials not fully configured. Falling back to console log mode.');
+    if (emailDisabled) {
+      console.log('[email] Email service disabled via EMAIL_DISABLED=true');
+    } else {
+      console.warn('[email] Email credentials not fully configured. Falling back to console log mode.');
+    }
   }
 }
 

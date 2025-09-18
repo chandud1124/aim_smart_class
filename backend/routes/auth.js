@@ -30,7 +30,7 @@ const registerValidation = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('email').isEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').isIn(['admin', 'principal', 'dean', 'hod', 'faculty', 'supervisor', 'technician', 'operator', 'security', 'student', 'user']).withMessage('Invalid role'),
+  body('role').isIn(['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest']).withMessage('Invalid role'),
   body('department').trim().isLength({ min: 2 }).withMessage('Department must be at least 2 characters'),
   body('employeeId').optional().trim().isLength({ min: 1 }).withMessage('Employee ID is required for non-student roles'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),

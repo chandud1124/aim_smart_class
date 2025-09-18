@@ -227,7 +227,7 @@ export const ClassroomAccessManager: React.FC = () => {
     }
 
     return (
-        <RoleGuard roles={['admin', 'principal', 'dean', 'hod', 'faculty']}>
+        <RoleGuard roles={['super-admin', 'admin', 'dean', 'faculty']}>
             <div className="space-y-6">
                 {/* Grant Access Form */}
                 <Card>
