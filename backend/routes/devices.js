@@ -12,7 +12,9 @@ const {
   getDeviceStats,
   updateDevice,
   deleteDevice,
-  getDeviceById
+  getDeviceById,
+  getGpioPinInfo,
+  validateGpioConfig
 } = require('../controllers/deviceController');
 const { body, param } = require('express-validator');
 
@@ -86,6 +88,11 @@ router.post('/:deviceId/pir/configure',
   checkDevicePermission('canConfigurePir'),
   require('../controllers/deviceController').configurePir
 );
+
+// GPIO pin information and validation
+router.get('/gpio-info', getGpioPinInfo);
+router.get('/gpio-info/:deviceId', getGpioPinInfo);
+router.post('/validate-gpio', validateGpioConfig);
 
 // PIR sensor data access
 router.get('/:deviceId/pir/data',

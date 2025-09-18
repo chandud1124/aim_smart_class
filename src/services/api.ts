@@ -188,6 +188,10 @@ export const deviceAPI = {
   // Secure admin-only: fetch single device with secret (?includeSecret=1)
   getDeviceWithSecret: (deviceId: string, pin?: string) =>
     api.get(`/devices/${deviceId}`, { params: { includeSecret: 1, secretPin: pin } }),
+
+  // GPIO pin information and validation
+  getGpioPinInfo: (deviceId?: string) => api.get(`/devices/gpio-info/${deviceId || 'new'}`),
+  validateGpioConfig: (config: any) => api.post('/devices/validate-gpio', config),
 };
 
 export const authAPI = {

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const gpioUtils = require('../utils/gpioUtils');
 
 const switchTypes = ['relay', 'light', 'fan', 'outlet', 'projector', 'ac'];
 
@@ -15,9 +16,12 @@ const switchSchema = new mongoose.Schema({
     max: [39, 'GPIO pin must be <= 39'],
     validate: {
       validator: function(v) {
-        return !(v >= 6 && v <= 11); // Pins 6-11 are reserved
+        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins by default
       },
-      message: 'GPIO pins 6-11 are reserved for internal use'
+      message: function(props) {
+        const status = gpioUtils.getGpioPinStatus(props.value);
+        return status.reason;
+      }
     }
   },
   type: {
@@ -48,9 +52,12 @@ const switchSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (v === undefined || v === null) return true;
-        return !(v >= 6 && v <= 11);
+        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins by default
       },
-      message: 'GPIO pins 6-11 are reserved for internal use'
+      message: function(props) {
+        const status = gpioUtils.getGpioPinStatus(props.value);
+        return status.reason;
+      }
     }
   },
   manualMode: {
@@ -149,9 +156,12 @@ const deviceSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!this.pirEnabled) return true;
-        return !(v >= 6 && v <= 11); // Pins 6-11 are reserved
+        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins for PIR
       },
-      message: 'GPIO pins 6-11 are reserved for internal use'
+      message: function(props) {
+        const status = gpioUtils.getGpioPinStatus(props.value);
+        return status.reason;
+      }
     }
   },
   pirAutoOffDelay: {
@@ -207,3 +217,4 @@ deviceSchema.pre('save', function(next) {
 const Device = mongoose.model('Device', deviceSchema);
 
 module.exports = Device;
+module.exports.GPIOUtils = gpioUtils;

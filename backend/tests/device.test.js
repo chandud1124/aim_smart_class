@@ -59,14 +59,14 @@ describe('Device API', () => {
             switches: [
                 {
                     name: 'Fan 1',
-                    gpio: 4,
+                    gpio: 16,
                     type: 'fan',
                     state: false,
                     icon: 'fan'
                 },
                 {
                     name: 'Light 1',
-                    gpio: 5,
+                    gpio: 17,
                     type: 'light',
                     state: false,
                     icon: 'lightbulb'
@@ -254,7 +254,7 @@ describe('Device API', () => {
                 switches: [
                     {
                         name: 'Test Switch',
-                        gpio: 2,
+                        gpio: 18,
                         type: 'light',
                         state: false
                     }

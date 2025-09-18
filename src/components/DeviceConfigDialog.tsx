@@ -10,24 +10,45 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Device } from '@/types';
 import { deviceAPI } from '@/services/api';
-import { Copy, Check, Eye, EyeOff, Shield } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Shield, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const switchTypes = ['relay', 'light', 'fan', 'outlet', 'projector', 'ac'] as const;
 const blocks = ['A', 'B', 'C', 'D'];
 const floors = ['0', '1', '2', '3', '4', '5'];
-const RESERVED = new Set([6, 7, 8, 9, 10, 11]);
-const VALID_PINS = Array.from({ length: 40 }, (_, i) => i).filter(p => !RESERVED.has(p));
 
+// GPIO Pin status types
+interface GpioPinInfo {
+  pin: number;
+  safe: boolean;
+  status: 'safe' | 'problematic' | 'reserved' | 'invalid';
+  reason: string;
+  used: boolean;
+  available: boolean;
+  category: string;
+  inputOnly?: boolean;
+  recommendedFor?: string[];
+  alternativePins?: number[];
+}
+
+interface GpioValidationResult {
+  valid: boolean;
+  errors: Array<{ type: string; switch?: number; pin: number; message: string; alternatives?: number[] }>;
+  warnings: Array<{ type: string; switch?: number; pin: number; message: string; alternatives?: number[] }>;
+}
+
+// Update validation to be more flexible with GPIO pins
 const switchSchema = z.object({
-  id: z.string().optional(), // existing switch id (for matching)
+  id: z.string().optional(),
   name: z.string().min(1),
-  gpio: z.number().min(0).max(39).refine(p => !RESERVED.has(p), 'Reserved pin (6-11)'),
+  gpio: z.number().min(0).max(39),
   type: z.enum(switchTypes),
   icon: z.string().optional(),
   state: z.boolean().default(false),
   manualSwitchEnabled: z.boolean().default(false),
-  manualSwitchGpio: z.number().min(0, { message: 'Required when manual is enabled' }).max(39).optional().refine(p => p === undefined || !RESERVED.has(p), 'Reserved pin (6-11)'),
+  manualSwitchGpio: z.number().min(0, { message: 'Required when manual is enabled' }).max(39).optional(),
   manualMode: z.enum(['maintained', 'momentary']).default('maintained'),
   manualActiveLow: z.boolean().default(true),
   usePir: z.boolean().default(false),
@@ -44,7 +65,7 @@ const formSchema = z.object({
   location: z.string().min(1),
   classroom: z.string().optional(),
   pirEnabled: z.boolean().default(false),
-  pirGpio: z.number().min(0).max(39).optional().refine(p => p === undefined || !RESERVED.has(p), 'Reserved pin'),
+  pirGpio: z.number().min(0).max(39).optional(),
   pirAutoOffDelay: z.number().min(0).default(30),
   switches: z.array(switchSchema).min(1).max(8).refine(sw => {
     const prim = sw.map(s => s.gpio);
@@ -68,6 +89,9 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
   const locParts = parseLocation(initialData?.location);
   const [block, setBlock] = useState(locParts.block);
   const [floor, setFloor] = useState(locParts.floor);
+  const [gpioInfo, setGpioInfo] = useState<GpioPinInfo[]>([]);
+  const [gpioValidation, setGpioValidation] = useState<GpioValidationResult | null>(null);
+  const [loadingGpio, setLoadingGpio] = useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData ? {
@@ -103,6 +127,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     if (initialData && open) {
       const lp = parseLocation(initialData.location);
       setBlock(lp.block); setFloor(lp.floor);
+      fetchGpioInfo(); // Fetch GPIO info when dialog opens with existing device
       form.reset({
         name: initialData.name,
         macAddress: initialData.macAddress,
@@ -129,6 +154,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       });
     } else if (!initialData && open) {
       const lp = parseLocation(undefined);
+      fetchGpioInfo(); // Fetch GPIO info when creating new device
       form.reset({
         name: '', macAddress: '', ipAddress: '', location: `Block ${lp.block} Floor ${lp.floor}`, classroom: '', pirEnabled: false, pirGpio: undefined, pirAutoOffDelay: 30,
         switches: [{ id: undefined, name: '', gpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]
@@ -144,6 +170,31 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
   const [secretVisible, setSecretVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const deviceId = (initialData as any)?.id;
+
+  // Fetch GPIO pin information
+  const fetchGpioInfo = async () => {
+    try {
+      setLoadingGpio(true);
+      const response = await deviceAPI.getGpioPinInfo(deviceId);
+      setGpioInfo(response.data.data.pins);
+    } catch (error) {
+      console.error('Failed to fetch GPIO info:', error);
+    } finally {
+      setLoadingGpio(false);
+    }
+  };
+
+  // Validate GPIO configuration
+  const validateGpioConfig = async (config: any) => {
+    try {
+      const response = await deviceAPI.validateGpioConfig(config);
+      setGpioValidation(response.data.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('GPIO validation failed:', error);
+      return null;
+    }
+  };
 
   const fetchSecret = async () => {
     if (!deviceId) { setSecretError('No device ID'); return; }
@@ -166,7 +217,23 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     if (!secretValue) return;
     try { await navigator.clipboard.writeText(secretValue); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
   };
-  const submit = (data: FormValues) => { onSubmit(data); onOpenChange(false); };
+  const submit = async (data: FormValues) => {
+    // Validate GPIO configuration before submitting
+    const validation = await validateGpioConfig({
+      switches: data.switches,
+      pirEnabled: data.pirEnabled,
+      pirGpio: data.pirGpio
+    });
+
+    if (validation && !validation.valid) {
+      // Show validation errors
+      setGpioValidation(validation);
+      return;
+    }
+
+    onSubmit(data);
+    onOpenChange(false);
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -219,17 +286,150 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
               <FormField control={form.control} name="pirEnabled" render={({ field }) => (<FormItem className="flex items-center gap-2"><FormControl><UiSwitch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="!mt-0">Enable PIR Sensor</FormLabel></FormItem>)} />
               {form.watch('pirEnabled') && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <FormField control={form.control} name="pirGpio" render={({ field }) => (<FormItem><FormLabel>PIR GPIO</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="pirGpio" render={({ field }) => {
+                    // Recommended pins for PIR sensors: 34, 35, 36, 39 (primary), 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33 (secondary)
+                    const recommendedPirPins = [34, 35, 36, 39, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+                    const availablePins = gpioInfo.filter(p => p.safe && recommendedPirPins.includes(p.pin));
+                    const list = [...availablePins];
+
+                    // If current pin is not in recommended list, add it to the list so user can see it but with warning
+                    if (field.value !== undefined && !list.find(p => p.pin === field.value)) {
+                      const currentPin = gpioInfo.find(p => p.pin === field.value);
+                      if (currentPin) list.push(currentPin);
+                    }
+                    list.sort((a, b) => a.pin - b.pin);
+
+                    const getPinStatusIcon = (pin: GpioPinInfo) => {
+                      if (pin.status === 'safe') return <CheckCircle className="w-4 h-4 text-success" />;
+                      if (pin.status === 'problematic') return <AlertTriangle className="w-4 h-4 text-warning" />;
+                      return <XCircle className="w-4 h-4 text-danger" />;
+                    };
+
+                    const getPinStatusColor = (pin: GpioPinInfo) => {
+                      if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
+                      if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
+                      return 'text-white bg-danger/90 border-danger/70';
+                    };
+
+                    const getPirPinRecommendation = (pin: GpioPinInfo) => {
+                      const primaryPirPins = [34, 35, 36, 39];
+                      const secondaryPirPins = [16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+                      if (primaryPirPins.includes(pin.pin)) return 'Primary (Recommended)';
+                      if (secondaryPirPins.includes(pin.pin)) return 'Secondary (Alternative)';
+                      return 'Not Recommended';
+                    };
+
+                    return (
+                      <FormItem>
+                        <FormLabel>PIR GPIO (Motion Sensor)</FormLabel>
+                        <Select value={field.value !== undefined ? String(field.value) : ''} onValueChange={v => field.onChange(v === '' ? undefined : Number(v))}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select recommended GPIO pin for PIR sensor" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-64">
+                            <SelectItem value="">Select</SelectItem>
+                            {list.map(pin => (
+                              <SelectItem
+                                key={pin.pin}
+                                value={String(pin.pin)}
+                                className={getPinStatusColor(pin)}
+                                disabled={pin.status !== 'safe'}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getPinStatusIcon(pin)}
+                                  <span>GPIO {pin.pin}</span>
+                                  {pin.status === 'safe' && (
+                                    <Badge variant="outline" className="text-xs bg-success/50 text-white border-success/70">
+                                      {getPirPinRecommendation(pin)}
+                                    </Badge>
+                                  )}
+                                  {pin.status === 'problematic' && (
+                                    <Badge variant="outline" className="text-xs bg-warning/50 text-white border-warning/70">
+                                      Problematic
+                                    </Badge>
+                                  )}
+                                  {pin.status === 'reserved' && (
+                                    <Badge variant="outline" className="text-xs bg-danger/50 text-white border-danger/70">
+                                      Reserved
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {field.value !== undefined && gpioInfo.find(p => p.pin === field.value)?.status === 'problematic' && (
+                          <Alert className="mt-2 border-warning/70 bg-warning/20">
+                            <AlertTriangle className="h-4 w-4 text-warning" />
+                            <AlertDescription className="text-foreground">
+                              <strong>Warning:</strong> {gpioInfo.find(p => p.pin === field.value)?.reason}
+                              {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                <div className="mt-2">
+                                  <strong>Recommended PIR pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                </div>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {field.value !== undefined && gpioInfo.find(p => p.pin === field.value)?.status === 'reserved' && (
+                          <Alert className="mt-2 border-danger/70 bg-danger/20">
+                            <XCircle className="h-4 w-4 text-danger" />
+                            <AlertDescription className="text-foreground">
+                              <strong>Warning:</strong> This pin is reserved and may cause system instability.
+                              {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                <div className="mt-2">
+                                  <strong>Use recommended PIR pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                </div>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {!recommendedPirPins.includes(field.value) && gpioInfo.find(p => p.pin === field.value)?.status === 'safe' && (
+                          <Alert className="mt-2 border-success/70 bg-success/20">
+                            <Info className="h-4 w-4 text-success" />
+                            <AlertDescription className="text-foreground">
+                              <strong>Note:</strong> This pin is safe but not recommended for PIR sensor.
+                              <div className="mt-2">
+                                <strong>Recommended PIR pins:</strong> GPIO 34, 35, 36, 39 (Primary) or 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33 (Secondary)
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }} />
                   <FormField control={form.control} name="pirAutoOffDelay" render={({ field }) => (<FormItem><FormLabel>Auto-off Delay (s)</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(Number(e.target.value || 0))} /></FormControl><FormMessage /></FormItem>)} />
                 </div>
               )}
             </div>
             <Separator />
             <div className="space-y-4">
+                            <div className="flex items-start gap-3 p-4 bg-card border border-border rounded-md">
+                <Info className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-muted-foreground">
+                  <strong>GPIO Pin Safety:</strong> Only safe GPIO pins are available for selection. These pins are recommended for reliable ESP32 operation and avoid boot issues or system instability.
+                  <div className="mt-2 flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      <span className="text-xs">Safe pins (recommended)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      <span className="text-xs">Problematic pins (avoid)</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <XCircle className="h-4 w-4 text-danger" />
+                      <span className="text-xs">Reserved pins (system use)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               {form.watch('switches')?.map((_, idx) => {
                 const switches = form.watch('switches') || [];
                 const usedPins = new Set(switches.flatMap((s, i) => { const arr = [s.gpio]; if (s.manualSwitchEnabled && s.manualSwitchGpio !== undefined) arr.push(s.manualSwitchGpio); return i === idx ? [] : arr; }));
-                const primaryAvail = VALID_PINS.filter(p => !usedPins.has(p) || p === switches[idx].gpio);
                 return (
                   <div key={idx} className="grid gap-4 p-4 border rounded-md">
                     <div className="flex justify-between items-center">
@@ -240,16 +440,168 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                     {(switches[idx] as any).id && <input type="hidden" value={(switches[idx] as any).id} {...form.register(`switches.${idx}.id` as const)} />}
                     <FormField control={form.control} name={`switches.${idx}.name`} render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} placeholder="Light" /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name={`switches.${idx}.type`} render={({ field }) => (<FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value || 'relay'}><FormControl><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger></FormControl><SelectContent>{switchTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name={`switches.${idx}.gpio`} render={({ field }) => { const list = [...primaryAvail]; if (!list.includes(field.value)) list.push(field.value); list.sort((a, b) => a - b); return (<FormItem><FormLabel>GPIO Pin</FormLabel><Select value={String(field.value)} onValueChange={v => field.onChange(Number(v))}><FormControl><SelectTrigger><SelectValue placeholder="GPIO" /></SelectTrigger></FormControl><SelectContent className="max-h-64">{list.map(p => <SelectItem key={p} value={String(p)}>{p}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>); }} />
+                    <FormField control={form.control} name={`switches.${idx}.gpio`} render={({ field }) => {
+                      const switches = form.watch('switches') || [];
+                      const usedPins = new Set(switches.flatMap((s, i) => i === idx ? [] : [s.gpio]));
+                      // Only show pins recommended for relay switches
+                      const recommendedRelayPins = [16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+                      const availablePins = gpioInfo.filter(p =>
+                        p.safe &&
+                        recommendedRelayPins.includes(p.pin) &&
+                        !usedPins.has(p.pin)
+                      );
+                      const list = [...availablePins];
+
+                      // If current pin is not in recommended list, add it to the list so user can see it but with warning
+                      if (field.value !== undefined && !list.find(p => p.pin === field.value)) {
+                        const currentPin = gpioInfo.find(p => p.pin === field.value);
+                        if (currentPin) list.push(currentPin);
+                      }
+                      list.sort((a, b) => a.pin - b.pin);
+
+                      const getPinStatusIcon = (pin: GpioPinInfo) => {
+                        if (pin.status === 'safe') return <CheckCircle className="w-4 h-4 text-success" />;
+                        if (pin.status === 'problematic') return <AlertTriangle className="w-4 h-4 text-warning" />;
+                        return <XCircle className="w-4 h-4 text-danger" />;
+                      };
+
+                      const getPinStatusColor = (pin: GpioPinInfo) => {
+                        if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
+                        if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
+                        return 'text-white bg-danger/90 border-danger/70';
+                      };
+
+                      const getPinRecommendation = (pin: GpioPinInfo) => {
+                        const primaryRelayPins = [16, 17, 18, 19, 21, 22];
+                        const secondaryRelayPins = [23, 25, 26, 27, 32, 33];
+                        if (primaryRelayPins.includes(pin.pin)) return 'Primary (Recommended)';
+                        if (secondaryRelayPins.includes(pin.pin)) return 'Secondary (Alternative)';
+                        return 'Not Recommended';
+                      };
+
+                      return (
+                        <FormItem>
+                          <FormLabel>GPIO Pin (Relay Control)</FormLabel>
+                          <Select value={String(field.value)} onValueChange={v => field.onChange(Number(v))}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select recommended GPIO pin for relay" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-64">
+                              {list.map(pin => (
+                                <SelectItem
+                                  key={pin.pin}
+                                  value={String(pin.pin)}
+                                  className={getPinStatusColor(pin)}
+                                  disabled={pin.status !== 'safe'}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {getPinStatusIcon(pin)}
+                                    <span>GPIO {pin.pin}</span>
+                                    {pin.status === 'safe' && (
+                                      <Badge variant="outline" className="text-xs bg-success/50 text-white border-success/70">
+                                        {getPinRecommendation(pin)}
+                                      </Badge>
+                                    )}
+                                    {pin.status === 'problematic' && (
+                                      <Badge variant="outline" className="text-xs bg-warning/50 text-white border-warning/70">
+                                        Problematic
+                                      </Badge>
+                                    )}
+                                    {pin.status === 'reserved' && (
+                                      <Badge variant="outline" className="text-xs bg-danger/50 text-white border-danger/70">
+                                        Reserved
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {gpioInfo.find(p => p.pin === field.value)?.status === 'problematic' && (
+                            <Alert className="mt-2 border-warning/70 bg-warning/20">
+                              <AlertTriangle className="h-4 w-4 text-warning" />
+                              <AlertDescription className="text-foreground">
+                                <strong>Warning:</strong> {gpioInfo.find(p => p.pin === field.value)?.reason}
+                                {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                  <div className="mt-2">
+                                    <strong>Recommended relay pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                  </div>
+                                )}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {gpioInfo.find(p => p.pin === field.value)?.status === 'reserved' && (
+                            <Alert className="mt-2 border-danger/70 bg-danger/20">
+                              <XCircle className="h-4 w-4 text-danger" />
+                              <AlertDescription className="text-foreground">
+                                <strong>Warning:</strong> This pin is reserved and may cause system instability.
+                                {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                  <div className="mt-2">
+                                    <strong>Use recommended relay pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                  </div>
+                                )}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {!recommendedRelayPins.includes(field.value) && gpioInfo.find(p => p.pin === field.value)?.status === 'safe' && (
+                            <Alert className="mt-2 border-success/70 bg-success/20">
+                              <Info className="h-4 w-4 text-success" />
+                              <AlertDescription className="text-foreground">
+                                <strong>Note:</strong> This pin is safe but not recommended for relay control.
+                                <div className="mt-2">
+                                  <strong>Recommended relay pins:</strong> GPIO 16, 17, 18, 19, 21, 22 (Primary) or 23, 25, 26, 27, 32, 33 (Secondary)
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }} />
                     <FormField control={form.control} name={`switches.${idx}.manualSwitchEnabled`} render={({ field }) => (<FormItem className="flex items-center gap-2"><FormControl><UiSwitch checked={!!field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="!mt-0">Manual Switch</FormLabel></FormItem>)} />
                     {form.watch(`switches.${idx}.manualSwitchEnabled`) && (
                       <>
                         <FormField control={form.control} name={`switches.${idx}.manualSwitchGpio`} render={({ field }) => {
                           const all = form.watch('switches') || [];
                           const used = new Set(all.flatMap((s, i) => { const arr = [s.gpio]; if (s.manualSwitchEnabled && s.manualSwitchGpio !== undefined) arr.push(s.manualSwitchGpio); return i === idx ? [s.gpio] : arr; }));
-                          const avail = VALID_PINS.filter(p => !used.has(p) || p === field.value);
-                          if (field.value !== undefined && !avail.includes(field.value)) avail.push(field.value);
-                          avail.sort((a, b) => a - b);
+                          // Only show pins recommended for manual switches
+                          const recommendedManualPins = [16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
+                          const availablePins = gpioInfo.filter(p =>
+                            p.safe &&
+                            recommendedManualPins.includes(p.pin) &&
+                            !used.has(p.pin)
+                          );
+                          const avail = [...availablePins];
+
+                          // If current pin is not in recommended list, add it to the list so user can see it but with warning
+                          if (field.value !== undefined && !avail.find(p => p.pin === field.value)) {
+                            const currentPin = gpioInfo.find(p => p.pin === field.value);
+                            if (currentPin) avail.push(currentPin);
+                          }
+                          avail.sort((a, b) => a.pin - b.pin);
+
+                          const getPinStatusIcon = (pin: GpioPinInfo) => {
+                            if (pin.status === 'safe') return <CheckCircle className="w-4 h-4 text-success" />;
+                            if (pin.status === 'problematic') return <AlertTriangle className="w-4 h-4 text-warning" />;
+                            return <XCircle className="w-4 h-4 text-danger" />;
+                          };
+
+                          const getPinStatusColor = (pin: GpioPinInfo) => {
+                            if (pin.status === 'safe') return 'text-white bg-success/90 border-success/70';
+                            if (pin.status === 'problematic') return 'text-white bg-warning/90 border-warning/70';
+                            return 'text-white bg-danger/90 border-danger/70';
+                          };
+
+                          const getPinRecommendation = (pin: GpioPinInfo) => {
+                            const primaryManualPins = [23, 25, 26, 27, 32, 33];
+                            const secondaryManualPins = [16, 17, 18, 19, 21, 22];
+                            if (primaryManualPins.includes(pin.pin)) return 'Primary (Recommended)';
+                            if (secondaryManualPins.includes(pin.pin)) return 'Secondary (Alternative)';
+                            return 'Not Recommended';
+                          };
+
                           const NONE = '__none__';
                           const currentVal = field.value === undefined ? NONE : String(field.value);
                           return (
@@ -258,16 +610,78 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                               <Select value={currentVal} onValueChange={v => field.onChange(v === NONE ? undefined : Number(v))}>
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="GPIO" />
+                                    <SelectValue placeholder="Select recommended GPIO pin for manual switch" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent className="max-h-64">
                                   <SelectItem key={NONE} value={NONE}>Select</SelectItem>
-                                  {avail.map(p => (
-                                    <SelectItem key={String(p)} value={String(p)}>{p}</SelectItem>
+                                  {avail.map(pin => (
+                                    <SelectItem
+                                      key={String(pin.pin)}
+                                      value={String(pin.pin)}
+                                      className={getPinStatusColor(pin)}
+                                      disabled={pin.status !== 'safe'}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {getPinStatusIcon(pin)}
+                                        <span>GPIO {pin.pin}</span>
+                                        {pin.status === 'safe' && (
+                                          <Badge variant="outline" className="text-xs bg-success/50 text-white border-success/70">
+                                            {getPinRecommendation(pin)}
+                                          </Badge>
+                                        )}
+                                        {pin.status === 'problematic' && (
+                                          <Badge variant="outline" className="text-xs bg-warning/50 text-white border-warning/70">
+                                            Problematic
+                                          </Badge>
+                                        )}
+                                        {pin.status === 'reserved' && (
+                                          <Badge variant="outline" className="text-xs bg-danger/50 text-white border-danger/70">
+                                            Reserved
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
+                              {field.value !== undefined && gpioInfo.find(p => p.pin === field.value)?.status === 'problematic' && (
+                                <Alert className="mt-2 border-warning/70 bg-warning/20">
+                                  <AlertTriangle className="h-4 w-4 text-warning" />
+                                  <AlertDescription className="text-foreground">
+                                    <strong>Warning:</strong> {gpioInfo.find(p => p.pin === field.value)?.reason}
+                                    {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                      <div className="mt-2">
+                                        <strong>Recommended manual switch pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                      </div>
+                                    )}
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                              {field.value !== undefined && gpioInfo.find(p => p.pin === field.value)?.status === 'reserved' && (
+                                <Alert className="mt-2 border-danger/70 bg-danger/20">
+                                  <XCircle className="h-4 w-4 text-danger" />
+                                  <AlertDescription className="text-foreground">
+                                    <strong>Warning:</strong> This pin is reserved and may cause system instability.
+                                    {gpioInfo.find(p => p.pin === field.value)?.alternativePins && (
+                                      <div className="mt-2">
+                                        <strong>Use recommended manual switch pins:</strong> GPIO {gpioInfo.find(p => p.pin === field.value)?.alternativePins?.join(', ')}
+                                      </div>
+                                    )}
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                              {field.value !== undefined && !recommendedManualPins.includes(field.value) && gpioInfo.find(p => p.pin === field.value)?.status === 'safe' && (
+                                <Alert className="mt-2 border-success/70 bg-success/20">
+                                  <Info className="h-4 w-4 text-success" />
+                                  <AlertDescription className="text-foreground">
+                                    <strong>Note:</strong> This pin is safe but not recommended for manual switches.
+                                    <div className="mt-2">
+                                      <strong>Recommended manual switch pins:</strong> GPIO 23, 25, 26, 27, 32, 33 (Primary) or 16, 17, 18, 19, 21, 22 (Secondary)
+                                    </div>
+                                  </AlertDescription>
+                                </Alert>
+                              )}
                               <FormMessage />
                             </FormItem>
                           );

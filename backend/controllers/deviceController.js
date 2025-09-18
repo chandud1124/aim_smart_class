@@ -1,5 +1,6 @@
 
 const Device = require('../models/Device');
+const gpioUtils = require('../utils/gpioUtils');
 const { logger } = require('../middleware/logger');
 // Per-device command sequence for strict ordering to devices
 const _cmdSeqMap = new Map(); // mac -> last seq
@@ -133,15 +134,26 @@ const createDevice = async (req, res) => {
       });
     }
 
-    // Ensure GPIO uniqueness across primary and manual switch pins
-    const primaryGpios = switches.map(sw => sw.gpio);
-    const manualGpios = switches.filter(sw => sw.manualSwitchEnabled && sw.manualSwitchGpio !== undefined).map(sw => sw.manualSwitchGpio);
-    const allGpios = [...primaryGpios, ...manualGpios];
-    if (new Set(allGpios).size !== allGpios.length) {
+    // Validate GPIO configuration using comprehensive validation
+    const gpioConfig = {
+      switches,
+      pirEnabled,
+      pirGpio
+    };
+    const gpioValidation = gpioUtils.validateGpioConfiguration(gpioConfig);
+
+    if (!gpioValidation.valid) {
       return res.status(400).json({
-        error: 'Validation failed',
-        details: 'Duplicate GPIO pin detected across switches or manual switches'
+        error: 'GPIO Validation Failed',
+        details: 'Invalid GPIO pin configuration',
+        errors: gpioValidation.errors,
+        warnings: gpioValidation.warnings
       });
+    }
+
+    // Log warnings if any (but don't block creation)
+    if (gpioValidation.warnings.length > 0) {
+      console.warn('[createDevice] GPIO warnings:', gpioValidation.warnings);
     }
 
     // Create new device
@@ -337,12 +349,28 @@ const updateDevice = async (req, res) => {
     let removedSwitches = [];
     const oldSwitchesSnapshot = device.switches ? device.switches.map(sw => sw.toObject ? sw.toObject() : { ...sw }) : [];
     if (switches && Array.isArray(switches)) {
-      const primaryGpiosU = switches.map(sw => sw.gpio);
-      const manualGpiosU = switches.filter(sw => sw.manualSwitchEnabled && sw.manualSwitchGpio !== undefined).map(sw => sw.manualSwitchGpio);
-      const all = [...primaryGpiosU, ...manualGpiosU];
-      if (new Set(all).size !== all.length) {
-        return res.status(400).json({ message: 'Duplicate GPIO pin across switches/manual switches' });
+      // Validate GPIO configuration using comprehensive validation
+      const gpioConfig = {
+        switches,
+        pirEnabled: pirEnabled !== undefined ? pirEnabled : device.pirEnabled,
+        pirGpio: pirGpio !== undefined ? pirGpio : device.pirGpio
+      };
+      const gpioValidation = gpioUtils.validateGpioConfiguration(gpioConfig);
+
+      if (!gpioValidation.valid) {
+        return res.status(400).json({
+          error: 'GPIO Validation Failed',
+          details: 'Invalid GPIO pin configuration',
+          errors: gpioValidation.errors,
+          warnings: gpioValidation.warnings
+        });
       }
+
+      // Log warnings if any (but don't block update)
+      if (gpioValidation.warnings.length > 0) {
+        console.warn('[updateDevice] GPIO warnings:', gpioValidation.warnings);
+      }
+
       // Build new ordered switch array preserving state if gpio changed; capture warnings
       const warnings = [];
       device.switches = switches.map((sw, idx) => {
@@ -1131,6 +1159,167 @@ const getPirData = async (req, res) => {
   }
 };
 
+// Get GPIO pin information and validation
+const getGpioPinInfo = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { includeUsed = 'true' } = req.query;
+
+    let device = null;
+    if (deviceId && deviceId !== 'new') {
+      device = await Device.findById(deviceId);
+      if (!device) {
+        return res.status(404).json({ message: 'Device not found' });
+      }
+    }
+
+    // Get all used pins for this device
+    const usedPins = new Set();
+    if (device) {
+      device.switches.forEach(sw => {
+        usedPins.add(sw.gpio);
+        if (sw.manualSwitchEnabled && sw.manualSwitchGpio !== undefined) {
+          usedPins.add(sw.manualSwitchGpio);
+        }
+      });
+      if (device.pirEnabled && device.pirGpio !== undefined) {
+        usedPins.add(device.pirGpio);
+      }
+    }
+
+    // Generate pin information
+    const pins = [];
+    for (let pin = 0; pin <= 39; pin++) {
+      const status = gpioUtils.getGpioPinStatus(pin);
+      const isUsed = usedPins.has(pin);
+
+      pins.push({
+        pin,
+        ...status,
+        used: isUsed,
+        available: status.safe && !isUsed
+      });
+    }
+
+    // Group pins by status
+    const grouped = {
+      safe: pins.filter(p => p.status === 'safe'),
+      problematic: pins.filter(p => p.status === 'problematic'),
+      reserved: pins.filter(p => p.status === 'reserved'),
+      used: pins.filter(p => p.used),
+      available: pins.filter(p => p.available)
+    };
+
+    // Recommended safe pins for different purposes
+    const recommendations = {
+      relayPins: gpioUtils.getRecommendedPins('relay'),
+      manualPins: gpioUtils.getRecommendedPins('manual'),
+      pirPins: gpioUtils.getRecommendedPins('pir')
+    };
+
+    res.json({
+      success: true,
+      data: {
+        pins,
+        grouped,
+        recommendations,
+        summary: {
+          totalPins: pins.length,
+          safePins: grouped.safe.length,
+          problematicPins: grouped.problematic.length,
+          reservedPins: grouped.reserved.length,
+          usedPins: grouped.used.length,
+          availablePins: grouped.available.length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Validate GPIO pin configuration
+const validateGpioConfig = async (req, res) => {
+  try {
+    const { switches = [], pirEnabled = false, pirGpio } = req.body;
+
+    const errors = [];
+    const warnings = [];
+    const usedPins = new Set();
+
+    // Validate switches
+    switches.forEach((sw, index) => {
+      const switchNum = index + 1;
+
+      // Check relay GPIO
+      if (sw.gpio !== undefined) {
+        if (usedPins.has(sw.gpio)) {
+          errors.push(`Switch ${switchNum}: GPIO ${sw.gpio} is already used`);
+        } else {
+          usedPins.add(sw.gpio);
+          const status = gpioUtils.getGpioPinStatus(sw.gpio);
+          if (!status.safe) {
+            if (status.status === 'problematic') {
+              warnings.push(`Switch ${switchNum}: GPIO ${sw.gpio} may cause ESP32 boot issues`);
+            } else {
+              errors.push(`Switch ${switchNum}: GPIO ${sw.gpio} is ${status.status} (${status.reason})`);
+            }
+          }
+        }
+      }
+
+      // Check manual switch GPIO
+      if (sw.manualSwitchEnabled && sw.manualSwitchGpio !== undefined) {
+        if (usedPins.has(sw.manualSwitchGpio)) {
+          errors.push(`Switch ${switchNum}: Manual GPIO ${sw.manualSwitchGpio} is already used`);
+        } else {
+          usedPins.add(sw.manualSwitchGpio);
+          const status = gpioUtils.getGpioPinStatus(sw.manualSwitchGpio);
+          if (!status.safe) {
+            if (status.status === 'problematic') {
+              warnings.push(`Switch ${switchNum}: Manual GPIO ${sw.manualSwitchGpio} may cause ESP32 boot issues`);
+            } else {
+              errors.push(`Switch ${switchNum}: Manual GPIO ${sw.manualSwitchGpio} is ${status.status} (${status.reason})`);
+            }
+          }
+        }
+      }
+    });
+
+    // Validate PIR GPIO
+    if (pirEnabled && pirGpio !== undefined) {
+      if (usedPins.has(pirGpio)) {
+        errors.push(`PIR: GPIO ${pirGpio} is already used`);
+      } else {
+        const status = gpioUtils.getGpioPinStatus(pirGpio);
+        if (!status.safe) {
+          if (status.status === 'problematic') {
+            warnings.push(`PIR: GPIO ${pirGpio} may cause ESP32 boot issues`);
+          } else {
+            errors.push(`PIR: GPIO ${pirGpio} is ${status.status} (${status.reason})`);
+          }
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        summary: {
+          totalSwitches: switches.length,
+          errors: errors.length,
+          warnings: warnings.length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getAllDevices,
   createDevice,
@@ -1146,5 +1335,7 @@ module.exports = {
   scheduleDevice,
   getDeviceHistory,
   configurePir,
-  getPirData
+  getPirData,
+  getGpioPinInfo,
+  validateGpioConfig
 };
