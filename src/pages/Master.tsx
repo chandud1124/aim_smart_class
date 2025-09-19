@@ -109,10 +109,42 @@ const Master = () => {
   const handleMasterToggle = async (state: boolean) => {
     try {
       await toggleAllSwitches(state);
+
+      // Show initial success message
       toast({
-        title: state ? "All Switches On" : "All Switches Off",
-        description: `All switches have been turned ${state ? 'on' : 'off'}`
+        title: state ? "Master Toggle Initiated" : "Master Toggle Initiated",
+        description: `Turning ${state ? 'on' : 'off'} all switches...`
       });
+
+      // Listen for bulk operation completion notification
+      const handleBulkComplete = (data: any) => {
+        if (data.operation === 'master_toggle') {
+          if (data.offlineDevices > 0) {
+            toast({
+              title: "Master Toggle Completed",
+              description: `${data.commandedDevices} devices updated. ${data.offlineDevices} offline devices queued.`,
+              variant: "default"
+            });
+          } else {
+            toast({
+              title: state ? "All Switches On" : "All Switches Off",
+              description: `Successfully updated ${data.commandedDevices} devices`
+            });
+          }
+        }
+      };
+
+      // Set up one-time listener for bulk operation completion
+      const socketService = (window as any).socketService;
+      if (socketService) {
+        socketService.once('bulk_operation_complete', handleBulkComplete);
+
+        // Clean up listener after 10 seconds
+        setTimeout(() => {
+          socketService.off('bulk_operation_complete', handleBulkComplete);
+        }, 10000);
+      }
+
     } catch (error) {
       toast({
         title: "Error",

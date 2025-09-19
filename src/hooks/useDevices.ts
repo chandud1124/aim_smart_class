@@ -404,7 +404,19 @@ const useDevicesInternal = () => {
         // Only attempt bulk toggle if at least one online device
         const anyOnline = devices.some(d => d.status === 'online');
         if (anyOnline) {
-          await deviceAPI.bulkToggle(state);
+          const response = await deviceAPI.bulkToggle(state);
+          const data = response.data;
+
+          // Handle the improved backend response
+          if (data.commandedDevices !== undefined && data.offlineDevices !== undefined) {
+            console.log(`Bulk toggle completed: ${data.commandedDevices} devices commanded, ${data.offlineDevices} devices offline`);
+
+            // Show detailed feedback to user via toast if available
+            if (data.offlineDevices > 0) {
+              // You could emit a custom event or use a toast system here
+              console.warn(`Warning: ${data.offlineDevices} devices are offline. Commands queued for when they reconnect.`);
+            }
+          }
         }
         // Let confirmations drive UI; do a safety refresh shortly after
         setTimeout(() => { loadDevices({ background: true, force: true }); }, 1800);

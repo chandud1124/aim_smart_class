@@ -320,20 +320,22 @@ const io = socketIo(server, {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token', 'access-control-allow-origin', 'access-control-allow-headers', 'access-control-allow-methods']
   },
-  // WebSocket configuration to prevent frame corruption
-  perMessageDeflate: false,
-  allowEIO3: true,
-  // Force polling transport initially, then allow WebSocket upgrade
+  // More conservative WebSocket settings to prevent frame corruption
+  perMessageDeflate: false, // Disable compression to avoid frame issues
+  httpCompression: false, // Disable HTTP compression
+  // Force polling initially, allow WebSocket upgrade
   transports: ['polling', 'websocket'],
-  // Additional settings for stability
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  upgradeTimeout: 30000,
-  maxHttpBufferSize: 1e8,
-  // Disable compression to avoid frame issues
-  httpCompression: false,
-  // Force new connection
-  forceNew: true
+  // More conservative timeouts and buffer sizes
+  pingTimeout: 20000, // 20 seconds (reduced from 60)
+  pingInterval: 10000, // 10 seconds (reduced from 25)
+  upgradeTimeout: 10000, // 10 seconds (reduced from 30)
+  maxHttpBufferSize: 1e6, // 1MB (reduced from 100MB)
+  // Connection stability settings
+  allowEIO3: true,
+  forceNew: false, // Don't force new connections
+  // Additional stability options
+  connectTimeout: 20000,
+  timeout: 20000
 });
 
 io.engine.on('connection_error', (err) => {

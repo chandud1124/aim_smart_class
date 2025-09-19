@@ -31,7 +31,7 @@ async function testDeviceConnection() {
       const pingResponse = await axios.get(`http://${device.ipAddress}/`, { 
         timeout: 5000,
         headers: {
-          'User-Agent': 'AIMS-Smart-Class-Test'
+          'User-Agent': 'AutoVolt-Test'
         }
       });
       console.log('   ✅ Device HTTP server is reachable');

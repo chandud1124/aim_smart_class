@@ -444,6 +444,13 @@ const Register: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-background to-muted/20">
       <div className="text-center mb-8">
+        <div className="flex justify-center mb-4">
+          <img
+            src="/logo.png"
+            alt="AutoVolt Logo"
+            className="h-16 w-auto"
+          />
+        </div>
         <h1 className="text-4xl font-bold text-primary">AutoVolt</h1>
         <p className="text-lg text-muted-foreground">Intelligent Power Management System</p>
       </div>

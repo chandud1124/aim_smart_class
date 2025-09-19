@@ -120,7 +120,10 @@ export function Header() {
           </Sheet>
         )}
         <div className={cn(isMobile && "max-w-[200px]", "overflow-hidden")}>
-          <h1 className="font-bold truncate">{currentPage.title}</h1>
+          <div className="flex items-center gap-3 mb-1">
+            <img src="/logo.png" alt="AutoVolt Logo" className="h-8 w-auto" />
+            <h1 className="font-bold truncate">{currentPage.title}</h1>
+          </div>
           <p className="text-sm text-muted-foreground truncate">{currentPage.description}</p>
         </div>
       </div>

@@ -809,6 +809,10 @@ const bulkToggleSwitches = async (req, res) => {
 
     const devices = await Device.find(match);
     let switchesChanged = 0;
+    let devicesCommanded = 0;
+    let devicesOffline = 0;
+    const offlineDevices = [];
+    const commandedDevices = [];
 
     for (const device of devices) {
       let deviceModified = false;
@@ -819,8 +823,98 @@ const bulkToggleSwitches = async (req, res) => {
           switchesChanged++;
         }
       });
+
       if (deviceModified) {
         await device.save();
+
+        // Check if device is online (has active WebSocket connection)
+        const isDeviceOnline = () => {
+          if (global.wsDevices && device.macAddress) {
+            const ws = global.wsDevices.get(device.macAddress.toUpperCase());
+            return ws && ws.readyState === 1;
+          }
+          return false;
+        };
+
+        const deviceOnline = isDeviceOnline();
+
+        if (deviceOnline) {
+          // Device is online, send command immediately
+          try {
+            const ws = global.wsDevices.get(device.macAddress.toUpperCase());
+            for (const sw of device.switches) {
+              const payload = {
+                type: 'switch_command',
+                mac: device.macAddress,
+                gpio: sw.relayGpio || sw.gpio,
+                state: sw.state,
+                seq: nextCmdSeq(device.macAddress)
+              };
+              ws.send(JSON.stringify(payload));
+              logger.info('[hw] switch_command (bulk) push', {
+                mac: device.macAddress,
+                gpio: payload.gpio,
+                state: payload.state,
+                deviceId: device._id.toString()
+              });
+            }
+            devicesCommanded++;
+            commandedDevices.push({
+              id: device._id,
+              name: device.name,
+              macAddress: device.macAddress,
+              switches: device.switches.length
+            });
+          } catch (e) {
+            logger.error('[bulkToggleSwitches] WS command failed for online device', {
+              deviceId: device._id.toString(),
+              mac: device.macAddress,
+              error: e.message
+            });
+            // Queue the command for later delivery
+            device.queuedIntents = (device.queuedIntents || []).filter(q => q.gpio !== (device.switches[0]?.relayGpio || device.switches[0]?.gpio));
+            device.queuedIntents.push({
+              gpio: device.switches[0]?.relayGpio || device.switches[0]?.gpio,
+              desiredState: state,
+              createdAt: new Date(),
+              bulkOperation: true
+            });
+            await device.save();
+          }
+        } else {
+          // Device is offline, queue the command for when it comes back online
+          logger.info('[bulkToggleSwitches] queuing command for offline device', {
+            deviceId: device._id.toString(),
+            mac: device.macAddress,
+            state
+          });
+
+          // Clear any existing queued intents for these switches
+          device.queuedIntents = (device.queuedIntents || []).filter(q =>
+            !device.switches.some(sw => (sw.relayGpio || sw.gpio) === q.gpio)
+          );
+
+          // Queue new intents for all switches
+          device.switches.forEach(sw => {
+            device.queuedIntents.push({
+              gpio: sw.relayGpio || sw.gpio,
+              desiredState: state,
+              createdAt: new Date(),
+              bulkOperation: true
+            });
+          });
+
+          await device.save();
+          devicesOffline++;
+          offlineDevices.push({
+            id: device._id,
+            name: device.name,
+            macAddress: device.macAddress,
+            switches: device.switches.length,
+            lastSeen: device.lastSeen
+          });
+        }
+
         // Log one aggregated activity entry per device to limit log volume
         try {
           await ActivityLog.create({
@@ -833,29 +927,11 @@ const bulkToggleSwitches = async (req, res) => {
             classroom: device.classroom,
             location: device.location,
             ip: req.ip,
-            userAgent: req.get('User-Agent')
+            userAgent: req.get('User-Agent'),
+            details: deviceOnline ? 'Command sent to device' : 'Command queued for offline device'
           });
         } catch (logErr) {
           if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches] log failed', logErr.message);
-        }
-        // NOTE: Do NOT emit device_state_changed here. We'll wait for ESP32 confirmations
-        // via switch_result/state_update to avoid UI desync.
-        // Push commands to ESP32 (raw WS) so physical relays change immediately
-        try {
-          if (global.wsDevices && device.macAddress) {
-            const ws = global.wsDevices.get(device.macAddress.toUpperCase());
-            if (ws && ws.readyState === 1) {
-              for (const sw of device.switches) {
-                const payload = { type: 'switch_command', mac: device.macAddress, gpio: sw.relayGpio || sw.gpio, state: sw.state, seq: nextCmdSeq(device.macAddress) };
-                try {
-                  logger.info('[hw] switch_command (bulk) push', { mac: device.macAddress, gpio: payload.gpio, state: payload.state, deviceId: device._id.toString() });
-                } catch { }
-                ws.send(JSON.stringify(payload));
-              }
-            }
-          }
-        } catch (e) {
-          if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches push failed]', e.message);
         }
       }
     }
@@ -863,18 +939,55 @@ const bulkToggleSwitches = async (req, res) => {
     // Emit a bulk intent so UI can show pending without flipping state
     try {
       const affectedIds = devices.filter(d => d.switches.some(sw => true)).map(d => d.id);
-      req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: affectedIds, ts: Date.now() });
+      req.app.get('io').emit('bulk_switch_intent', {
+        desiredState: state,
+        deviceIds: affectedIds,
+        commandedDevices: commandedDevices.length,
+        offlineDevices: offlineDevices.length,
+        ts: Date.now()
+      });
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches bulk_switch_intent emit failed]', e.message);
     }
 
+    // Emit notification about bulk operation results
+    try {
+      req.app.get('io').emit('bulk_operation_complete', {
+        operation: 'master_toggle',
+        desiredState: state,
+        totalDevices: devices.length,
+        commandedDevices: commandedDevices.length,
+        offlineDevices: offlineDevices.length,
+        switchesChanged,
+        offlineDeviceList: offlineDevices,
+        timestamp: new Date()
+      });
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches notification emit failed]', e.message);
+    }
+
+    const message = `Bulk toggled switches ${state ? 'on' : 'off'}. ${devicesCommanded} devices commanded, ${devicesOffline} devices offline (commands queued).`;
+
+    logger.info('[bulkToggleSwitches] completed', {
+      totalDevices: devices.length,
+      commandedDevices: devicesCommanded,
+      offlineDevices: devicesOffline,
+      switchesChanged,
+      state
+    });
+
     res.json({
       success: true,
-      message: `Bulk toggled switches ${state ? 'on' : 'off'}`,
-      devices: devices,
-      switchesChanged
+      message,
+      devices: devices.length,
+      commandedDevices: devicesCommanded,
+      offlineDevices: devicesOffline,
+      switchesChanged,
+      offlineDeviceList: offlineDevices,
+      commandedDeviceList: commandedDevices
     });
   } catch (error) {
+    logger.error('[bulkToggleSwitches] error', error.message);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

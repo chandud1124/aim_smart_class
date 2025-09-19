@@ -6,7 +6,7 @@ const emailConfigured = !!(process.env.EMAIL_USERNAME && process.env.EMAIL_PASSW
 
 let transporter = null;
 if (emailConfigured) {
-  transporter = nodemailer.createTransporter({
+  transporter = nodemailer.createTransport({
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth: {
       user: process.env.EMAIL_USERNAME,

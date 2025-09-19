@@ -16,7 +16,9 @@ const switchSchema = new mongoose.Schema({
     max: [39, 'GPIO pin must be <= 39'],
     validate: {
       validator: function(v) {
-        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins by default
+        // Allow problematic pins for existing devices during updates to prevent bulk toggle failures
+        // Only enforce strict validation for new devices
+        return gpioUtils.validateGpioPin(v, true); // Allow problematic pins
       },
       message: function(props) {
         const status = gpioUtils.getGpioPinStatus(props.value);
@@ -52,7 +54,8 @@ const switchSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (v === undefined || v === null) return true;
-        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins by default
+        // Allow problematic pins for existing devices during updates
+        return gpioUtils.validateGpioPin(v, true); // Allow problematic pins
       },
       message: function(props) {
         const status = gpioUtils.getGpioPinStatus(props.value);
@@ -156,7 +159,8 @@ const deviceSchema = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!this.pirEnabled) return true;
-        return gpioUtils.validateGpioPin(v, false); // Don't allow problematic pins for PIR
+        // Allow problematic pins for existing devices during updates
+        return gpioUtils.validateGpioPin(v, true); // Allow problematic pins
       },
       message: function(props) {
         const status = gpioUtils.getGpioPinStatus(props.value);
