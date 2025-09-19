@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 export const usePermissions = () => {
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
 
     const role = user?.role || '';
     const roleLevel = (user as any)?.roleLevel || 0;
@@ -132,6 +132,9 @@ export const usePermissions = () => {
         hasDepartmentOverride,
 
         // Raw permissions object for advanced checks
-        permissions
+        permissions,
+
+        // Utility functions
+        refreshPermissions: refreshProfile
     };
 };

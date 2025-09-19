@@ -559,6 +559,20 @@ io.on('connection', (socket) => {
   // Emit a hello for quick handshake debug
   socket.emit('server_hello', { ts: Date.now() });
 
+  // Join user-specific room if authenticated
+  if (socket.handshake.auth && socket.handshake.auth.token) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(socket.handshake.auth.token, process.env.JWT_SECRET);
+      if (decoded && decoded.id) {
+        socket.join(`user_${decoded.id}`);
+        logger.info(`Socket ${socket.id} joined user room: user_${decoded.id}`);
+      }
+    } catch (error) {
+      logger.warn(`Failed to join user room for socket ${socket.id}:`, error.message);
+    }
+  }
+
   socket.on('join-room', (room) => {
     try {
       socket.join(room);

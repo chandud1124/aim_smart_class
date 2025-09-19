@@ -252,6 +252,58 @@ const updateUser = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Emit real-time notification to the updated user if they're online
+    if (req.app.get('io')) {
+      const io = req.app.get('io');
+
+      // Notify the specific user about their profile update
+      io.to(`user_${user._id}`).emit('user_profile_updated', {
+        type: 'profile_updated',
+        userId: user._id,
+        updatedBy: req.user._id,
+        updatedByName: req.user.name,
+        changes: Object.keys(updateData),
+        timestamp: new Date(),
+        message: 'Your profile has been updated by an administrator'
+      });
+
+      // If role was changed, also emit a role change event
+      if (updateData.role && updateData.role !== user.role) {
+        io.to(`user_${user._id}`).emit('user_role_changed', {
+          type: 'role_changed',
+          userId: user._id,
+          oldRole: user.role,
+          newRole: updateData.role,
+          updatedBy: req.user._id,
+          updatedByName: req.user.name,
+          timestamp: new Date(),
+          message: `Your role has been changed from ${user.role} to ${updateData.role}`
+        });
+      }
+
+      // Notify all admins about the user update (except the one making the change)
+      const adminRoles = ['super-admin', 'admin', 'dean'];
+      const admins = await User.find({
+        role: { $in: adminRoles },
+        isActive: true,
+        isApproved: true,
+        _id: { $ne: req.user._id } // Exclude the admin making the change
+      }).select('_id name email');
+
+      admins.forEach(admin => {
+        io.to(`user_${admin._id}`).emit('user_updated', {
+          type: 'user_updated',
+          updatedUserId: user._id,
+          updatedUserName: user.name,
+          updatedUserRole: user.role,
+          updatedBy: req.user._id,
+          updatedByName: req.user.name,
+          changes: Object.keys(updateData),
+          timestamp: new Date()
+        });
+      });
+    }
+
     // Note: ActivityLog is for device activities, not user management
     // User updates don't need to be logged as device activities
 

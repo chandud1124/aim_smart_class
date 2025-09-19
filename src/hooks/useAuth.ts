@@ -1,6 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { authAPI } from '@/services/api';
+import { socketService } from '@/services/socket';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -24,6 +26,8 @@ export const useAuth = () => {
     return !!localStorage.getItem('auth_token');
   });
 
+  const { toast } = useToast();
+
   // Debounce auth check to avoid duplicate rapid mounts
   const authCheckScheduled = useRef(false);
   useEffect(() => {
@@ -34,6 +38,42 @@ export const useAuth = () => {
       }, 50);
     }
   }, []);
+
+  // Listen for real-time user profile updates
+  useEffect(() => {
+    const handleUserProfileUpdated = (data: any) => {
+      console.log('[Auth] User profile updated:', data);
+      toast({
+        title: "Profile Updated",
+        description: data.message || "Your profile has been updated by an administrator.",
+        duration: 5000,
+      });
+      // Refresh user data from server
+      checkAuthStatus();
+    };
+
+    const handleUserRoleChanged = (data: any) => {
+      console.log('[Auth] User role changed:', data);
+      toast({
+        title: "Role Changed",
+        description: data.message || `Your role has been changed.`,
+        variant: "destructive",
+        duration: 8000,
+      });
+      // Force a full refresh of authentication state
+      checkAuthStatus();
+    };
+
+    // Register event listeners
+    socketService.on('user_profile_updated', handleUserProfileUpdated);
+    socketService.on('user_role_changed', handleUserRoleChanged);
+
+    return () => {
+      // Cleanup event listeners
+      socketService.off('user_profile_updated', handleUserProfileUpdated);
+      socketService.off('user_role_changed', handleUserRoleChanged);
+    };
+  }, [toast]);
 
   const checkAuthStatus = async () => {
     if ((window as any).__authProfileInFlight) return; // simple client guard
@@ -114,6 +154,7 @@ export const useAuth = () => {
     isAuthenticated,
     login,
     logout,
-    updateProfile
+    updateProfile,
+    refreshProfile: checkAuthStatus // Expose refresh function for manual updates
   };
 };
