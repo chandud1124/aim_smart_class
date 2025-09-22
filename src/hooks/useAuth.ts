@@ -14,6 +14,7 @@ interface User {
   employeeId?: string;
   accessLevel: string;
   assignedDevices: string[];
+  profilePicture?: string;
 }
 
 export const useAuth = () => {
@@ -41,19 +42,22 @@ export const useAuth = () => {
 
   // Listen for real-time user profile updates
   useEffect(() => {
+    console.log('[Auth] Setting up real-time event listeners');
+
     const handleUserProfileUpdated = (data: any) => {
-      console.log('[Auth] User profile updated:', data);
+      console.log('[Auth] 📨 Received user_profile_updated event:', data);
       toast({
         title: "Profile Updated",
         description: data.message || "Your profile has been updated by an administrator.",
         duration: 5000,
       });
       // Refresh user data from server
+      console.log('[Auth] 🔄 Refreshing user profile after update event');
       checkAuthStatus();
     };
 
     const handleUserRoleChanged = (data: any) => {
-      console.log('[Auth] User role changed:', data);
+      console.log('[Auth] 📨 Received user_role_changed event:', data);
       toast({
         title: "Role Changed",
         description: data.message || `Your role has been changed.`,
@@ -61,14 +65,17 @@ export const useAuth = () => {
         duration: 8000,
       });
       // Force a full refresh of authentication state
+      console.log('[Auth] 🔄 Refreshing user profile after role change event');
       checkAuthStatus();
     };
 
     // Register event listeners
+    console.log('[Auth] Registering socket event listeners');
     socketService.on('user_profile_updated', handleUserProfileUpdated);
     socketService.on('user_role_changed', handleUserRoleChanged);
 
     return () => {
+      console.log('[Auth] Cleaning up socket event listeners');
       // Cleanup event listeners
       socketService.off('user_profile_updated', handleUserProfileUpdated);
       socketService.off('user_role_changed', handleUserRoleChanged);

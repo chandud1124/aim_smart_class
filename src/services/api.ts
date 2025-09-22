@@ -537,6 +537,20 @@ export const usersAPI = {
 
   // Get user flags (like first login reset required)
   getUserFlags: () => api.get('/users/me/flags'),
+
+  // Upload profile picture
+  uploadProfilePicture: (file: File) => {
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+    return api.patch('/users/me/profile-picture', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // Delete profile picture
+  deleteProfilePicture: () => api.delete('/users/me/profile-picture'),
 };
 
 export const settingsAPI = {

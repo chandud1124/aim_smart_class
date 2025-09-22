@@ -149,6 +149,10 @@ const userSchema = new mongoose.Schema({
   lastProfileUpdate: {
     type: Date
   },
+  profilePicture: {
+    type: String, // URL/path to profile picture
+    default: null
+  },
   isOnline: {
     type: Boolean,
     default: false,

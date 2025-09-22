@@ -244,6 +244,10 @@ const updateUser = async (req, res) => {
       }
     }
 
+    // Get the user before updating to compare old vs new values
+    const oldUser = await User.findById(req.params.id);
+    if (!oldUser) return res.status(404).json({ message: 'User not found' });
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -255,8 +259,10 @@ const updateUser = async (req, res) => {
     // Emit real-time notification to the updated user if they're online
     if (req.app.get('io')) {
       const io = req.app.get('io');
+      console.log(`[REAL-TIME] Emitting user update events for user ${user._id}`);
 
       // Notify the specific user about their profile update
+      console.log(`[REAL-TIME] Emitting to room: user_${user._id}`);
       io.to(`user_${user._id}`).emit('user_profile_updated', {
         type: 'profile_updated',
         userId: user._id,
@@ -268,16 +274,17 @@ const updateUser = async (req, res) => {
       });
 
       // If role was changed, also emit a role change event
-      if (updateData.role && updateData.role !== user.role) {
+      if (updateData.role && updateData.role !== oldUser.role) {
+        console.log(`[REAL-TIME] Role changed from ${oldUser.role} to ${updateData.role}, emitting role change event`);
         io.to(`user_${user._id}`).emit('user_role_changed', {
           type: 'role_changed',
           userId: user._id,
-          oldRole: user.role,
+          oldRole: oldUser.role,
           newRole: updateData.role,
           updatedBy: req.user._id,
           updatedByName: req.user.name,
           timestamp: new Date(),
-          message: `Your role has been changed from ${user.role} to ${updateData.role}`
+          message: `Your role has been changed from ${oldUser.role} to ${updateData.role}`
         });
       }
 
@@ -290,6 +297,7 @@ const updateUser = async (req, res) => {
         _id: { $ne: req.user._id } // Exclude the admin making the change
       }).select('_id name email');
 
+      console.log(`[REAL-TIME] Notifying ${admins.length} admins about user update`);
       admins.forEach(admin => {
         io.to(`user_${admin._id}`).emit('user_updated', {
           type: 'user_updated',
@@ -302,6 +310,8 @@ const updateUser = async (req, res) => {
           timestamp: new Date()
         });
       });
+    } else {
+      console.log('[REAL-TIME] Socket.IO not available, skipping real-time notifications');
     }
 
     // Note: ActivityLog is for device activities, not user management

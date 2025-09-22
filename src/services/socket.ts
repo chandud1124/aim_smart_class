@@ -209,6 +209,22 @@ class SocketService {
       console.log('[Socket.IO] Config update:', data);
       this.emitToListeners('config_update', data);
     });
+
+    // User profile update events
+    this.socket.on('user_profile_updated', (data) => {
+      console.log('[Socket.IO] User profile updated:', data);
+      this.emitToListeners('user_profile_updated', data);
+    });
+
+    this.socket.on('user_role_changed', (data) => {
+      console.log('[Socket.IO] User role changed:', data);
+      this.emitToListeners('user_role_changed', data);
+    });
+
+    this.socket.on('user_updated', (data) => {
+      console.log('[Socket.IO] User updated (admin notification):', data);
+      this.emitToListeners('user_updated', data);
+    });
   }
 
   private handleReconnect() {

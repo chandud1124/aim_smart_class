@@ -3,6 +3,9 @@ const router = express.Router();
 const { auth, authorize } = require('../middleware/auth');
 const { sendTempPasswordEmail, sendPasswordChangedEmail } = require('../services/emailService');
 const crypto = require('crypto');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const {
   getAllUsers,
   getUser,
@@ -11,6 +14,42 @@ const {
   deleteUser,
   toggleUserStatus
 } = require('../controllers/userController');
+
+// Configure multer for profile picture uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/profiles');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with user ID
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `profile-${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files (jpeg, jpg, png, gif) are allowed!'));
+    }
+  }
+});
 
 // All user routes require authentication
 router.use(auth);
@@ -41,14 +80,87 @@ router.patch('/me/password', async (req, res) => {
   }
 });
 
-// GET /api/users/me/flags - return forced-reset flag
-router.get('/me/flags', async (req, res) => {
+// PATCH /api/users/me/profile-picture - upload profile picture
+router.patch('/me/profile-picture', (req, res, next) => {
+  upload.single('profilePicture')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      // A Multer error occurred when uploading
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'File too large. Maximum size is 5MB.' });
+      }
+    } else if (err) {
+      // An unknown error occurred
+      return res.status(400).json({ message: err.message || 'Invalid file type. Only JPEG, PNG, and GIF are allowed.' });
+    }
+    // Everything went fine, proceed to the actual handler
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const User = require('../models/User');
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Delete old profile picture if exists
+    if (user.profilePicture) {
+      const oldPath = path.join(__dirname, '../uploads/profiles', path.basename(user.profilePicture));
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update user with new profile picture path
+    const profilePictureUrl = `/uploads/profiles/${req.file.filename}`;
+    user.profilePicture = profilePictureUrl;
+    user.lastProfileUpdate = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile picture updated successfully',
+      profilePicture: profilePictureUrl
+    });
+  } catch (error) {
+    console.error('Profile picture upload error:', error);
+    res.status(500).json({ message: 'Error uploading profile picture' });
+  }
+});
+
+// DELETE /api/users/me/profile-picture - delete profile picture
+router.delete('/me/profile-picture', async (req, res) => {
   try {
     const User = require('../models/User');
-    const user = await User.findById(req.user.id).select('firstLoginResetRequired');
-    res.json({ firstLoginResetRequired: user ? user.firstLoginResetRequired : false });
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.profilePicture) {
+      const filePath = path.join(__dirname, '../uploads/profiles', path.basename(user.profilePicture));
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    user.profilePicture = null;
+    user.lastProfileUpdate = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile picture removed successfully'
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching flags' });
+    console.error('Profile picture delete error:', error);
+    res.status(500).json({ message: 'Error removing profile picture' });
   }
 });
 
