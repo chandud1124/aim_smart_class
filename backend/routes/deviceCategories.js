@@ -70,7 +70,7 @@ router.get('/categories/filter', async (req, res) => {
 });
 
 // Get device statistics overview
-router.get('/stats', authorize('admin'), async (req, res) => {
+router.get('/stats', authorize('admin', 'super-admin'), async (req, res) => {
   try {
     const Device = require('../models/Device');
     const ActivityLog = require('../models/ActivityLog');

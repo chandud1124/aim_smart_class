@@ -6,7 +6,7 @@ const ActivityLog = require('../models/ActivityLog');
 const { logger } = require('../middleware/logger');
 
 // Get system status
-router.get('/status', auth, authorize('admin'), async (req, res) => {
+router.get('/status', auth, authorize('admin', 'super-admin'), async (req, res) => {
     try {
         const status = {
             devices: {

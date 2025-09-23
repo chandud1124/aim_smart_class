@@ -188,7 +188,7 @@ router.post('/:id(' + objectIdPattern + ')/status', toggleUserStatus);
 router.delete('/:id(' + objectIdPattern + ')', deleteUser);
 
 // PATCH /api/users/:id/password - admin sets/resets a user's password
-router.patch('/:id(' + objectIdPattern + ')/password', authorize('admin'), async (req, res) => {
+router.patch('/:id(' + objectIdPattern + ')/password', authorize('admin', 'super-admin'), async (req, res) => {
   try {
     const { password } = req.body;
     if (!password || password.length < 6) {
@@ -208,7 +208,7 @@ router.patch('/:id(' + objectIdPattern + ')/password', authorize('admin'), async
 });
 
 // GET /api/users/online - get list of online users (admin only)
-router.get('/online', authorize('admin'), async (req, res) => {
+router.get('/online', authorize('admin', 'super-admin'), async (req, res) => {
   try {
     // Get socket service instance from the app
     const io = req.app.get('io');

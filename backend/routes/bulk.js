@@ -6,7 +6,7 @@ const { logger } = require('../middleware/logger');
 const Device = require('../models/Device');
 
 // Bulk create devices
-router.post('/devices', auth, authorize('admin'), async (req, res) => {
+router.post('/devices', auth, authorize('admin', 'super-admin'), async (req, res) => {
     try {
         const results = await BulkOperations.bulkCreateDevices(req.body.devices, req.user.id);
         res.json({
@@ -60,7 +60,7 @@ router.post('/toggle', auth, async (req, res) => {
 });
 
 // Bulk update devices
-router.put('/devices', auth, authorize('admin'), async (req, res) => {
+router.put('/devices', auth, authorize('admin', 'super-admin'), async (req, res) => {
     try {
         const results = await BulkOperations.bulkUpdateDevices(req.body.updates);
         res.json({

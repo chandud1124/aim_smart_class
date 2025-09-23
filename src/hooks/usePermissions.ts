@@ -65,13 +65,6 @@ export const usePermissions = () => {
     const canManageAnnouncements = permissions.canManageAnnouncements || hasManagementAccess;
 
     return {
-        // User status
-        isApproved,
-        isActive,
-
-        // Roles
-        role,
-        roleLevel,
         isSuperAdmin,
         isDean,
         isAdmin,
@@ -80,61 +73,42 @@ export const usePermissions = () => {
         isStudent,
         isSecurity,
         isGuest,
-
-        // Permission groups
         hasSuperAccess,
         hasAdminAccess,
         hasManagementAccess,
         hasStaffAccess,
         hasBasicAccess,
-
-        // User management permissions
         canManageUsers,
         canApproveUsers,
-        canDeleteUsers,
-        canResetPasswords,
-        canManageRoles,
-        canViewAuditLogs,
-
-        // Device permissions
         canManageDevices,
-        canAccessSecurityDevices,
-        canAccessStudentDevices,
-        canAccessGuestDevices,
-
-        // Reporting and monitoring
         canViewReports,
-        canViewSecurityAlerts,
-        canReceiveAlerts,
-
-        // Schedule management
         canManageSchedule,
-        canCreateSchedules,
-        canModifySchedules,
-        canOverrideSchedules,
-        canViewAllSchedules,
-
-        // Class extension permissions
         canRequestExtensions,
         canApproveExtensions,
-
-        // System settings
-        canManageSettings,
-
-        // Communication
-        canSendNotifications,
-        canManageAnnouncements,
-
-        // Classroom-specific permissions
+        canViewSecurityAlerts,
         canAccessAllClassrooms,
         canBypassTimeRestrictions,
         hasEmergencyAccess,
         hasDepartmentOverride,
-
-        // Raw permissions object for advanced checks
+        canAccessSecurityDevices,
+        canAccessStudentDevices,
+        canAccessGuestDevices,
+        canDeleteUsers,
+        canResetPasswords,
+        canManageRoles,
+        canViewAuditLogs,
+        canManageSettings,
+        canCreateSchedules,
+        canModifySchedules,
+        canOverrideSchedules,
+        canViewAllSchedules,
+        canSendNotifications,
+        canManageAnnouncements,
+        role,
+        roleLevel,
+        isApproved,
+        isActive,
         permissions,
-
-        // Utility functions
-        refreshPermissions: refreshProfile
+        refreshProfile
     };
 };

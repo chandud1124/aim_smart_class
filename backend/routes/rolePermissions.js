@@ -6,7 +6,7 @@ const { logger } = require('../middleware/logger');
 
 // All role permissions routes require authentication and admin authorization
 router.use(auth);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'super-admin'));
 
 // Helper function to sanitize role permissions for client
 const toClientRolePermissions = (rp) => ({
@@ -382,7 +382,7 @@ router.post('/:role/reset', async (req, res) => {
 });
 
 // POST /api/role-permissions/initialize - Initialize default permissions for all roles
-router.post('/initialize', auth, authorize('admin'), async (req, res) => {
+router.post('/initialize', auth, authorize('admin', 'super-admin'), async (req, res) => {
   try {
     // Clear all existing role permissions first
     await RolePermissions.deleteMany({});

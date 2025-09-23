@@ -13,7 +13,7 @@ const {
 // Grant device permission to user
 router.post('/grant',
     auth,
-    authorize('admin'),
+    authorize('admin', 'super-admin'),
     grantDevicePermission
 );
 
@@ -26,28 +26,28 @@ router.get('/user/:userId',
 // Update device permission
 router.put('/:permissionId',
     auth,
-    authorize('admin'),
+    authorize('admin', 'super-admin'),
     updateDevicePermission
 );
 
 // Revoke device permission
 router.delete('/:permissionId',
     auth,
-    authorize('admin'),
+    authorize('admin', 'super-admin'),
     revokeDevicePermission
 );
 
 // Get device permissions summary (admin only)
 router.get('/summary',
     auth,
-    authorize('admin'),
+    authorize('admin', 'super-admin'),
     getDevicePermissionsSummary
 );
 
 // Grant temporary override (admin only)
 router.post('/:permissionId/override',
     auth,
-    authorize('admin'),
+    authorize('admin', 'super-admin'),
     grantTemporaryOverride
 );
 

@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
-  const { isAdmin, hasManagementAccess } = usePermissions();
+  const { isAdmin, isSuperAdmin, hasManagementAccess } = usePermissions();
   const { refreshDevices } = useDevices();
   const { start, stop } = useGlobalLoading();
   const [navLock, setNavLock] = useState(false);
@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
         {navigationSections.map((section, sectionIndex) => {
           // Filter items based on permissions
           const visibleItems = section.items.filter((item: any) => {
-            if (item.adminOnly && !isAdmin) {
+            if (item.adminOnly && !(isAdmin || isSuperAdmin)) {
               return false;
             }
             if (item.requiresPermission) {
@@ -141,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
           });
 
           // Skip section if no visible items or section is admin-only and user is not admin
-          if (visibleItems.length === 0 || (section.adminOnly && !isAdmin)) return null;
+          if (visibleItems.length === 0 || (section.adminOnly && !(isAdmin || isSuperAdmin))) return null;
 
           return (
             <div key={section.title} className="space-y-1">
