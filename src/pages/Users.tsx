@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Users as UsersIcon, Plus, Shield, User, Edit, Trash2, GraduationCap, ShieldCheck, RefreshCcw, Search, Wrench } from 'lucide-react';
 import { UserDialog } from '@/components/UserDialog';
+import type { UserData } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
@@ -27,7 +28,7 @@ interface User {
   designation?: string;
   phone?: string;
   assignedRooms: string[];
-  permissions: any;
+  permissions: Record<string, unknown>;
   isOnline?: boolean;
   lastSeen?: Date;
   registrationDate?: string;
@@ -107,7 +108,7 @@ const Users = () => {
   const [me, setMe] = useState<string | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [socket, setSocket] = useState<any>(null);
+  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
 
   // load self id and role once
@@ -127,7 +128,7 @@ const Users = () => {
       const response = await api.get('/users/online');
       const onlineUsersList = response.data.data;
       console.log('[DEBUG] Online users from backend:', onlineUsersList);
-      const onlineUserIds = new Set<string>(onlineUsersList.map((user: any) => user._id.toString()));
+  const onlineUserIds = new Set<string>(onlineUsersList.map((user: { _id: string }) => user._id.toString()));
       setOnlineUsers(onlineUserIds);
     } catch (error) {
       console.error('Failed to fetch online users:', error);
@@ -159,16 +160,16 @@ const Users = () => {
       socketConnection.emit('authenticate', token);
     });
 
-    socketConnection.on('authenticated', (data: any) => {
+  socketConnection.on('authenticated', (data: unknown) => {
       console.log('Socket authentication successful');
     });
 
-    socketConnection.on('auth_error', (error: any) => {
+  socketConnection.on('auth_error', (error: unknown) => {
       console.error('Socket authentication error:', error);
       setSocketConnected(false);
     });
 
-    socketConnection.on('user_status_change', (data: any) => {
+  socketConnection.on('user_status_change', (data: { userId: string; isOnline: boolean }) => {
       console.log('User status change:', data);
       setOnlineUsers(prev => {
         const newSet = new Set(prev);
@@ -186,7 +187,7 @@ const Users = () => {
       setSocketConnected(false);
     });
 
-    socketConnection.on('connect_error', (error: any) => {
+  socketConnection.on('connect_error', (error: unknown) => {
       console.error('Socket connection error:', error);
       setSocketConnected(false);
     });
@@ -201,7 +202,7 @@ const Users = () => {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = { page, limit };
+  const params: Record<string, unknown> = { page, limit };
       if (search.trim()) params.search = search.trim();
       if (roleFilter !== 'all') params.role = roleFilter;
       if (departmentFilter !== 'all') params.department = departmentFilter;
@@ -209,7 +210,7 @@ const Users = () => {
       const response = await api.get('/users', { params });
       const payload = response.data;
       const list = payload.data || [];
-      let normalized = list.map((u: any) => ({
+  let normalized = list.map((u: Record<string, any>) => ({
         id: u._id || u.id,
         name: u.name,
         email: u.email,
@@ -249,7 +250,7 @@ const Users = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const handleAddUser = async (userData: any) => {
+  const handleAddUser = async (userData: UserData) => {
     try {
       const response = await api.post('/users', userData);
       const raw = response.data.user || response.data; // backend returns { user, tempPassword? }
@@ -282,7 +283,7 @@ const Users = () => {
     }
   };
 
-  const handleEditUser = async (userData: any) => {
+  const handleEditUser = async (userData: UserData) => {
     if (!editingUser) return;
     try {
       const response = await api.put(`/users/${editingUser.id}`, userData);

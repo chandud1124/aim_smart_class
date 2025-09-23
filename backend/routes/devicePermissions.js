@@ -13,7 +13,7 @@ const {
 // Grant device permission to user
 router.post('/grant',
     auth,
-    authorize('admin', 'principal', 'dean', 'hod'),
+    authorize('admin'),
     grantDevicePermission
 );
 
@@ -26,21 +26,21 @@ router.get('/user/:userId',
 // Update device permission
 router.put('/:permissionId',
     auth,
-    authorize('admin', 'principal', 'dean', 'hod', 'faculty'),
+    authorize('admin'),
     updateDevicePermission
 );
 
 // Revoke device permission
 router.delete('/:permissionId',
     auth,
-    authorize('admin', 'principal', 'dean', 'hod', 'faculty'),
+    authorize('admin'),
     revokeDevicePermission
 );
 
 // Get device permissions summary (admin only)
 router.get('/summary',
     auth,
-    authorize('admin', 'principal'),
+    authorize('admin'),
     getDevicePermissionsSummary
 );
 

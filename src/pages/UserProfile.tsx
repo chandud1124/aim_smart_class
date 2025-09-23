@@ -106,10 +106,14 @@ const UserProfile: React.FC = () => {
                     description: 'Profile updated successfully'
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            let message = 'Failed to update profile';
+            if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+                message = (error.response.data as { message?: string }).message || message;
+            }
             toast({
                 title: 'Error',
-                description: error.response?.data?.message || 'Failed to update profile',
+                description: message,
                 variant: 'destructive'
             });
         } finally {
@@ -154,10 +158,14 @@ const UserProfile: React.FC = () => {
                     description: 'Password updated successfully'
                 });
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
+            let message = 'Failed to update password';
+            if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+                message = (error.response.data as { message?: string }).message || message;
+            }
             toast({
                 title: 'Error',
-                description: error.response?.data?.message || 'Failed to update password',
+                description: message,
                 variant: 'destructive'
             });
         } finally {

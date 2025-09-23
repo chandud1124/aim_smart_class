@@ -21,7 +21,7 @@ const getAllDevices = async (req, res) => {
   try {
     let query = {};
 
-    if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
       // Build complex query for device access
       const accessConditions = [];
 

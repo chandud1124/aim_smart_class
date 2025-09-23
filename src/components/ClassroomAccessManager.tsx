@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { User } from '@/types';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
 import { RoleGuard } from '@/components/RoleGuard';
@@ -49,7 +50,7 @@ export const ClassroomAccessManager: React.FC = () => {
     const { isAuthenticated, user } = useAuth();
     const [accessRecords, setAccessRecords] = useState<ClassroomAccess[]>([]);
     const [classrooms, setClassrooms] = useState<string[]>([]);
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [granting, setGranting] = useState(false);
@@ -102,15 +103,19 @@ export const ClassroomAccessManager: React.FC = () => {
             console.log('Users response:', usersRes.data);
             console.log('Access records response:', accessRes.data);
 
-            setClassrooms(classroomsRes.data.data.map((c: any) => c.classroom));
-            setUsers(usersRes.data.data.filter((u: any) => u.isActive));
+            setClassrooms(classroomsRes.data.data.map((c: { classroom: string }) => c.classroom));
+            setUsers(usersRes.data.data.filter((u: User) => u.isActive));
             setAccessRecords(accessRes.data.data);
 
-            console.log('Filtered users:', usersRes.data.data.filter((u: any) => u.isActive));
+            console.log('Filtered users:', usersRes.data.data.filter((u: User) => u.isActive));
             console.log('Access records loaded:', accessRes.data.data);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error loading data:', error);
-            setError(error.response?.data?.message || 'Failed to load data. Please try again.');
+            let message = 'Failed to load data. Please try again.';
+            if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data && typeof error.response.data.message === 'string') {
+                message = error.response.data.message;
+            }
+            setError(message);
             setUsers([]);
             setClassrooms([]);
             setAccessRecords([]);
@@ -256,7 +261,7 @@ export const ClassroomAccessManager: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 users.map(user => (
-                                                    <SelectItem key={user._id} value={user._id}>
+                                                    <SelectItem key={user.id} value={user.id}>
                                                         {user.name} ({user.email}) - {user.role}
                                                     </SelectItem>
                                                 ))

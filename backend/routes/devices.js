@@ -35,7 +35,7 @@ const deviceIdValidation = [
 // Device Routes with validation and proper error handling
 router.get('/', getAllDevices);
 // Restrict creation strictly to admin
-router.post('/', authorize('admin'), validateDevice, handleValidationErrors, createDevice);
+router.post('/', authorize('admin', 'super-admin'), validateDevice, handleValidationErrors, createDevice);
 router.post('/bulk-toggle', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), bulkToggleValidation, handleValidationErrors, require('../controllers/deviceController').bulkToggleSwitches);
 
 // Bulk toggle by type

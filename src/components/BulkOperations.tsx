@@ -110,11 +110,15 @@ export const BulkOperations: React.FC = () => {
 
       // Refresh devices to show updated states
       await fetchDevices();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Bulk operation failed:', error);
+      let message = 'Bulk operation failed';
+      if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
       toast({
         title: "Error",
-        description: error.message || "Bulk operation failed",
+        description: message,
         variant: "destructive",
       });
     } finally {

@@ -204,10 +204,14 @@ const Register: React.FC = () => {
       });
 
       setTimeout(() => navigate('/login'), 5000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      let message = 'Failed to connect to the server. Please try again.';
+      if (err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data) {
+        message = (err.response.data as { message?: string }).message || message;
+      }
       toast({
         title: 'Error',
-        description: err.response?.data?.message || 'Failed to connect to the server. Please try again.',
+        description: message,
         variant: 'destructive'
       });
     }

@@ -397,14 +397,14 @@ const login = async (req, res) => {
 
     // Extra debug (only in non-production)
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
+       
       console.log('[auth:login] attempt', { email });
     }
 
     const user = await User.findOne({ email }).select('+password');
     if (!user || !(await user.matchPassword(password))) {
       if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
+         
         console.log('[auth:login] invalid credentials', { email, found: !!user });
       }
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -438,7 +438,7 @@ const login = async (req, res) => {
     });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
+       
       console.error('[auth:login] error', error);
     }
     res.status(500).json({ message: 'Server error', error: error.message });

@@ -43,8 +43,12 @@ export const ActivityStatistics: React.FC = () => {
       setError(null);
       const response = await activityAPI.getStats(period);
       setStats(response.data.data || {});
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch activity statistics');
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+        setError((err as { message: string }).message);
+      } else {
+        setError('Failed to fetch activity statistics');
+      }
       console.error('Error fetching activity stats:', err);
     } finally {
       setLoading(false);

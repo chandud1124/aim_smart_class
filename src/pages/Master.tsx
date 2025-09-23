@@ -117,25 +117,36 @@ const Master = () => {
       });
 
       // Listen for bulk operation completion notification
-      const handleBulkComplete = (data: any) => {
-        if (data.operation === 'master_toggle') {
-          if (data.offlineDevices > 0) {
+
+      type BulkCompleteData = {
+        operation: string;
+        commandedDevices: number;
+        offlineDevices: number;
+      };
+      const handleBulkComplete = (data: unknown) => {
+        if (
+          typeof data === 'object' && data !== null &&
+          'operation' in data &&
+          (data as { operation: unknown }).operation === 'master_toggle'
+        ) {
+          const d = data as BulkCompleteData;
+          if (typeof d.offlineDevices === 'number' && d.offlineDevices > 0) {
             toast({
               title: "Master Toggle Completed",
-              description: `${data.commandedDevices} devices updated. ${data.offlineDevices} offline devices queued.`,
+              description: `${d.commandedDevices} devices updated. ${d.offlineDevices} offline devices queued.`,
               variant: "default"
             });
           } else {
             toast({
               title: state ? "All Switches On" : "All Switches Off",
-              description: `Successfully updated ${data.commandedDevices} devices`
+              description: `Successfully updated ${d.commandedDevices} devices`
             });
           }
         }
       };
 
       // Set up one-time listener for bulk operation completion
-      const socketService = (window as any).socketService;
+      const socketService = (window as unknown as { socketService?: { once: Function; off: Function } }).socketService;
       if (socketService) {
         socketService.once('bulk_operation_complete', handleBulkComplete);
 

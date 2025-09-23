@@ -24,7 +24,7 @@ interface PermissionRequest {
     };
     requestType: string;
     status: 'pending' | 'approved' | 'rejected';
-    requestDetails: any;
+    requestDetails: Record<string, unknown>;
     createdAt: string;
     comments?: Array<{
         userId: { name: string };
@@ -223,7 +223,7 @@ const PermissionManagement: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {getRoleBadge(request.requestDetails.role)}
+                                                    {typeof request.requestDetails.role === 'string' ? getRoleBadge(request.requestDetails.role) : null}
                                                     {getStatusBadge(request.status)}
                                                 </div>
                                             </div>
@@ -276,7 +276,7 @@ const PermissionManagement: React.FC = () => {
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Role</Label>
-                                                                    <p className="text-sm text-muted-foreground">{request.requestDetails.role}</p>
+                                                                    <p className="text-sm text-muted-foreground">{typeof request.requestDetails.role === 'string' ? request.requestDetails.role : ''}</p>
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Department</Label>
@@ -299,7 +299,7 @@ const PermissionManagement: React.FC = () => {
                                                             {request.requestDetails.reason && (
                                                                 <div>
                                                                     <Label className="text-sm font-medium">Reason for Registration</Label>
-                                                                    <p className="text-sm text-muted-foreground mt-1">{request.requestDetails.reason}</p>
+                                                                    <p className="text-sm text-muted-foreground mt-1">{typeof request.requestDetails.reason === 'string' ? request.requestDetails.reason : ''}</p>
                                                                 </div>
                                                             )}
 
@@ -390,7 +390,7 @@ const PermissionManagement: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {getRoleBadge(request.requestDetails.role)}
+                                            {typeof request.requestDetails.role === 'string' ? getRoleBadge(request.requestDetails.role) : null}
                                             {getStatusBadge(request.status)}
                                         </div>
                                     </div>

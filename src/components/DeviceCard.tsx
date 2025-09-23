@@ -169,7 +169,7 @@ export default function DeviceCard({ device, onToggleSwitch, onEditDevice, onDel
                           const isOn = sw.state;
                           return (
                             <tr
-                              key={sw.id || (sw as any)._id || `${sw.name}-${(sw as any).gpio || (sw as any).relayGpio || i}`}
+                              key={sw.id || `${sw.name}-${sw.gpio ?? sw.relayGpio ?? i}`}
                               className={
                                 `${device.status !== 'online' ? 'opacity-60' : ''} ${isOn ? (device.status === 'online' ? 'bg-green-100 text-green-900' : 'bg-red-200 text-red-900') : ''}`
                               }
@@ -183,7 +183,7 @@ export default function DeviceCard({ device, onToggleSwitch, onEditDevice, onDel
                                   size="sm"
                                   variant={isOn ? 'default' : 'outline'}
                                   onClick={() => {
-                                    const sid = sw.id || (sw as any)._id;
+                                    const sid = sw.id;
                                     if (sid) onToggleSwitch(device.id, sid);
                                     else console.warn('Switch missing id when toggling', sw);
                                   }}

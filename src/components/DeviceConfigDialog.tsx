@@ -41,9 +41,10 @@ interface GpioValidationResult {
 
 // Update validation to be more flexible with GPIO pins
 const switchSchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   name: z.string().min(1),
   gpio: z.number().min(0).max(39),
+  relayGpio: z.number().min(0).max(39),
   type: z.enum(switchTypes),
   icon: z.string().optional(),
   state: z.boolean().default(false),
@@ -103,8 +104,9 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       pirEnabled: initialData.pirEnabled || false,
       pirGpio: initialData.pirGpio,
       pirAutoOffDelay: initialData.pirAutoOffDelay || 30,
-      switches: initialData.switches.map((sw: any) => ({
-        id: sw.id || sw._id,
+  switches: initialData.switches.map((sw: import('@/types').Switch) => ({
+    id: sw.id,
+    relayGpio: sw.gpio ?? 0,
         name: sw.name,
         gpio: sw.relayGpio ?? sw.gpio ?? 0,
         type: sw.type || 'relay',
@@ -119,7 +121,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       }))
     } : {
       name: '', macAddress: '', ipAddress: '', location: `Block ${locParts.block} Floor ${locParts.floor}`, classroom: '', pirEnabled: false, pirGpio: undefined, pirAutoOffDelay: 30,
-      switches: [{ id: undefined, name: '', gpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]
+  switches: [{ id: `switch-${Date.now()}-0`, name: '', gpio: 0, relayGpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]
     }
   });
   // When switching between devices, reset the form with new defaults so fields are populated
@@ -137,8 +139,8 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
         pirEnabled: initialData.pirEnabled || false,
         pirGpio: initialData.pirGpio,
         pirAutoOffDelay: initialData.pirAutoOffDelay || 30,
-        switches: initialData.switches.map((sw: any) => ({
-          id: sw.id || sw._id,
+    switches: initialData.switches.map((sw: import('@/types').Switch) => ({
+    id: sw.id,
           name: sw.name,
           gpio: sw.relayGpio ?? sw.gpio ?? 0,
           type: sw.type || 'relay',
@@ -157,7 +159,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       fetchGpioInfo(); // Fetch GPIO info when creating new device
       form.reset({
         name: '', macAddress: '', ipAddress: '', location: `Block ${lp.block} Floor ${lp.floor}`, classroom: '', pirEnabled: false, pirGpio: undefined, pirAutoOffDelay: 30,
-        switches: [{ id: undefined, name: '', gpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]
+  switches: [{ id: `switch-${Date.now()}-0`, name: '', gpio: 0, relayGpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]
       });
     }
   }, [initialData, open]);
@@ -169,7 +171,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
   const [secretError, setSecretError] = useState<string | null>(null);
   const [secretVisible, setSecretVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  const deviceId = (initialData as any)?.id;
+  const deviceId = initialData?.id;
 
   // Fetch GPIO pin information
   const fetchGpioInfo = async () => {
@@ -185,7 +187,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
   };
 
   // Validate GPIO configuration
-  const validateGpioConfig = async (config: any) => {
+  const validateGpioConfig = async (config: { switches: import('@/types').Switch[]; pirEnabled: boolean; pirGpio?: number }) => {
     try {
       const response = await deviceAPI.validateGpioConfig(config);
       setGpioValidation(response.data.data);
@@ -208,19 +210,47 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       }
       setSecretValue(s);
       setSecretVisible(true);
-    } catch (e: any) {
-      setSecretError(e?.message || 'Failed');
+    } catch (e: unknown) {
+      let message = 'Failed';
+      if (e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string') {
+        message = (e as { message: string }).message;
+      }
+      setSecretError(message);
     } finally { setSecretLoading(false); }
   };
 
   const copySecret = async () => {
     if (!secretValue) return;
-    try { await navigator.clipboard.writeText(secretValue); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
+    try {
+      await navigator.clipboard.writeText(secretValue);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      // Optionally log error for debugging
+      // console.error('Clipboard copy failed', e);
+    }
   };
   const submit = async (data: FormValues) => {
+    // Ensure every switch has a string id before validation and submission
+    const switchesWithId = data.switches.map(sw => ({
+      id: typeof sw.id === 'string' && sw.id.length > 0 ? sw.id : `switch-${Date.now()}-${Math.floor(Math.random()*10000)}`,
+      name: sw.name || 'Unnamed Switch',
+      type: sw.type || 'relay',
+      gpio: sw.gpio ?? 0,
+      relayGpio: sw.relayGpio ?? sw.gpio ?? 0,
+      state: sw.state ?? false,
+      manualSwitchEnabled: sw.manualSwitchEnabled ?? false,
+      manualSwitchGpio: sw.manualSwitchGpio,
+      manualMode: sw.manualMode || 'maintained',
+      manualActiveLow: sw.manualActiveLow !== undefined ? sw.manualActiveLow : true,
+      usePir: sw.usePir ?? false,
+      dontAutoOff: sw.dontAutoOff ?? false,
+      icon: sw.icon
+    }));
+
     // Validate GPIO configuration before submitting
     const validation = await validateGpioConfig({
-      switches: data.switches,
+      switches: switchesWithId,
       pirEnabled: data.pirEnabled,
       pirGpio: data.pirGpio
     });
@@ -231,7 +261,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       return;
     }
 
-    onSubmit(data);
+    onSubmit({ ...data, switches: switchesWithId });
     onOpenChange(false);
   };
   return (
@@ -445,7 +475,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                       {idx > 0 && <Button type="button" variant="destructive" size="sm" onClick={() => { const sw = [...switches]; sw.splice(idx, 1); form.setValue('switches', sw); }}>Remove</Button>}
                     </div>
                     {/* Hidden id field to preserve existing switch identity */}
-                    {(switches[idx] as any).id && <input type="hidden" value={(switches[idx] as any).id} {...form.register(`switches.${idx}.id` as const)} />}
+                    {switches[idx]?.id && <input type="hidden" value={switches[idx].id} {...form.register(`switches.${idx}.id` as const)} />}
                     <FormField control={form.control} name={`switches.${idx}.name`} render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} placeholder="Light" /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name={`switches.${idx}.type`} render={({ field }) => (<FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value || 'relay'}><FormControl><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger></FormControl><SelectContent>{switchTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name={`switches.${idx}.gpio`} render={({ field }) => {
@@ -735,7 +765,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                   </div>
                 );
               })}
-              <Button type="button" variant="outline" onClick={() => { const sw = form.getValues('switches') || []; form.setValue('switches', [...sw, { id: undefined, name: '', gpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]); }}>Add Switch</Button>
+              <Button type="button" variant="outline" onClick={() => { const sw = form.getValues('switches') || []; form.setValue('switches', [...sw, { id: `switch-${Date.now()}-${Math.floor(Math.random()*10000)}`, name: '', gpio: 0, relayGpio: 0, type: 'relay', icon: 'lightbulb', state: false, manualSwitchEnabled: false, manualMode: 'maintained', manualActiveLow: true, usePir: false, dontAutoOff: false }]); }}>Add Switch</Button>
               {/* Added manualMode/manualActiveLow defaults when adding a new switch */}
               {/* NOTE: Above Add Switch handler updated to include them if needed */}
             </div>

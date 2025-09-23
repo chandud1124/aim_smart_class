@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useDevices } from '@/hooks/useDevices';
 import { useToast } from '@/hooks/use-toast';
 
-interface ScheduleData {
+export interface ScheduleData {
   name: string;
   time: string;
   action: 'on' | 'off';

@@ -27,14 +27,15 @@ import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import api from '@/services/api';
 import { ActivityLog } from '@/types';
 
+
 // Safe property access helper
-const safe = (obj: any, path: string, defaultValue: any = null) => {
+function safe<T = unknown, D = null>(obj: T, path: string, defaultValue: D = null as D): any {
   try {
-    return path.split('.').reduce((current, key) => current?.[key], obj) ?? defaultValue;
+    return path.split('.').reduce((current: any, key) => current?.[key], obj) ?? defaultValue;
   } catch {
     return defaultValue;
   }
-};
+}
 
 interface LocalActivityLog {
   id: string;
@@ -58,8 +59,8 @@ interface LocalActivityLog {
     resolution?: string;
     responseTime?: number;
   } | string;
-  details?: any;
-  context?: any;
+  details?: Record<string, unknown>;
+  context?: Record<string, unknown>;
 }
 
 interface ManualSwitchLog {
@@ -100,8 +101,8 @@ interface DeviceStatusLog {
     responseTime?: number;
     powerStatus?: string;
   };
-  switchStates?: any[];
-  alerts?: any[];
+  switchStates?: Record<string, unknown>[];
+  alerts?: Record<string, unknown>[];
   summary?: {
     totalSwitchesOn?: number;
     totalSwitchesOff?: number;
@@ -158,7 +159,7 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
   const [showCalendar, setShowCalendar] = useState(false);
 
   // Device list state
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
   // Pagination
@@ -347,7 +348,7 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
   };
 
   const filteredData = useMemo(() => {
-    let data: any[] = [];
+  let data: LocalActivityLog[] | ManualSwitchLog[] | DeviceStatusLog[] = [];
     switch (activeTab) {
       case 'activities': data = activityLogs; break;
       case 'manual-switches': data = manualSwitchLogs; break;

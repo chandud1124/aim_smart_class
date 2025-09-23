@@ -104,10 +104,14 @@ const CreateTicketDialog: React.FC<CreateTicketDialogProps> = ({ onTicketCreated
                 tags: []
             });
             onTicketCreated?.();
-        } catch (error: any) {
+        } catch (error: unknown) {
+            let message = 'Failed to create ticket. Please try again.';
+            if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+                message = (error as { message: string }).message;
+            }
             toast({
                 title: "Error",
-                description: error.message || "Failed to create ticket. Please try again.",
+                description: message,
                 variant: "destructive"
             });
         } finally {

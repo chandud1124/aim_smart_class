@@ -17,7 +17,11 @@ const Switches = () => {
     try {
       const raw = localStorage.getItem('switches_collapsed');
       return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
+    } catch (e) {
+      // Optionally log error for debugging
+      // console.error('LocalStorage setItem failed', e);
+      return {};
+    }
   });
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
@@ -25,7 +29,12 @@ const Switches = () => {
 
   // Persist collapsed state
   useEffect(() => {
-    try { localStorage.setItem('switches_collapsed', JSON.stringify(collapsed)); } catch { }
+    try {
+      localStorage.setItem('switches_collapsed', JSON.stringify(collapsed));
+    } catch (e) {
+      // Optionally log error for debugging
+      // console.error('LocalStorage setItem failed', e);
+    }
   }, [collapsed]);
 
   const locations = useMemo(() => {
@@ -130,7 +139,11 @@ const Switches = () => {
             const allOn = onCount === device.switches.length && device.switches.length > 0;
             const allOff = onCount === 0;
             const isCollapsed = collapsed[device.id];
-            const hasSchedules = device.switches.some(sw => (sw as any).schedule?.length || (sw as any).schedules?.length);
+            const hasSchedules = device.switches.some(sw => {
+              if ('schedule' in sw && Array.isArray((sw as { schedule?: unknown }).schedule) && (sw as { schedule?: unknown[] }).schedule?.length) return true;
+              if ('schedules' in sw && Array.isArray((sw as { schedules?: unknown }).schedules) && (sw as { schedules?: unknown[] }).schedules?.length) return true;
+              return false;
+            });
             return (
               <Card key={device.id} className={`border shadow-sm flex flex-col ${hasSchedules ? 'ring-1 ring-blue-300' : ''}`}>
                 <CardHeader className="pb-3 cursor-pointer px-4 py-3" onClick={() => setCollapsed(c => ({ ...c, [device.id]: !c[device.id] }))}>
@@ -169,8 +182,9 @@ const Switches = () => {
                   <CardContent className="pt-0 pb-3 px-4 flex-1">
                     <div className="space-y-2 max-h-64 overflow-auto pr-1">
                       {device.switches.map(sw => {
-                        const scheduled = (sw as any).schedule?.length > 0 || (sw as any).schedules?.length > 0;
-                        const power = (sw as any).powerConsumption;
+                        const scheduled = ('schedule' in sw && Array.isArray((sw as { schedule?: unknown }).schedule) && (sw as { schedule?: unknown[] }).schedule?.length > 0)
+                          || ('schedules' in sw && Array.isArray((sw as { schedules?: unknown }).schedules) && (sw as { schedules?: unknown[] }).schedules?.length > 0);
+                        const power = 'powerConsumption' in sw ? (sw as { powerConsumption?: number }).powerConsumption : undefined;
                         return (
                           <div key={sw.id} className="p-2 rounded border bg-muted/30 flex flex-col gap-1 text-[11px]">
                             <div className="flex items-center justify-between gap-2">
@@ -182,7 +196,7 @@ const Switches = () => {
                               />
                             </div>
                             <div className="flex justify-between text-[9px] text-muted-foreground">
-                              <span>GPIO {(sw as any).relayGpio ?? (sw as any).gpio}</span>
+                              <span>GPIO {'relayGpio' in sw && typeof (sw as { relayGpio?: number }).relayGpio === 'number' ? (sw as { relayGpio?: number }).relayGpio : ('gpio' in sw && typeof (sw as { gpio?: number }).gpio === 'number' ? (sw as { gpio?: number }).gpio : '')}</span>
                               <span className="uppercase">{sw.type}</span>
                             </div>
                             {(scheduled || power !== undefined) && (

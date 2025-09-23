@@ -137,8 +137,8 @@ const DevicePermissionManager: React.FC = () => {
             ]);
             
             // Flatten permissions from summary format
-            const flatPermissions = permissionsRes.data.data.flatMap((summary: any) => 
-                summary.permissions.map((perm: any) => ({
+            const flatPermissions = permissionsRes.data.data.flatMap((summary: { permissions: DevicePermission['permissions'][]; device: DevicePermission['device'] }) => 
+                summary.permissions.map((perm: DevicePermission['permissions']) => ({
                     ...perm,
                     device: summary.device
                 }))

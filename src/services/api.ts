@@ -1,5 +1,6 @@
 
 
+import type { Device, Schedule } from '../types';
 import axios from 'axios';
 
 // Auto-detect working API base URL
@@ -16,7 +17,7 @@ export async function detectApiBaseUrl() {
       const res = await fetch(url + '/health');
       if (res.ok) {
         detectedApiBaseUrl = url;
-        // eslint-disable-next-line no-console
+         
         console.info('[api] Using API base URL:', url);
         return url;
       }
@@ -70,7 +71,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest: any = error.config || {};
+  const originalRequest: Record<string, unknown> = error.config || {};
     const status = error.response?.status;
     const path = (originalRequest?.url || '').toString();
 
@@ -82,7 +83,7 @@ api.interceptors.response.use(
       url: path,
       method: originalRequest.method,
     };
-    // eslint-disable-next-line no-console
+     
     console.error('API Error:', debugPayload);
 
     // If 401 during explicit login/register attempt -> just reject so UI can show error (NO redirect)
@@ -104,7 +105,7 @@ api.interceptors.response.use(
           }
         }
       } catch (refreshErr) {
-        // eslint-disable-next-line no-console
+         
         console.warn('Token refresh failed, clearing session');
       }
     }
@@ -159,21 +160,24 @@ export const updateSettings = (settings: Partial<Settings>) =>
 // Device REST API endpoints
 export const deviceAPI = {
   // Old deviceAPI methods
-  updateStatus: (deviceId: string, status: any) =>
-    api.post<{ success: boolean; device: any }>(`/device-api/${deviceId}/status`, status),
 
-  sendCommand: (deviceId: string, command: { type: string, payload: any }) =>
+  updateStatus: (deviceId: string, status: Partial<Device>) =>
+    api.post<{ success: boolean; device: Device }>(`/device-api/${deviceId}/status`, status),
+
+
+  sendCommand: (deviceId: string, command: { type: string; payload: unknown }) =>
     api.post<{ success: boolean }>(`/device-api/${deviceId}/command`, { command }),
 
+
   getCommands: (deviceId: string) =>
-    api.get<{ commands: Array<{ type: string, payload: any }> }>(`/device-api/${deviceId}/commands`),
+    api.get<{ commands: Array<{ type: string; payload: unknown }> }>(`/device-api/${deviceId}/commands`),
 
   // New deviceAPI methods
   getAllDevices: () => api.get('/devices'),
 
-  createDevice: (deviceData: any) => api.post('/devices', deviceData),
+  createDevice: (deviceData: Partial<Device>) => api.post('/devices', deviceData),
 
-  updateDevice: (deviceId: string, updates: any) =>
+  updateDevice: (deviceId: string, updates: Partial<Device>) =>
     api.put(`/devices/${deviceId}`, updates),
 
   deleteDevice: (deviceId: string) => api.delete(`/devices/${deviceId}`),
@@ -191,7 +195,7 @@ export const deviceAPI = {
 
   // GPIO pin information and validation
   getGpioPinInfo: (deviceId?: string) => api.get(`/devices/gpio-info/${deviceId || 'new'}`),
-  validateGpioConfig: (config: any) => api.post('/devices/validate-gpio', config),
+  validateGpioConfig: (config: Record<string, unknown>) => api.post('/devices/validate-gpio', config),
 };
 
 export const authAPI = {
@@ -242,9 +246,9 @@ export const authAPI = {
 export const scheduleAPI = {
   getAllSchedules: () => api.get('/schedules'),
 
-  createSchedule: (scheduleData: any) => api.post('/schedules', scheduleData),
+  createSchedule: (scheduleData: Partial<Schedule>) => api.post('/schedules', scheduleData),
 
-  updateSchedule: (scheduleId: string, updates: any) =>
+  updateSchedule: (scheduleId: string, updates: Partial<Schedule>) =>
     api.put(`/schedules/${scheduleId}`, updates),
 
   deleteSchedule: (scheduleId: string) => api.delete(`/schedules/${scheduleId}`),
@@ -254,7 +258,7 @@ export const scheduleAPI = {
 };
 
 export const activityAPI = {
-  getActivities: (filters?: any) => api.get('/activities', { params: filters }),
+  getActivities: (filters?: Record<string, unknown>) => api.get('/activities', { params: filters }),
 
   getStats: (period?: string) => api.get('/activities/stats', { params: { period } }),
 
@@ -264,7 +268,7 @@ export const activityAPI = {
 };
 
 export const securityAPI = {
-  getAlerts: (params?: any) => api.get('/security/alerts', { params }),
+  getAlerts: (params?: Record<string, unknown>) => api.get('/security/alerts', { params }),
 
   getBlacklist: () => api.get('/security/blacklist'),
 
@@ -275,7 +279,7 @@ export const securityAPI = {
   resolveAlert: (alertId: string, resolution?: string) => 
     api.post(`/security/alerts/${alertId}/resolve`, { resolution }),
 
-  createAlert: (alertData: any) => api.post('/security/alerts', alertData),
+  createAlert: (alertData: Record<string, unknown>) => api.post('/security/alerts', alertData),
 };
 
 export const ticketAPI = {
@@ -318,12 +322,12 @@ export const ticketAPI = {
 };
 
 export const bulkAPI = {
-  createDevices: (devices: any[]) => api.post('/bulk/devices', { devices }),
+  createDevices: (devices: Device[]) => api.post('/bulk/devices', { devices }),
   
   toggleSwitches: (devices: string[], switchId: string, state: boolean) => 
     api.post('/bulk/toggle', { devices, switchId, state }),
   
-  updateDevices: (updates: any[]) => api.put('/bulk/devices', { updates }),
+  updateDevices: (updates: Partial<Device>[]) => api.put('/bulk/devices', { updates }),
 };
 
 export const rolePermissionsAPI = {
@@ -336,32 +340,32 @@ export const rolePermissionsAPI = {
   // Create new role permissions
   createRolePermissions: (data: {
     role: string;
-    userManagement?: any;
-    deviceManagement?: any;
-    classroomManagement?: any;
-    scheduleManagement?: any;
-    activityManagement?: any;
-    securityManagement?: any;
-    ticketManagement?: any;
-    systemManagement?: any;
-    extensionManagement?: any;
-    calendarIntegration?: any;
-    esp32Management?: any;
-    bulkOperations?: any;
-    departmentRestrictions?: any;
-    timeRestrictions?: any;
-    notifications?: any;
-    apiAccess?: any;
-    audit?: any;
-    metadata?: any;
+    userManagement?: Record<string, unknown>;
+    deviceManagement?: Record<string, unknown>;
+    classroomManagement?: Record<string, unknown>;
+    scheduleManagement?: Record<string, unknown>;
+    activityManagement?: Record<string, unknown>;
+    securityManagement?: Record<string, unknown>;
+    ticketManagement?: Record<string, unknown>;
+    systemManagement?: Record<string, unknown>;
+    extensionManagement?: Record<string, unknown>;
+    calendarIntegration?: Record<string, unknown>;
+    esp32Management?: Record<string, unknown>;
+    bulkOperations?: Record<string, unknown>;
+    departmentRestrictions?: Record<string, unknown>;
+    timeRestrictions?: Record<string, unknown>;
+    notifications?: Record<string, unknown>;
+    apiAccess?: Record<string, unknown>;
+    audit?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
   }) => api.post('/role-permissions', data),
 
   // Update permissions for a specific role
-  updateRolePermissions: (role: string, updates: any) =>
+  updateRolePermissions: (role: string, updates: Record<string, unknown>) =>
     api.put(`/role-permissions/${role}`, updates),
 
   // Partially update permissions for a specific role
-  patchRolePermissions: (role: string, updates: any) =>
+  patchRolePermissions: (role: string, updates: Record<string, unknown>) =>
     api.patch(`/role-permissions/${role}`, updates),
 
   // Delete permissions for a specific role
@@ -462,8 +466,8 @@ export const devicePermissionsAPI = {
 
   // Update device permission
   updateDevicePermission: (permissionId: string, data: {
-    permissions?: any;
-    restrictions?: any;
+  permissions?: Record<string, unknown>;
+  restrictions?: Record<string, unknown>;
     expiresAt?: string;
     reason?: string;
   }) => api.put(`/device-permissions/${permissionId}`, data),
@@ -575,7 +579,7 @@ export const esp32API = {
   }) => api.post(`/esp32/state/${macAddress}`, data),
 
   // Send command to ESP32 device
-  sendCommand: (macAddress: string, command: any) =>
+  sendCommand: (macAddress: string, command: { type: string; payload: unknown }) =>
     api.post(`/esp32/command/${macAddress}`, { command }),
 };
 
@@ -645,7 +649,7 @@ export const enhancedLogsAPI = {
   // Export logs to Excel
   exportLogs: (data: {
     logType: 'activities' | 'errors' | 'manual-switches' | 'device-status';
-    filters?: any;
+  filters?: Record<string, unknown>;
     includeColumns?: string[];
   }) => api.post('/enhanced-logs/export/excel', data),
 

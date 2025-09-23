@@ -1,74 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import api from '@/services/api';
 
+
+import React, { useState, useEffect } from 'react';
+import api from '@/services/api';
+import { scheduleAPI } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Calendar, Clock, Plus, Edit, Trash2 } from 'lucide-react';
 import { ScheduleDialog } from '@/components/ScheduleDialog';
-import { scheduleAPI } from '@/services/api';
-import { useToast } from '@/hooks/use-toast';
+import type { ScheduleData } from '@/components/ScheduleDialog';
+import { DAY_NAMES } from '@/constants/days';
 
-interface Schedule {
-  id: string;
-  name: string;
-  time: string;
-  action: 'on' | 'off';
-  // Days are user-friendly names for UI, we map to numbers (0-6) when calling the API
-  days: string[];
-  // Switch IDs are composite `${deviceId}-${switchId}` for UI; map to objects for API
-  switches: string[];
-  enabled: boolean;
-  timeoutMinutes?: number;
-}
-// Day helpers: backend expects 0-6 (0=Sunday) and cron uses same
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 const dayNameToNumber = (name: string): number => {
   const idx = DAY_NAMES.findIndex(d => d.toLowerCase() === name.toLowerCase());
-  return idx >= 0 ? idx : 1; // default to Monday
+  return idx >= 0 ? idx : 1;
 };
 const dayNumberToName = (n: number): string => DAY_NAMES[n] ?? 'Monday';
 const toSwitchRef = (comboId: string) => {
   const [deviceId, switchId] = comboId.split('-');
   return { deviceId, switchId };
 };
-const fromSwitchRef = (ref: any): string => `${ref.deviceId}-${ref.switchId}`;
+type SwitchRef = { deviceId: string; switchId: string };
+const fromSwitchRef = (ref: SwitchRef): string => `${ref.deviceId}-${ref.switchId}`;
 
+interface Schedule {
+  id: string;
+  name: string;
+  time: string;
+  action: 'on' | 'off';
+  days: string[];
+  switches: string[];
+  enabled: boolean;
+  timeoutMinutes?: number;
+}
 
 const Schedule: React.FC = () => {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const handleDeleteSchedule = async (scheduleId: string) => {
+  const { toast } = useToast();
+
+  const handleDeleteSchedule = async (scheduleId: string | null) => {
+    if (!scheduleId) return;
     try {
       const response = await api.delete(`/schedules/${scheduleId}`);
       if (response.data.success) {
         setSchedules(prev => prev.filter(s => s.id !== scheduleId));
-        toast({
-          title: "Schedule Deleted",
-          description: "Schedule has been removed successfully"
-        });
+        toast({ title: 'Schedule Deleted', description: 'Schedule has been removed successfully' });
       }
-    } catch (error) {
-      console.error('Delete schedule error:', error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to delete schedule",
-        variant: "destructive"
-      });
+    } catch (error: unknown) {
+      let message = 'Failed to delete schedule';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+        const data = error.response.data as { message?: string; error?: string };
+        message = data.message || data.error || message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
-  const handleEditSchedule = async (scheduleData: any) => {
+  const handleEditSchedule = async (scheduleData: ScheduleData) => {
     if (!editingSchedule) return;
     try {
       const payload = {
         name: scheduleData.name,
         time: scheduleData.time,
         action: scheduleData.action,
-        type: scheduleData.type || 'weekly',
-        days: (scheduleData.days || []).map((d: string) => dayNameToNumber(d)),
-        switches: (scheduleData.switches || []).map((id: string) => toSwitchRef(id)),
+        type: (scheduleData as any).type || 'weekly',
+        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string') : [],
+        switches: Array.isArray(scheduleData.switches) ? scheduleData.switches.filter((id): id is string => typeof id === 'string').map((id: string) => toSwitchRef(id)) : [],
         enabled: true,
         timeoutMinutes: scheduleData.timeoutMinutes ?? 0
       };
@@ -80,43 +84,36 @@ const Schedule: React.FC = () => {
           name: s.name,
           time: s.time,
           action: s.action,
-          days: (s.days || []).map((n: number) => dayNumberToName(n)),
-          switches: (s.switches || []).map(fromSwitchRef),
+          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+          switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
           enabled: s.enabled,
           timeoutMinutes: s.timeoutMinutes
         };
-        setSchedules(prev =>
-          prev.map(schedule =>
-            schedule.id === editingSchedule.id
-              ? updatedSchedule
-              : schedule
-          )
-        );
+        setSchedules(prev => prev.map(schedule => schedule.id === editingSchedule.id ? updatedSchedule : schedule));
         setEditingSchedule(null);
-        toast({
-          title: "Schedule Updated",
-          description: `${scheduleData.name} has been updated successfully`
-        });
+        toast({ title: 'Schedule Updated', description: `${scheduleData.name} has been updated successfully` });
       }
-    } catch (error) {
-      console.error('Edit schedule error:', error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || error.response?.data?.error || "Failed to update schedule",
-        variant: "destructive"
-      });
+    } catch (error: unknown) {
+      let message = 'Failed to update schedule';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+        const data = error.response.data as { message?: string; error?: string };
+        message = data.message || data.error || message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
-  const handleAddSchedule = async (scheduleData: any) => {
+  const handleAddSchedule = async (scheduleData: ScheduleData) => {
     try {
       const payload = {
         name: scheduleData.name,
         time: scheduleData.time,
         action: scheduleData.action,
         type: 'weekly',
-        days: (scheduleData.days || []).map((d: string) => dayNameToNumber(d)),
-        switches: (scheduleData.switches || []).map((id: string) => toSwitchRef(id)),
+        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string') : [],
+        switches: Array.isArray(scheduleData.switches) ? scheduleData.switches.filter((id): id is string => typeof id === 'string').map((id: string) => toSwitchRef(id)) : [],
         enabled: true,
         timeoutMinutes: scheduleData.timeoutMinutes ?? 0
       };
@@ -128,30 +125,25 @@ const Schedule: React.FC = () => {
           name: s.name,
           time: s.time,
           action: s.action,
-          days: (s.days || []).map((n: number) => dayNumberToName(n)),
-          switches: (s.switches || []).map(fromSwitchRef),
+          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+          switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
           enabled: s.enabled,
           timeoutMinutes: s.timeoutMinutes
         };
         setSchedules(prev => [...prev, newSchedule]);
-        toast({
-          title: "Schedule Added",
-          description: `${scheduleData.name} has been scheduled successfully`
-        });
+        toast({ title: 'Schedule Added', description: `${scheduleData.name} has been scheduled successfully` });
       }
-    } catch (error) {
-      console.error('Add schedule error:', error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || error.response?.data?.error || "Failed to add schedule",
-        variant: "destructive"
-      });
+    } catch (error: unknown) {
+      let message = 'Failed to add schedule';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+        const data = error.response.data as { message?: string; error?: string };
+        message = data.message || data.error || message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchSchedules = async () => {
@@ -163,26 +155,24 @@ const Schedule: React.FC = () => {
             name: s.name,
             time: s.time,
             action: s.action,
-            days: Array.isArray(s.days) ? s.days.map((n: number) => dayNumberToName(n)) : [],
-            switches: Array.isArray(s.switches) ? s.switches.map(fromSwitchRef) : [],
+            days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+            switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
             enabled: s.enabled,
             timeoutMinutes: s.timeoutMinutes
           }));
           setSchedules(mapped);
         } else {
-          toast({
-            title: "Error",
-            description: "Failed to fetch schedules",
-            variant: "destructive"
-          });
+          toast({ title: 'Error', description: 'Failed to fetch schedules', variant: 'destructive' });
         }
-      } catch (error) {
-        console.error('Schedule fetch error:', error);
-        toast({
-          title: "Error",
-          description: error.response?.data?.message || error.response?.data?.error || "Failed to fetch schedules",
-          variant: "destructive"
-        });
+      } catch (error: unknown) {
+        let message = 'Failed to fetch schedules';
+        if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+          const data = error.response.data as { message?: string; error?: string };
+          message = data.message || data.error || message;
+        } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          message = (error as { message: string }).message;
+        }
+        toast({ title: 'Error', description: message, variant: 'destructive' });
       }
     };
     fetchSchedules();
@@ -192,9 +182,15 @@ const Schedule: React.FC = () => {
     try {
       await scheduleAPI.runNow(scheduleId);
       toast({ title: 'Schedule Executed', description: 'Triggered immediately. Check device state.' });
-    } catch (error: any) {
-      console.error('Run-now error:', error);
-      toast({ title: 'Error', description: error.response?.data?.message || error.response?.data?.error || 'Failed to run schedule', variant: 'destructive' });
+    } catch (error: unknown) {
+      let message = 'Failed to run schedule';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+        const data = error.response.data as { message?: string; error?: string };
+        message = data.message || data.error || message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
@@ -207,22 +203,26 @@ const Schedule: React.FC = () => {
         setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, enabled: !target.enabled } : s));
         toast({ title: 'Schedule Updated', description: `${target.name} ${!target.enabled ? 'enabled' : 'disabled'}` });
       }
-    } catch (error: any) {
-      console.error('Toggle schedule error:', error);
-      toast({ title: 'Error', description: error.response?.data?.message || error.response?.data?.error || 'Failed to update schedule', variant: 'destructive' });
+    } catch (error: unknown) {
+      let message = 'Failed to update schedule';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object') {
+        const data = error.response.data as { message?: string; error?: string };
+        message = data.message || data.error || message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
 
   return (
     <>
-      {/* Top Bar / Toolbar */}
       <div className="flex items-center justify-between py-4 px-2 bg-background border-b mb-6">
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Add Schedule
         </Button>
       </div>
-      {/* Main Content */}
       <div className="space-y-6">
         {schedules.length === 0 ? (
           <div className="text-center py-12">
@@ -322,7 +322,6 @@ const Schedule: React.FC = () => {
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
-                      {/* Confirm Delete Schedule Dialog */}
                       <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
                         <DialogContent>
                           <DialogHeader>

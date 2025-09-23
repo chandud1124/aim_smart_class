@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useDevices } from '@/hooks/useDevices';
 import { useToast } from '@/hooks/use-toast';
 
-interface UserData {
+export interface UserData {
   name: string;
   email: string;
   role: 'super-admin' | 'dean' | 'admin' | 'faculty' | 'teacher' | 'student' | 'security' | 'guest';

@@ -76,8 +76,14 @@ export const Profile = () => {
         email: formData.email
       });
       toast.success('Profile updated successfully');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+    } catch (error: unknown) {
+      let message = 'Failed to update profile';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data && typeof error.response.data.message === 'string') {
+        message = error.response.data.message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast.error(message);
     } finally {
       setLoading(prev => ({ ...prev, profile: false }));
     }
@@ -111,8 +117,14 @@ export const Profile = () => {
         newPassword: '',
         confirmPassword: ''
       }));
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update password');
+    } catch (error: unknown) {
+      let message = 'Failed to update password';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data && typeof error.response.data.message === 'string') {
+        message = error.response.data.message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast.error(message);
     } finally {
       setLoading(prev => ({ ...prev, password: false }));
     }
@@ -124,8 +136,14 @@ export const Profile = () => {
       await updateProfile({ delete: true });
       toast.success('Account deleted successfully');
       // Handle logout and redirect
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete account');
+    } catch (error: unknown) {
+      let message = 'Failed to delete account';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data && typeof error.response.data.message === 'string') {
+        message = error.response.data.message;
+      } else if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+        message = (error as { message: string }).message;
+      }
+      toast.error(message);
     } finally {
       setLoading(prev => ({ ...prev, delete: false }));
       setShowDeleteDialog(false);

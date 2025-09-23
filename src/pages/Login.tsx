@@ -47,11 +47,15 @@ const Login: React.FC = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
+      let message = 'Login failed';
+      if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response && error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+        message = (error.response.data as { message?: string }).message || message;
+      }
       toast({
         title: "Error",
-        description: error.response?.data?.message || 'Login failed',
+        description: message,
         variant: "destructive",
       });
     } finally {

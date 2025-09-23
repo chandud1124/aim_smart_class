@@ -35,7 +35,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
   const totalSwitches = derivedTotal || externalTotal || 0;
   const activeSwitches = derivedActive || externalActive || 0;
   if (externalTotal !== undefined && externalTotal !== derivedTotal && process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
+     
     console.debug('[MasterSwitchCard] external vs derived mismatch', { externalTotal, derivedTotal, externalActive, derivedActive });
   }
   const { customSwitches, addCustomSwitch, toggleCustomSwitch, deleteCustomSwitch, toggleOnlineDevicesInCustomSwitch } = useCustomMasterSwitches();

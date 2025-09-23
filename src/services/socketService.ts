@@ -14,7 +14,7 @@ class SocketService {
     }
     const SOCKET_URL = derived;
     if (SOCKET_URL !== RAW_SOCKET_URL) {
-      // eslint-disable-next-line no-console
+       
       console.warn('[socket] Overriding outdated socket URL', RAW_SOCKET_URL, '->', SOCKET_URL);
     }
     // Connect to base namespace
@@ -35,9 +35,9 @@ class SocketService {
 
     // Quick version / debug info
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const pkg = require('socket.io-client/package.json');
-      // eslint-disable-next-line no-console
+       
       console.log(`[socket] client version ${pkg.version} connecting to ${SOCKET_URL}`);
     } catch {/* ignore */ }
 
@@ -46,7 +46,7 @@ class SocketService {
 
   private setupDefaultListeners() {
     this.socket?.on('connect', () => {
-      console.log('Socket connected (transport=' + (this.socket as any)?.io?.engine?.transport?.name + ')');
+  console.log('Socket connected (transport=' + (this.socket?.io?.engine?.transport?.name ?? 'unknown') + ')');
       this.emit('client_connected', { timestamp: new Date() });
       // Authenticate socket so backend can track online users
       try {
@@ -75,51 +75,55 @@ class SocketService {
     });
 
     this.socket?.on('connect_error', (err) => {
-      console.warn('[socket] connect_error', err.message, 'transport=', (this.socket as any)?.io?.engine?.transport?.name);
+  console.warn('[socket] connect_error', err.message, 'transport=', (this.socket?.io?.engine?.transport?.name ?? 'unknown'));
     });
 
     this.socket?.on('disconnect', (reason) => {
       console.log('Socket disconnected', reason);
     });
 
-    (this.socket?.io as any).on('reconnect_attempt', (attempt: number) => {
+    (this.socket?.io as { on?: (event: string, cb: (attempt: number) => void) => void })?.on?.('reconnect_attempt', (attempt: number) => {
       console.log('[socket] reconnect_attempt', attempt);
     });
 
-    this.socket?.on('close', (desc: any) => {
+    this.socket?.on('close', (desc: unknown) => {
       console.log('[socket] close event', desc);
     });
 
     this.socket?.on('error', (error) => {
-      console.error('Socket error:', error, 'transport=', (this.socket as any)?.io?.engine?.transport?.name);
+  console.error('Socket error:', error, 'transport=', (this.socket?.io?.engine?.transport?.name ?? 'unknown'));
     });
 
     // Auth feedback
     this.socket?.on('authenticated', () => {
       console.log('[socket] authenticated with server');
     });
-    this.socket?.on('auth_error', (err: any) => {
-      console.warn('[socket] auth_error', err?.message || err);
+    this.socket?.on('auth_error', (err: unknown) => {
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+        console.warn('[socket] auth_error', (err as { message: string }).message);
+      } else {
+        console.warn('[socket] auth_error', err);
+      }
     });
   }
 
   // Generic event listener
-  public on(event: string, callback: Function) {
+  public on<T = unknown>(event: string, callback: (data: T) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)?.add(callback);
-    this.socket?.on(event, callback as any);
+    this.socket?.on(event, callback);
   }
 
   // Remove event listener
-  public off(event: string, callback: Function) {
+  public off<T = unknown>(event: string, callback: (data: T) => void) {
     this.listeners.get(event)?.delete(callback);
-    this.socket?.off(event, callback as any);
+    this.socket?.off(event, callback);
   }
 
   // Emit event
-  public emit(event: string, data: any) {
+  public emit<T = unknown>(event: string, data: T) {
     this.socket?.emit(event, data);
   }
 
@@ -145,7 +149,7 @@ class SocketService {
   }
 
   // Send command to device
-  public sendDeviceCommand(deviceId: string, command: any) {
+  public sendDeviceCommand(deviceId: string, command: Record<string, unknown>) {
     this.emit('device_command', { deviceId, command });
   }
 
@@ -153,7 +157,7 @@ class SocketService {
   public disconnect() {
     this.listeners.forEach((callbacks, event) => {
       callbacks.forEach(callback => {
-        this.socket?.off(event, callback as any);
+        this.socket?.off(event, callback as (...args: unknown[]) => void);
       });
     });
     this.listeners.clear();

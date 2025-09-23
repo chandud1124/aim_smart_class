@@ -9,8 +9,9 @@ import { Loader2, Shield, Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
+import { User } from '@/types';
 interface LoginPageProps {
-  onLogin: (user: any, token: string) => void;
+  onLogin: (user: User, token: string) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
@@ -39,17 +40,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         title: "Login Successful",
         description: `Welcome back, ${user.name}!`
       });
-    } catch (error: any) {
-      const status = error?.response?.status;
-      const code = error?.response?.data?.error;
+    } catch (error: unknown) {
+      let status: number | undefined;
+      let code: string | undefined;
+      let message = 'Login failed';
+      if (error && typeof error === 'object') {
+        if ('response' in error && error.response && typeof error.response === 'object') {
+          const resp = error.response as { status?: number; data?: { error?: string; message?: string } };
+          status = resp.status;
+          code = resp.data?.error;
+          message = resp.data?.message || message;
+        } else if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          message = (error as { message: string }).message;
+        }
+      }
       if (status === 503 || code === 'DB_NOT_CONNECTED') {
         setError('Server is starting up (database unavailable). Please try again in a few seconds.');
       } else {
-        setError(error.response?.data?.message || 'Login failed');
+        setError(message);
       }
       toast({
         title: "Login Failed",
-        description: status === 503 || code === 'DB_NOT_CONNECTED' ? 'Backend database is not ready yet. Try again shortly.' : (error.response?.data?.message || 'Invalid credentials'),
+  description: status === 503 || code === 'DB_NOT_CONNECTED' ? 'Backend database is not ready yet. Try again shortly.' : message,
         variant: "destructive"
       });
     } finally {

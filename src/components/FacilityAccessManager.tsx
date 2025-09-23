@@ -97,13 +97,18 @@ export const FacilityAccessManager: React.FC = () => {
             console.log('Users response:', usersRes.data);
             console.log('Access response:', accessRes.data);
 
-            setFacilities(facilitiesRes.data.data.map((c: any) => c.classroom));
+            setFacilities(facilitiesRes.data.data.map((c: { classroom: string }) => c.classroom));
             setUsers(usersRes.data.data);
             setAccessRecords(accessRes.data.data || []);
             
             console.log('Data loaded successfully');
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || 'Failed to load data';
+        } catch (err: unknown) {
+            let errorMessage = 'Failed to load data';
+            if (err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data && typeof err.response.data.message === 'string') {
+                errorMessage = err.response.data.message;
+            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+                errorMessage = (err as { message: string }).message;
+            }
             console.error('Error loading data:', errorMessage);
             setError(errorMessage);
             setFacilities([]);
@@ -154,8 +159,13 @@ export const FacilityAccessManager: React.FC = () => {
             setTimeRestrictionEnabled(false);
             
             await loadData();
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || 'Failed to grant access';
+        } catch (err: unknown) {
+            let errorMessage = 'Failed to grant access';
+            if (err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data && typeof err.response.data.message === 'string') {
+                errorMessage = err.response.data.message;
+            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as any).message === 'string') {
+                errorMessage = (err as any).message;
+            }
             console.error('Error granting access:', errorMessage);
             setError(errorMessage);
         } finally {
@@ -171,8 +181,13 @@ export const FacilityAccessManager: React.FC = () => {
             await api.delete(`/api/facility/${accessId}`);
             setSuccess('Access revoked successfully');
             await loadData();
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || 'Failed to revoke access';
+        } catch (err: unknown) {
+            let errorMessage = 'Failed to revoke access';
+            if (err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data && typeof err.response.data.message === 'string') {
+                errorMessage = err.response.data.message;
+            } else if (err && typeof err === 'object' && 'message' in err && typeof (err as any).message === 'string') {
+                errorMessage = (err as any).message;
+            }
             console.error('Error revoking access:', errorMessage);
             setError(errorMessage);
         } finally {

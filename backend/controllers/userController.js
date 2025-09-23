@@ -37,7 +37,10 @@ const getAllUsers = async (req, res) => {
     let filter = {};
 
     // Apply role-based filtering
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'super-admin') {
+      // Super admin can see all users (no filter)
+      // No additional filter needed
+    } else if (req.user.role === 'admin') {
       // Admin can see all except super-admin
       filter.role = { $ne: 'super-admin' };
     } else if (req.user.role === 'faculty') {
@@ -244,17 +247,34 @@ const updateUser = async (req, res) => {
       }
     }
 
+
     // Get the user before updating to compare old vs new values
     const oldUser = await User.findById(req.params.id);
     if (!oldUser) return res.status(404).json({ message: 'User not found' });
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    ).select('-password -resetPasswordToken -resetPasswordExpire');
-
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    // If role is being changed, recalculate permissions
+    let user;
+    if (updateData.role && updateData.role !== oldUser.role) {
+      // Update the user first
+      user = await User.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      ).select('-password -resetPasswordToken -resetPasswordExpire');
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      // Recalculate permissions based on new role
+      const rolePermissions = require('../models/User');
+      user.role = updateData.role;
+      // This will trigger the pre-save hook to update permissions
+      await user.save();
+    } else {
+      user = await User.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      ).select('-password -resetPasswordToken -resetPasswordExpire');
+      if (!user) return res.status(404).json({ message: 'User not found' });
+    }
 
     // Emit real-time notification to the updated user if they're online
     if (req.app.get('io')) {
