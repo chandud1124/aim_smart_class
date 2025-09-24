@@ -6,13 +6,19 @@ const crypto = require('crypto');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { handleValidationErrors } = require('../middleware/validationHandler');
+const { body } = require('express-validator');
 const {
   getAllUsers,
   getUser,
   createUser,
   updateUser,
   deleteUser,
-  toggleUserStatus
+  toggleUserStatus,
+  bulkActivateUsers,
+  bulkDeactivateUsers,
+  bulkDeleteUsers,
+  bulkAssignRole
 } = require('../controllers/userController');
 
 // Configure multer for profile picture uploads
@@ -56,15 +62,21 @@ router.use(auth);
 
 // Self-service routes BEFORE parameterized ObjectId routes to avoid conflicts
 // PATCH /api/users/me/password - self-service password change (auth user)
-router.patch('/me/password', async (req, res) => {
+router.patch('/me/password', 
+  [
+    body('currentPassword')
+      .notEmpty()
+      .withMessage('Current password is required'),
+    body('newPassword')
+      .isLength({ min: 6 })
+      .withMessage('New password must be at least 6 characters long')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+      .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'currentPassword and newPassword required' });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'New password must be at least 6 characters' });
-    }
     const User = require('../models/User');
     const user = await User.findById(req.user.id).select('+password');
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -226,5 +238,18 @@ router.get('/online', authorize('admin', 'super-admin'), async (req, res) => {
     res.status(500).json({ message: 'Error fetching online users' });
   }
 });
+
+// Bulk operations routes
+// POST /api/users/bulk/activate - bulk activate users
+router.post('/bulk/activate', authorize('admin', 'super-admin'), bulkActivateUsers);
+
+// POST /api/users/bulk/deactivate - bulk deactivate users
+router.post('/bulk/deactivate', authorize('admin', 'super-admin'), bulkDeactivateUsers);
+
+// POST /api/users/bulk/delete - bulk delete users
+router.post('/bulk/delete', authorize('admin', 'super-admin'), bulkDeleteUsers);
+
+// POST /api/users/bulk/assign-role - bulk assign role to users
+router.post('/bulk/assign-role', authorize('admin', 'super-admin'), bulkAssignRole);
 
 module.exports = router;

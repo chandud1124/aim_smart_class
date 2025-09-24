@@ -106,7 +106,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       pirAutoOffDelay: initialData.pirAutoOffDelay || 30,
   switches: initialData.switches.map((sw: import('@/types').Switch) => ({
     id: sw.id,
-    relayGpio: sw.gpio ?? 0,
+    relayGpio: sw.gpio ?? sw.relayGpio ?? 0,
         name: sw.name,
         gpio: sw.relayGpio ?? sw.gpio ?? 0,
         type: sw.type || 'relay',
@@ -143,6 +143,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     id: sw.id,
           name: sw.name,
           gpio: sw.relayGpio ?? sw.gpio ?? 0,
+          relayGpio: sw.gpio ?? sw.relayGpio ?? 0,
           type: sw.type || 'relay',
           icon: sw.icon,
           state: !!sw.state,
@@ -164,6 +165,24 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     }
   }, [initialData, open]);
   useEffect(() => { form.setValue('location', `Block ${block} Floor ${floor}`); }, [block, floor]);
+
+  // Keep gpio and relayGpio synchronized for each switch
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+      if (name && name.includes('gpio') && !name.includes('manual') && !name.includes('pir') && type === 'change') {
+        const pathParts = name.split('.');
+        if (pathParts.length === 3 && pathParts[1] === 'switches') {
+          const switchIndex = parseInt(pathParts[2]);
+          const gpioValue = form.getValues(`switches.${switchIndex}.gpio`);
+          if (gpioValue !== undefined) {
+            form.setValue(`switches.${switchIndex}.relayGpio`, gpioValue, { shouldValidate: false });
+          }
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   // Secret reveal state
   const [secretPin, setSecretPin] = useState('');
   const [secretLoading, setSecretLoading] = useState(false);
@@ -203,17 +222,26 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     setSecretLoading(true); setSecretError(null); setCopied(false);
     try {
       const resp = await deviceAPI.getDeviceWithSecret(deviceId, secretPin || undefined);
-      const s = resp.data?.deviceSecret || resp.data?.data?.deviceSecret;
+      // Try multiple possible locations for the secret
+      const s = resp.data?.deviceSecret || resp.data?.data?.deviceSecret || resp.data?.data?.device?.deviceSecret;
       if (!s) {
-        setSecretError('Secret not returned');
+        console.error('Secret not found in response:', resp.data);
+        setSecretError('Secret not returned from server');
         return;
       }
       setSecretValue(s);
       setSecretVisible(true);
     } catch (e: unknown) {
-      let message = 'Failed';
-      if (e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string') {
-        message = (e as { message: string }).message;
+      let message = 'Failed to fetch secret';
+      if (e && typeof e === 'object' && 'response' in e) {
+        const error = e as { response?: { status?: number; data?: unknown } };
+        if (error.response?.status === 403) {
+          message = 'Access denied - admin privileges required or invalid PIN';
+        } else if (error.response?.status === 404) {
+          message = 'Device not found';
+        } else if (error.response?.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
+          message = String((error.response.data as { message: unknown }).message);
+        }
       }
       setSecretError(message);
     } finally { setSecretLoading(false); }
@@ -236,8 +264,8 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
       id: typeof sw.id === 'string' && sw.id.length > 0 ? sw.id : `switch-${Date.now()}-${Math.floor(Math.random()*10000)}`,
       name: sw.name || 'Unnamed Switch',
       type: sw.type || 'relay',
-      gpio: sw.gpio ?? 0,
-      relayGpio: sw.relayGpio ?? sw.gpio ?? 0,
+      gpio: sw.gpio ?? sw.relayGpio ?? 0,
+      relayGpio: sw.gpio ?? sw.relayGpio ?? 0,
       state: sw.state ?? false,
       manualSwitchEnabled: sw.manualSwitchEnabled ?? false,
       manualSwitchGpio: sw.manualSwitchGpio,
@@ -291,7 +319,7 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
                 <p className="text-xs text-muted-foreground">Enter admin PIN to generate/reveal the device secret. Keep it confidential.</p>
                 <div className="flex items-center gap-2">
                   <Input placeholder="PIN" type="password" value={secretPin} onChange={e => setSecretPin(e.target.value)} className="max-w-[140px]" />
-                  <Button type="button" variant="outline" size="sm" disabled={secretLoading || !secretPin} onClick={fetchSecret}>{secretLoading ? 'Loading...' : (secretValue ? 'Regenerate' : 'Reveal')}</Button>
+                  <Button type="button" variant="outline" size="sm" disabled={secretLoading} onClick={fetchSecret}>{secretLoading ? 'Loading...' : (secretValue ? 'Regenerate' : 'Reveal')}</Button>
                   {secretValue && (
                     <Button type="button" variant="outline" size="icon" onClick={() => setSecretVisible(v => !v)}>
                       {secretVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

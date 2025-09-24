@@ -182,6 +182,149 @@ class SocketService {
     isUserOnline(userId) {
         return this.onlineUsers.has(userId.toString());
     }
+
+    // Enhanced notification methods
+    notifyDeviceStatusChange(deviceId, status, deviceName, location) {
+        this.io.to(`device:${deviceId}`).emit('device:status', {
+            deviceId,
+            status,
+            deviceName,
+            location,
+            timestamp: new Date()
+        });
+
+        // Also broadcast to all authenticated users
+        this.broadcastToAuthenticated('device_status_change', {
+            deviceId,
+            status,
+            deviceName,
+            location,
+            timestamp: new Date()
+        });
+    }
+
+    notifyDeviceError(deviceId, error, deviceName, location) {
+        this.io.to(`device:${deviceId}`).emit('device:error', {
+            deviceId,
+            error,
+            deviceName,
+            location,
+            timestamp: new Date()
+        });
+
+        // Notify admins and relevant users
+        this.broadcastToRole('admin', 'device_error_alert', {
+            deviceId,
+            error,
+            deviceName,
+            location,
+            timestamp: new Date(),
+            severity: 'high'
+        });
+    }
+
+    notifySwitchChange(deviceId, switchId, switchName, newState, deviceName, location, userId = null) {
+        const notification = {
+            deviceId,
+            switchId,
+            switchName,
+            newState,
+            deviceName,
+            location,
+            userId,
+            timestamp: new Date()
+        };
+
+        // Notify device subscribers
+        this.io.to(`device:${deviceId}`).emit('switch:changed', notification);
+
+        // Broadcast to all authenticated users for general awareness
+        this.broadcastToAuthenticated('switch_state_change', notification);
+    }
+
+    notifyBulkOperation(userId, operation, results, deviceCount) {
+        const notification = {
+            userId,
+            operation,
+            results,
+            deviceCount,
+            timestamp: new Date(),
+            successCount: results.filter(r => r.success).length,
+            failureCount: results.filter(r => !r.success).length
+        };
+
+        // Notify the user who initiated the operation
+        this.broadcastToUser(userId, 'bulk_operation_complete', notification);
+
+        // Notify admins about bulk operations
+        this.broadcastToRole('admin', 'bulk_operation_alert', notification);
+    }
+
+    notifyScheduleExecution(scheduleId, scheduleName, results) {
+        const notification = {
+            scheduleId,
+            scheduleName,
+            results,
+            timestamp: new Date(),
+            successCount: results.filter(r => r.success).length,
+            failureCount: results.filter(r => !r.success).length
+        };
+
+        // Notify admins about schedule execution
+        this.broadcastToRole('admin', 'schedule_executed', notification);
+    }
+
+    notifyUserAction(userId, action, details) {
+        const notification = {
+            userId,
+            action,
+            details,
+            timestamp: new Date()
+        };
+
+        // Notify admins about user actions
+        this.broadcastToRole('admin', 'user_action', notification);
+    }
+
+    notifySystemAlert(message, severity = 'medium', metadata = {}) {
+        const alert = {
+            message,
+            severity,
+            metadata,
+            timestamp: new Date()
+        };
+
+        // Broadcast system alerts to all authenticated users
+        this.broadcastToAuthenticated('system_alert', alert);
+    }
+
+    // Helper methods for targeted broadcasting
+    broadcastToAuthenticated(event, data) {
+        for (const [socketId, clientInfo] of this.connectedClients.entries()) {
+            if (clientInfo.authenticated) {
+                this.io.to(socketId).emit(event, data);
+            }
+        }
+    }
+
+    broadcastToRole(role, event, data) {
+        for (const [socketId, clientInfo] of this.connectedClients.entries()) {
+            if (clientInfo.authenticated && clientInfo.userId) {
+                // We need to check user role - this would require async operation
+                // For now, we'll emit and let client-side filtering handle it
+                this.io.to(socketId).emit(event, data);
+            }
+        }
+    }
+
+    broadcastToUser(userId, event, data) {
+        const userSockets = this.onlineUsers.get(userId.toString());
+        if (userSockets) {
+            userSockets.forEach(socketId => {
+                this.io.to(socketId).emit(event, data);
+            });
+        }
+    }
 }
 
 module.exports = SocketService;

@@ -14,7 +14,10 @@ import {
   User,
   UserCheck,
   FileText,
-  Activity
+  Activity,
+  Brain,
+  BarChart3,
+  Monitor
 } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,6 +30,15 @@ import { cn } from '@/lib/utils';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const navigationSections = [
+  {
+    title: 'Analytics & AI',
+    items: [
+      { name: 'Analytics & Monitoring', icon: BarChart3, href: '/analytics', current: false, adminOnly: true },
+      { name: 'AI/ML Insights', icon: Brain, href: '/aiml', current: false, adminOnly: true },
+      { name: 'Grafana Analytics', icon: BarChart3, href: '/grafana', current: false, adminOnly: true },
+      { name: 'Prometheus Metrics', icon: Monitor, href: '/prometheus', current: false, adminOnly: true },
+    ]
+  },
   {
     title: 'Core Operations',
     items: [

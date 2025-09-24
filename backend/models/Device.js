@@ -204,6 +204,10 @@ const deviceSchema = new mongoose.Schema({
 deviceSchema.index({ macAddress: 1 }, { unique: true });
 deviceSchema.index({ ipAddress: 1 }, { unique: true });
 deviceSchema.index({ assignedUsers: 1 });
+deviceSchema.index({ classroom: 1 }); // Index for classroom-based queries
+deviceSchema.index({ status: 1 }); // Index for status filtering
+deviceSchema.index({ location: 1 }); // Index for location-based queries
+deviceSchema.index({ lastSeen: -1 }); // Index for recent device queries
 
 // Pre-save middleware to ensure switches have unique names
 deviceSchema.pre('save', function(next) {

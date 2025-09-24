@@ -3,6 +3,8 @@ const express = require('express');
 const { auth, authorize } = require('../middleware/auth');
 const Schedule = require('../models/Schedule');
 const scheduleService = require('../services/scheduleService');
+const { handleValidationErrors } = require('../middleware/validationHandler');
+const { body, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -23,7 +25,48 @@ router.get('/', async (req, res) => {
 });
 
 // Create schedule
-router.post('/', authorize('admin', 'faculty'), async (req, res) => {
+router.post('/', 
+  authorize('admin', 'faculty'),
+  [
+    body('name')
+      .trim()
+      .notEmpty()
+      .withMessage('Schedule name is required')
+      .isLength({ max: 100 })
+      .withMessage('Schedule name must be less than 100 characters'),
+    body('time')
+      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+      .withMessage('Valid time format required (HH:MM)'),
+    body('action')
+      .isIn(['on', 'off'])
+      .withMessage('Action must be either "on" or "off"'),
+    body('type')
+      .isIn(['once', 'daily', 'weekly'])
+      .withMessage('Invalid schedule type'),
+    body('days')
+      .optional()
+      .isArray()
+      .withMessage('Days must be an array'),
+    body('days.*')
+      .optional()
+      .isInt({ min: 0, max: 6 })
+      .withMessage('Day must be a number between 0 and 6 (0=Sunday, 6=Saturday)'),
+    body('switches')
+      .isArray({ min: 1 })
+      .withMessage('At least one switch is required'),
+    body('switches.*.deviceId')
+      .isMongoId()
+      .withMessage('Valid device ID is required'),
+    body('switches.*.switchId')
+      .isString()
+      .withMessage('Switch ID must be a string'),
+    body('timeoutMinutes')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Timeout minutes must be a non-negative integer')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const schedule = await Schedule.create({
       ...req.body,
@@ -39,7 +82,58 @@ router.post('/', authorize('admin', 'faculty'), async (req, res) => {
 });
 
 // Update schedule
-router.put('/:id', authorize('admin', 'faculty'), async (req, res) => {
+router.put('/:id', 
+  authorize('admin', 'faculty'),
+  [
+    param('id')
+      .isMongoId()
+      .withMessage('Valid schedule ID is required'),
+    body('name')
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage('Schedule name cannot be empty')
+      .isLength({ max: 100 })
+      .withMessage('Schedule name must be less than 100 characters'),
+    body('time')
+      .optional()
+      .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+      .withMessage('Valid time format required (HH:MM)'),
+    body('action')
+      .optional()
+      .isIn(['on', 'off'])
+      .withMessage('Action must be either "on" or "off"'),
+    body('type')
+      .optional()
+      .isIn(['once', 'daily', 'weekly'])
+      .withMessage('Invalid schedule type'),
+    body('days')
+      .optional()
+      .isArray()
+      .withMessage('Days must be an array'),
+    body('days.*')
+      .optional()
+      .isInt({ min: 0, max: 6 })
+      .withMessage('Day must be a number between 0 and 6 (0=Sunday, 6=Saturday)'),
+    body('switches')
+      .optional()
+      .isArray({ min: 1 })
+      .withMessage('At least one switch is required'),
+    body('switches.*.deviceId')
+      .optional()
+      .isMongoId()
+      .withMessage('Valid device ID is required'),
+    body('switches.*.switchId')
+      .optional()
+      .isString()
+      .withMessage('Switch ID must be a string'),
+    body('timeoutMinutes')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Timeout minutes must be a non-negative integer')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const schedule = await Schedule.findByIdAndUpdate(
       req.params.id,
@@ -60,7 +154,15 @@ router.put('/:id', authorize('admin', 'faculty'), async (req, res) => {
 });
 
 // Toggle schedule enabled flag (frontend calls this route)
-router.put('/:id/toggle', authorize('admin', 'faculty'), async (req, res) => {
+router.put('/:id/toggle', 
+  authorize('admin', 'faculty'),
+  [
+    param('id')
+      .isMongoId()
+      .withMessage('Valid schedule ID is required')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const schedule = await Schedule.findById(req.params.id);
     if (!schedule) {
@@ -80,7 +182,15 @@ router.put('/:id/toggle', authorize('admin', 'faculty'), async (req, res) => {
 });
 
 // Run schedule immediately (for testing/debugging)
-router.post('/:id/run', authorize('admin', 'faculty'), async (req, res) => {
+router.post('/:id/run', 
+  authorize('admin', 'faculty'),
+  [
+    param('id')
+      .isMongoId()
+      .withMessage('Valid schedule ID is required')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const schedule = await Schedule.findById(req.params.id);
     if (!schedule) {
@@ -94,7 +204,15 @@ router.post('/:id/run', authorize('admin', 'faculty'), async (req, res) => {
 });
 
 // Delete schedule
-router.delete('/:id', authorize('admin', 'faculty'), async (req, res) => {
+router.delete('/:id', 
+  authorize('admin', 'faculty'),
+  [
+    param('id')
+      .isMongoId()
+      .withMessage('Valid schedule ID is required')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const schedule = await Schedule.findByIdAndDelete(req.params.id);
     

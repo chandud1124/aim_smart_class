@@ -1,5 +1,11 @@
 
-import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity, BarChart3, Server, Settings2 } from "lucide-react";
+
+import AnalyticsPage from "./pages/AnalyticsPage";
+import AIMLPage from "./pages/AIMLPage";
+import GrafanaPage from "./pages/GrafanaPage";
+import PrometheusPage from "./pages/PrometheusPage";
+
+import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity, BarChart3, Server, Settings2, Brain, Monitor } from "lucide-react";
 import Index from "./pages/Index";
 import Devices from "./pages/Devices";
 import Switches from "./pages/Switches";
@@ -21,6 +27,30 @@ import SecurityDashboardPage from "./pages/SecurityDashboardPage";
 import SystemHealthPage from "./pages/SystemHealthPage";
 
 export const navItems = [
+  {
+    title: "Analytics & Monitoring",
+    to: "/analytics",
+    icon: <BarChart3 className="h-4 w-4" />,
+    page: <AnalyticsPage />,
+  },
+  {
+    title: "AI/ML Insights",
+    to: "/aiml",
+    icon: <Brain className="h-4 w-4" />,
+    page: <AIMLPage />,
+  },
+  {
+    title: "Grafana Analytics",
+    to: "/grafana",
+    icon: <BarChart3 className="h-4 w-4" />,
+    page: <GrafanaPage />,
+  },
+  {
+    title: "Prometheus Metrics",
+    to: "/prometheus",
+    icon: <Monitor className="h-4 w-4" />,
+    page: <PrometheusPage />,
+  },
   // Core Operations
   {
     title: "Power Dashboard",

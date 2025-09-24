@@ -4,9 +4,42 @@ const { auth, authorize } = require('../middleware/auth');
 const BulkOperations = require('../utils/bulkOperations');
 const { logger } = require('../middleware/logger');
 const Device = require('../models/Device');
+const { handleValidationErrors } = require('../middleware/validationHandler');
+const { body } = require('express-validator');
 
 // Bulk create devices
-router.post('/devices', auth, authorize('admin', 'super-admin'), async (req, res) => {
+router.post('/devices', 
+  auth, 
+  authorize('admin', 'super-admin'),
+  [
+    body('devices')
+      .isArray({ min: 1 })
+      .withMessage('Devices must be a non-empty array'),
+    body('devices.*.name')
+      .trim()
+      .notEmpty()
+      .withMessage('Device name is required')
+      .isLength({ max: 100 })
+      .withMessage('Device name must be less than 100 characters'),
+    body('devices.*.macAddress')
+      .trim()
+      .notEmpty()
+      .withMessage('MAC address is required')
+      .matches(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)
+      .withMessage('Invalid MAC address format'),
+    body('devices.*.ipAddress')
+      .trim()
+      .notEmpty()
+      .withMessage('IP address is required')
+      .matches(/^(\d{1,3}\.){3}\d{1,3}$/)
+      .withMessage('Invalid IP address format'),
+    body('devices.*.location')
+      .trim()
+      .notEmpty()
+      .withMessage('Location is required')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
     try {
         const results = await BulkOperations.bulkCreateDevices(req.body.devices, req.user.id);
         res.json({
@@ -23,15 +56,23 @@ router.post('/devices', auth, authorize('admin', 'super-admin'), async (req, res
 });
 
 // Bulk toggle switches
-router.post('/toggle', auth, async (req, res) => {
+router.post('/toggle', 
+  auth,
+  [
+    body('devices')
+      .isArray({ min: 1 })
+      .withMessage('Devices must be a non-empty array'),
+    body('switchId')
+      .isInt({ min: 0 })
+      .withMessage('Switch ID must be a non-negative integer'),
+    body('state')
+      .isBoolean()
+      .withMessage('State must be a boolean value')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
     try {
         const { devices, switchId, state } = req.body;
-        if (!Array.isArray(devices) || !switchId) {
-            return res.status(400).json({
-                error: 'Invalid request',
-                message: 'devices must be an array and switchId is required'
-            });
-        }
 
         const results = await BulkOperations.bulkToggleSwitches(devices, switchId, state, req);
 
@@ -60,7 +101,22 @@ router.post('/toggle', auth, async (req, res) => {
 });
 
 // Bulk update devices
-router.put('/devices', auth, authorize('admin', 'super-admin'), async (req, res) => {
+router.put('/devices', 
+  auth, 
+  authorize('admin', 'super-admin'),
+  [
+    body('updates')
+      .isArray({ min: 1 })
+      .withMessage('Updates must be a non-empty array'),
+    body('updates.*.deviceId')
+      .isMongoId()
+      .withMessage('Valid device ID is required'),
+    body('updates.*.updates')
+      .isObject()
+      .withMessage('Updates must be an object')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
     try {
         const results = await BulkOperations.bulkUpdateDevices(req.body.updates);
         res.json({

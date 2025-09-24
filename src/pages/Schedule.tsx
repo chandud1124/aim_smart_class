@@ -71,7 +71,7 @@ const Schedule: React.FC = () => {
         time: scheduleData.time,
         action: scheduleData.action,
         type: (scheduleData as any).type || 'weekly',
-        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string') : [],
+        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string').map(dayNameToNumber) : [],
         switches: Array.isArray(scheduleData.switches) ? scheduleData.switches.filter((id): id is string => typeof id === 'string').map((id: string) => toSwitchRef(id)) : [],
         enabled: true,
         timeoutMinutes: scheduleData.timeoutMinutes ?? 0
@@ -84,7 +84,7 @@ const Schedule: React.FC = () => {
           name: s.name,
           time: s.time,
           action: s.action,
-          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is number => typeof d === 'number').map(dayNumberToName) : [],
           switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
           enabled: s.enabled,
           timeoutMinutes: s.timeoutMinutes
@@ -112,7 +112,7 @@ const Schedule: React.FC = () => {
         time: scheduleData.time,
         action: scheduleData.action,
         type: 'weekly',
-        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string') : [],
+        days: Array.isArray(scheduleData.days) ? scheduleData.days.filter((d): d is string => typeof d === 'string').map(dayNameToNumber) : [],
         switches: Array.isArray(scheduleData.switches) ? scheduleData.switches.filter((id): id is string => typeof id === 'string').map((id: string) => toSwitchRef(id)) : [],
         enabled: true,
         timeoutMinutes: scheduleData.timeoutMinutes ?? 0
@@ -125,7 +125,7 @@ const Schedule: React.FC = () => {
           name: s.name,
           time: s.time,
           action: s.action,
-          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+          days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is number => typeof d === 'number').map(dayNumberToName) : [],
           switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
           enabled: s.enabled,
           timeoutMinutes: s.timeoutMinutes
@@ -155,7 +155,7 @@ const Schedule: React.FC = () => {
             name: s.name,
             time: s.time,
             action: s.action,
-            days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is string => typeof d === 'string') : [],
+            days: Array.isArray(s.days) ? s.days.filter((d: unknown): d is number => typeof d === 'number').map(dayNumberToName) : [],
             switches: Array.isArray(s.switches) ? s.switches.filter((ref: unknown): ref is SwitchRef => typeof ref === 'object' && ref !== null && 'deviceId' in ref && 'switchId' in ref).map(fromSwitchRef) : [],
             enabled: s.enabled,
             timeoutMinutes: s.timeoutMinutes

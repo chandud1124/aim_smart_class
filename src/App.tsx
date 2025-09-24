@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,12 +37,34 @@ const ActivityStatisticsPage = lazy(() => import("./pages/ActivityStatisticsPage
 const BulkOperationsPage = lazy(() => import("./pages/BulkOperationsPage"));
 const SecurityDashboardPage = lazy(() => import("./pages/SecurityDashboardPage"));
 const SystemHealthPage = lazy(() => import("./pages/SystemHealthPage"));
+const AIMLPage = lazy(() => import("./pages/AIMLPage"));
+const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
+const GrafanaPage = lazy(() => import("./pages/GrafanaPage"));
+const PrometheusPage = lazy(() => import("./pages/PrometheusPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors
+        if (error && typeof error === 'object' && 'status' in error) {
+          const status = (error as any).status;
+          if (status >= 400 && status < 500) {
+            return false;
+          }
+        }
+        return failureCount < 3;
+      },
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+      onError: (error) => {
+        console.error('Mutation error:', error);
+      },
     },
   },
 });
@@ -103,6 +124,10 @@ const App = () => {
                     <Route path="security" element={<SecurityDashboardPage />} />
                     <Route path="system-health" element={<SystemHealthPage />} />
                     <Route path="tickets" element={<Tickets />} />
+                    <Route path="aiml" element={<AIMLPage />} />
+                    <Route path="analytics" element={<AnalyticsPage />} />
+                    <Route path="grafana" element={<GrafanaPage />} />
+                    <Route path="prometheus" element={<PrometheusPage />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />

@@ -1,6 +1,10 @@
 const Device = require('../models/Device');
+const PowerConsumptionLog = require('../models/PowerConsumptionLog');
 const EnhancedLoggingService = require('./enhancedLoggingService');
 const DeviceStatusLog = require('../models/DeviceStatusLog');
+
+// Import power calculation functions from metricsService
+const { getBasePowerConsumption, calculateDevicePowerConsumption } = require('../metricsService');
 
 class DeviceMonitoringService {
   constructor() {
@@ -42,15 +46,18 @@ class DeviceMonitoringService {
   async performMonitoringCheck() {
     try {
       console.log('[MONITORING] Starting scheduled device status check...');
-      
+
       const devices = await Device.find({}).sort({ name: 1 });
-      
+
       for (const device of devices) {
         await this.checkDeviceStatus(device);
         // Small delay between devices to prevent overwhelming
         await this.sleep(1000);
       }
-      
+
+      // Store power consumption data by device and classroom
+      await this.storePowerConsumptionData(devices);
+
       console.log(`[MONITORING] Completed status check for ${devices.length} devices`);
     } catch (error) {
       console.error('[MONITORING-ERROR]', error);
@@ -130,8 +137,8 @@ class DeviceMonitoringService {
           const totalToday = Math.floor(Math.random() * 480); // 0-8 hours
           const totalWeek = totalToday * 7 + Math.floor(Math.random() * 1000);
           
-          // Calculate power consumption (simulated)
-          const basePower = this.getBasePowerConsumption(switchData.name);
+          // Calculate power consumption using improved function
+          const basePower = getBasePowerConsumption(switchData.name, switchData.type);
           const currentPower = currentState === 'on' ? basePower : 0;
           const totalTodayPower = (totalToday / 60) * basePower;
           const totalWeekPower = (totalWeek / 60) * basePower;
@@ -293,21 +300,96 @@ class DeviceMonitoringService {
     };
   }
 
-  // Get base power consumption for different devices
-  getBasePowerConsumption(deviceName) {
-    // Convert name to lowercase for better matching
-    const name = deviceName.toLowerCase();
-    
-    if (name.includes('fan')) return 75;
-    if (name.includes('light')) return 20;
-    if (name.includes('projector')) return 250;
-    if (name.includes('ac') || name.includes('air')) return 1200;
-    if (name.includes('speaker')) return 30;
-    if (name.includes('whiteboard') || name.includes('board')) return 100;
-    if (name.includes('outlet')) return 100;
-    
-    // Default power consumption
-    return 50;
+  // Store power consumption data by device and classroom
+  async storePowerConsumptionData(devices) {
+    try {
+      const powerData = {
+        timestamp: new Date(),
+        totalConsumption: 0,
+        byDevice: {},
+        byClassroom: {},
+        byDeviceType: {}
+      };
+
+      // Calculate power consumption for each device
+      devices.forEach(device => {
+        const devicePower = calculateDevicePowerConsumption(device);
+        const classroom = device.classroom || 'unassigned';
+        const deviceType = device.switches.length > 0 ? device.switches[0].type : 'unknown';
+
+        // Store by device
+        powerData.byDevice[device._id.toString()] = {
+          deviceId: device._id.toString(),
+          deviceName: device.name,
+          classroom: classroom,
+          powerConsumption: devicePower,
+          switches: device.switches.length,
+          activeSwitches: device.switches.filter(sw => sw.state).length,
+          status: device.status
+        };
+
+        // Aggregate by classroom
+        if (!powerData.byClassroom[classroom]) {
+          powerData.byClassroom[classroom] = {
+            classroom: classroom,
+            totalPower: 0,
+            deviceCount: 0,
+            onlineDevices: 0,
+            activeDevices: 0,
+            devices: []
+          };
+        }
+
+        powerData.byClassroom[classroom].totalPower += devicePower;
+        powerData.byClassroom[classroom].deviceCount += 1;
+        powerData.byClassroom[classroom].devices.push(device._id.toString());
+
+        if (device.status === 'online') {
+          powerData.byClassroom[classroom].onlineDevices += 1;
+        }
+
+        if (devicePower > 0) {
+          powerData.byClassroom[classroom].activeDevices += 1;
+        }
+
+        // Aggregate by device type
+        if (!powerData.byDeviceType[deviceType]) {
+          powerData.byDeviceType[deviceType] = {
+            type: deviceType,
+            totalPower: 0,
+            deviceCount: 0,
+            activeDevices: 0
+          };
+        }
+
+        powerData.byDeviceType[deviceType].totalPower += devicePower;
+        powerData.byDeviceType[deviceType].deviceCount += 1;
+        if (devicePower > 0) {
+          powerData.byDeviceType[deviceType].activeDevices += 1;
+        }
+
+        // Add to total consumption
+        powerData.totalConsumption += devicePower;
+      });
+
+      // Store in database using PowerConsumptionLog model
+      const powerLog = new PowerConsumptionLog({
+        timestamp: powerData.timestamp,
+        totalConsumption: powerData.totalConsumption,
+        byDevice: powerData.byDevice,
+        byClassroom: powerData.byClassroom,
+        byDeviceType: powerData.byDeviceType
+      });
+
+      await powerLog.save();
+
+      console.log(`[POWER-MONITORING] Stored power consumption data: ${powerData.totalConsumption}W total`);
+
+      return powerData;
+    } catch (error) {
+      console.error('[POWER-MONITORING] Error storing power consumption data:', error);
+      return null;
+    }
   }
 
   // Get due monitoring checks

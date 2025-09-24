@@ -4,6 +4,8 @@ const { auth, authorize } = require('../middleware/auth');
 const Device = require('../models/Device');
 const ActivityLog = require('../models/ActivityLog');
 const { logger } = require('../middleware/logger');
+const { handleValidationErrors } = require('../middleware/validationHandler');
+const { body } = require('express-validator');
 
 // Get system status
 router.get('/status', auth, authorize('admin', 'super-admin'), async (req, res) => {
@@ -94,7 +96,32 @@ router.get('/activities/summary', auth, async (req, res) => {
 });
 
 // Validate device configuration
-router.post('/validate/device', auth, async (req, res) => {
+router.post('/validate/device', 
+  auth,
+  [
+    body('macAddress')
+      .trim()
+      .notEmpty()
+      .withMessage('MAC address is required')
+      .matches(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)
+      .withMessage('Invalid MAC address format'),
+    body('switches')
+      .isArray()
+      .withMessage('Switches must be an array')
+      .custom(switches => {
+        switches.forEach((sw, index) => {
+          if (typeof sw.gpio !== 'number' || sw.gpio < 0 || sw.gpio > 39) {
+            throw new Error(`Switch ${index + 1} has invalid GPIO pin`);
+          }
+          if ([6, 7, 8, 9, 10, 11].includes(sw.gpio)) {
+            throw new Error(`Switch ${index + 1} uses reserved GPIO pin`);
+          }
+        });
+        return true;
+      })
+  ],
+  handleValidationErrors,
+  async (req, res) => {
     try {
         const { macAddress, switches } = req.body;
         const validationResults = {

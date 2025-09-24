@@ -11,7 +11,7 @@ const checkDevicePermission = (requiredPermission) => {
             const userId = req.user._id;
             
             // Admin bypass
-            if (req.user.role === 'admin') {
+            if (req.user.role === 'admin' || req.user.role === 'super-admin') {
                 return next();
             }
             

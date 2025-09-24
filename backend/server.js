@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 const { logger } = require('./middleware/logger');
 const routeMonitor = require('./middleware/routeMonitor');
+const { auth } = require('./middleware/auth');
 
 // Load secure configuration if available
 let secureConfig = {};
@@ -101,6 +102,7 @@ crashMonitor.start();
 let dbConnected = false;
 const connectDB = async (retries = 5) => {
   const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation';
+  console.log('Connecting to MongoDB:', primaryUri);
   const fallbackUri = process.env.MONGODB_URI_FALLBACK || process.env.MONGODB_URI_DIRECT; // optional
   const opts = {
     useNewUrlParser: true,
@@ -470,6 +472,7 @@ apiRouter.use('/activities', apiLimiter, activityRoutes);
 apiRouter.use('/activity-logs', apiLimiter, activityLogRoutes);
 apiRouter.use('/logs', apiLimiter, enhancedLogRoutes);
 apiRouter.use('/security', apiLimiter, securityRoutes);
+apiRouter.use('/analytics', apiLimiter, require('./routes/analytics'));
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
 apiRouter.use('/facility', apiLimiter, require('./routes/classroom'));
@@ -917,6 +920,17 @@ wss.on('connection', (ws) => {
           io.emit('device_toggle_blocked', { deviceId: device.id, switchGpio: gpio, reason, requestedState: requested, actualState: actual, timestamp: Date.now() });
           // Emit dedicated switch_result event for precise UI reconciliation (failure)
           io.emit('switch_result', { deviceId: device.id, gpio, requestedState: requested, actualState: actual, success: false, reason, ts: Date.now() });
+
+          // Enhanced notification for switch failure
+          const socketService = require('./services/socketService');
+          if (socketService && typeof socketService.notifyDeviceError === 'function') {
+            socketService.notifyDeviceError(
+              device._id,
+              `Switch toggle failed: ${reason}`,
+              device.name,
+              device.location
+            );
+          }
           return;
         }
         // Success path: if backend DB state mismatches actual, reconcile and broadcast
@@ -928,6 +942,21 @@ wss.on('connection', (ws) => {
         }
         // Always emit switch_result for UI even if no DB change (authoritative confirmation)
         io.emit('switch_result', { deviceId: device.id, gpio, requestedState: requested, actualState: actual !== undefined ? actual : (target ? target.state : undefined), success: true, ts: Date.now() });
+
+        // Enhanced notification for successful switch change
+        if (target && actual !== undefined) {
+          const socketService = require('./services/socketService');
+          if (socketService && typeof socketService.notifySwitchChange === 'function') {
+            socketService.notifySwitchChange(
+              device._id,
+              target._id.toString(),
+              target.name,
+              actual,
+              device.name,
+              device.location
+            );
+          }
+        }
       } catch (e) {
         logger.error('[switch_result handling] error', e.message);
       }
@@ -979,8 +1008,8 @@ wss.on('connection', (ws) => {
           switchName: targetSwitch.name,
           physicalPin: physicalPin,
           action: action,
-          previousState: previousState,
-          newState: newState,
+          previousState: previousState ? 'on' : 'off',
+          newState: newState ? 'on' : 'off',
           detectedBy: detectedBy,
           timestamp: new Date(timestamp),
           macAddress: ws.mac
@@ -1076,6 +1105,53 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+  });
+});
+
+// Global error handling middleware
+app.use((error, req, res, next) => {
+  // Log the error
+  logger.error('Global error handler:', {
+    error: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    user: req.user ? req.user.id : 'unauthenticated'
+  });
+
+  // Don't leak error details in production
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  
+  // Handle different types of errors
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: isDevelopment ? error.message : 'Invalid input data',
+      details: isDevelopment ? error.errors : undefined
+    });
+  }
+
+  if (error.name === 'CastError') {
+    return res.status(400).json({
+      error: 'Invalid ID',
+      message: isDevelopment ? error.message : 'Invalid resource ID'
+    });
+  }
+
+  if (error.code === 11000) {
+    return res.status(409).json({
+      error: 'Duplicate Entry',
+      message: 'Resource already exists'
+    });
+  }
+
+  // Default error response
+  res.status(error.status || 500).json({
+    error: 'Internal Server Error',
+    message: isDevelopment ? error.message : 'Something went wrong',
+    ...(isDevelopment && { stack: error.stack })
   });
 });
 

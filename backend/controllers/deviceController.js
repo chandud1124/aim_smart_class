@@ -17,43 +17,49 @@ const ActivityLog = require('../models/ActivityLog');
 const SecurityAlert = require('../models/SecurityAlert');
 // Access io via req.app.get('io') where needed instead of legacy socketService
 
+// Helper function to build device access query based on user permissions
+function buildDeviceAccessQuery(user) {
+  if (user.role === 'admin' || user.role === 'super-admin') {
+    return {}; // Admin can access all devices
+  }
+
+  const accessConditions = [];
+
+  // Direct device assignments
+  if (user.assignedDevices && user.assignedDevices.length > 0) {
+    accessConditions.push({ _id: { $in: user.assignedDevices } });
+  }
+
+  // Classroom-based access
+  if (user.assignedRooms && user.assignedRooms.length > 0) {
+    accessConditions.push({ classroom: { $in: user.assignedRooms } });
+  }
+
+  // Department-based access for management and faculty roles
+  if ((user.role === 'principal' || user.role === 'dean' || user.role === 'hod' || user.role === 'faculty') && user.department) {
+    accessConditions.push({
+      classroom: { $regex: `^${user.department}-`, $options: 'i' }
+    });
+  }
+
+  if (accessConditions.length === 0) {
+    return null; // No access to any devices
+  }
+
+  return { $or: accessConditions };
+}
+
 const getAllDevices = async (req, res) => {
   try {
-    let query = {};
-
-  if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
-      // Build complex query for device access
-      const accessConditions = [];
-
-      // Direct device assignments
-      if (req.user.assignedDevices && req.user.assignedDevices.length > 0) {
-        accessConditions.push({ _id: { $in: req.user.assignedDevices } });
-      }
-
-      // Classroom-based access
-      if (req.user.assignedRooms && req.user.assignedRooms.length > 0) {
-        accessConditions.push({ classroom: { $in: req.user.assignedRooms } });
-      }
-
-      // Department-based access for management and faculty roles
-      if ((req.user.role === 'principal' || req.user.role === 'dean' || req.user.role === 'hod' || req.user.role === 'faculty') && req.user.department) {
-        accessConditions.push({
-          classroom: { $regex: `^${req.user.department}-`, $options: 'i' }
-        });
-      }
-
-      // If no access conditions, user can't see any devices
-      if (accessConditions.length === 0) {
-        return res.json({
-          success: true,
-          data: []
-        });
-      }
-
-      query.$or = accessConditions;
+    const query = buildDeviceAccessQuery(req.user);
+    if (query === null) {
+      return res.json({
+        success: true,
+        data: []
+      });
     }
 
-    const devices = await Device.find(query).populate('assignedUsers', 'name email role');
+    const devices = await Device.find(query).populate('assignedUsers', 'name email role').lean();
 
     res.json({
       success: true,
@@ -213,22 +219,27 @@ const createDevice = async (req, res) => {
 
     // Emit notification to all connected users with appropriate permissions
     if (req.app.get('io')) {
-      req.app.get('io').emit('device_notification', {
-        type: 'device_created',
-        message: `New device "${device.name}" created in ${device.location}`,
-        deviceId: device._id,
-        deviceName: device.name,
-        location: device.location,
-        metadata: {
+      const socketService = req.app.get('socketService');
+      if (socketService) {
+        socketService.notifyDeviceStatusChange(device._id, 'created', device.name, device.location);
+      } else {
+        req.app.get('io').emit('device_notification', {
+          type: 'device_created',
+          message: `New device "${device.name}" created in ${device.location}`,
           deviceId: device._id,
           deviceName: device.name,
-          deviceLocation: device.location,
-          deviceClassroom: device.classroom,
-          createdBy: req.user.name,
-          switchCount: device.switches.length
-        },
-        timestamp: new Date()
-      });
+          location: device.location,
+          metadata: {
+            deviceId: device._id,
+            deviceName: device.name,
+            deviceLocation: device.location,
+            deviceClassroom: device.classroom,
+            createdBy: req.user.name,
+            switchCount: device.switches.length
+          },
+          timestamp: new Date()
+        });
+      }
     }
 
     // Push updated config to ESP32 if connected (include manual fields)
@@ -432,22 +443,27 @@ const updateDevice = async (req, res) => {
 
     // Emit notification to all connected users with appropriate permissions
     if (req.app.get('io')) {
-      req.app.get('io').emit('device_notification', {
-        type: 'device_updated',
-        message: `Device "${device.name}" was updated in ${device.location}`,
-        deviceId: device._id,
-        deviceName: device.name,
-        location: device.location,
-        metadata: {
+      const socketService = req.app.get('socketService');
+      if (socketService) {
+        socketService.notifyDeviceStatusChange(device._id, 'updated', device.name, device.location);
+      } else {
+        req.app.get('io').emit('device_notification', {
+          type: 'device_updated',
+          message: `Device "${device.name}" was updated in ${device.location}`,
           deviceId: device._id,
           deviceName: device.name,
-          deviceLocation: device.location,
-          deviceClassroom: device.classroom,
-          updatedBy: req.user.name,
-          switchCount: device.switches.length
-        },
-        timestamp: new Date()
-      });
+          location: device.location,
+          metadata: {
+            deviceId: device._id,
+            deviceName: device.name,
+            deviceLocation: device.location,
+            deviceClassroom: device.classroom,
+            updatedBy: req.user.name,
+            switchCount: device.switches.length
+          },
+          timestamp: new Date()
+        });
+      }
     }
 
     // If any switches were removed, proactively send OFF command for their relay gpios to ensure hardware deactivates them
@@ -659,9 +675,19 @@ const toggleSwitch = async (req, res) => {
 
 const getDeviceStats = async (req, res) => {
   try {
-    const matchQuery = (req.user.role !== 'admin')
-      ? { _id: { $in: req.user.assignedDevices } }
-      : {};
+    const matchQuery = buildDeviceAccessQuery(req.user);
+    if (matchQuery === null) {
+      return res.json({
+        totalDevices: 0,
+        onlineDevices: 0,
+        offlineDevices: 0,
+        totalSwitches: 0,
+        switchesOn: 0,
+        switchesOff: 0,
+        pirEnabled: 0,
+        pirTriggered: 0
+      });
+    }
 
     const devices = await Device.find(matchQuery)
       .select('status switches pirEnabled pirGpio pirAutoOffDelay pirSensorLastTriggered')
@@ -707,7 +733,7 @@ const getDeviceById = async (req, res) => {
     // If admin wants secret, explicitly select it
     const includeSecret = req.query.includeSecret === '1' || req.query.includeSecret === 'true';
     let query = Device.findById(req.params.deviceId);
-    if (includeSecret && req.user && req.user.role === 'admin') {
+    if (includeSecret && req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) {
       query = query.select('+deviceSecret');
     }
     let device = await query;
@@ -715,24 +741,24 @@ const getDeviceById = async (req, res) => {
       return res.status(404).json({ message: 'Device not found' });
     }
     // Optional PIN gate for secret (set DEVICE_SECRET_PIN in env). If set, must match ?secretPin=.
-    if (includeSecret && req.user && req.user.role === 'admin') {
+    if (includeSecret && req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) {
       const requiredPin = process.env.DEVICE_SECRET_PIN;
       if (requiredPin && (req.query.secretPin !== requiredPin)) {
         return res.status(403).json({ message: 'Invalid PIN' });
       }
     }
     // Auto-generate a secret if missing and admin requested it
-    if (includeSecret && req.user && req.user.role === 'admin' && !device.deviceSecret) {
+    if (includeSecret && req.user && (req.user.role === 'admin' || req.user.role === 'super-admin') && !device.deviceSecret) {
       const crypto = require('crypto');
       device.deviceSecret = crypto.randomBytes(24).toString('hex');
       await device.save();
     }
     // Avoid leaking secret unless explicitly requested
     const raw = device.toObject();
-    if (!(includeSecret && req.user && req.user.role === 'admin')) {
+    if (!(includeSecret && req.user && (req.user.role === 'admin' || req.user.role === 'super-admin'))) {
       delete raw.deviceSecret;
     }
-    res.json({ success: true, data: raw, deviceSecret: includeSecret && req.user && req.user.role === 'admin' ? raw.deviceSecret : undefined });
+    res.json({ success: true, data: raw, deviceSecret: includeSecret && req.user && (req.user.role === 'admin' || req.user.role === 'super-admin') ? raw.deviceSecret : undefined });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -769,22 +795,27 @@ const deleteDevice = async (req, res) => {
 
     // Emit notification to all connected users with appropriate permissions
     if (req.app.get('io')) {
-      req.app.get('io').emit('device_notification', {
-        type: 'device_deleted',
-        message: `Device "${device.name}" was deleted from ${device.location}`,
-        deviceId: device._id,
-        deviceName: device.name,
-        location: device.location,
-        metadata: {
+      const socketService = req.app.get('socketService');
+      if (socketService) {
+        socketService.notifyDeviceStatusChange(device._id, 'deleted', device.name, device.location);
+      } else {
+        req.app.get('io').emit('device_notification', {
+          type: 'device_deleted',
+          message: `Device "${device.name}" was deleted from ${device.location}`,
           deviceId: device._id,
           deviceName: device.name,
-          deviceLocation: device.location,
-          deviceClassroom: device.classroom,
-          deletedBy: req.user.name,
-          switchCount: device.switches.length
-        },
-        timestamp: new Date()
-      });
+          location: device.location,
+          metadata: {
+            deviceId: device._id,
+            deviceName: device.name,
+            deviceLocation: device.location,
+            deviceClassroom: device.classroom,
+            deletedBy: req.user.name,
+            switchCount: device.switches.length
+          },
+          timestamp: new Date()
+        });
+      }
     }
 
     res.json({ success: true, message: 'Device deleted successfully' });
@@ -801,10 +832,10 @@ const bulkToggleSwitches = async (req, res) => {
       return res.status(400).json({ message: 'state boolean required' });
     }
 
-    // Scope devices based on user role (reuse logic from getAllDevices)
-    const match = {};
-    if (req.user.role !== 'admin') {
-      match._id = { $in: req.user.assignedDevices };
+    // Scope devices based on user role using the same logic as getAllDevices
+    const match = buildDeviceAccessQuery(req.user);
+    if (match === null) {
+      return res.status(403).json({ message: 'No devices accessible for bulk operations' });
     }
 
     const devices = await Device.find(match);
@@ -938,7 +969,7 @@ const bulkToggleSwitches = async (req, res) => {
 
     // Emit a bulk intent so UI can show pending without flipping state
     try {
-      const affectedIds = devices.filter(d => d.switches.some(sw => true)).map(d => d.id);
+      const affectedIds = devices.filter(d => d.switches.some(sw => true)).map(d => d._id.toString());
       req.app.get('io').emit('bulk_switch_intent', {
         desiredState: state,
         deviceIds: affectedIds,
@@ -952,16 +983,38 @@ const bulkToggleSwitches = async (req, res) => {
 
     // Emit notification about bulk operation results
     try {
-      req.app.get('io').emit('bulk_operation_complete', {
-        operation: 'master_toggle',
-        desiredState: state,
-        totalDevices: devices.length,
-        commandedDevices: commandedDevices.length,
-        offlineDevices: offlineDevices.length,
-        switchesChanged,
-        offlineDeviceList: offlineDevices,
-        timestamp: new Date()
-      });
+      const socketService = req.app.get('socketService');
+      if (socketService && typeof socketService.notifyBulkOperation === 'function') {
+        const results = commandedDevices.map(device => ({
+          deviceId: device.id,
+          deviceName: device.name,
+          success: true,
+          switchesChanged: device.switches.length
+        })).concat(offlineDevices.map(device => ({
+          deviceId: device.id,
+          deviceName: device.name,
+          success: false,
+          reason: 'device_offline'
+        })));
+
+        socketService.notifyBulkOperation(
+          req.user.id,
+          'bulk_toggle',
+          results,
+          devices.length
+        );
+      } else {
+        req.app.get('io').emit('bulk_operation_complete', {
+          operation: 'master_toggle',
+          desiredState: state,
+          totalDevices: devices.length,
+          commandedDevices: commandedDevices.length,
+          offlineDevices: offlineDevices.length,
+          switchesChanged,
+          offlineDeviceList: offlineDevices,
+          timestamp: new Date()
+        });
+      }
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.warn('[bulkToggleSwitches notification emit failed]', e.message);
     }
@@ -1000,9 +1053,9 @@ const bulkToggleByType = async (req, res) => {
     if (typeof state !== 'boolean') {
       return res.status(400).json({ message: 'state boolean required' });
     }
-    const match = {};
-    if (req.user.role !== 'admin') {
-      match._id = { $in: req.user.assignedDevices };
+    const match = buildDeviceAccessQuery(req.user);
+    if (match === null) {
+      return res.status(403).json({ message: 'No devices accessible for bulk operations' });
     }
     const devices = await Device.find(match);
     logger.info(`[bulkToggleByType] Found ${devices.length} devices for type ${type}, state ${state}`);
@@ -1057,7 +1110,7 @@ const bulkToggleByType = async (req, res) => {
       }
     }
     try {
-      const ids = devices.map(d => d.id);
+      const ids = devices.map(d => d._id.toString());
       req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: ids, filter: { type }, ts: Date.now() });
     } catch (emitErr) {
       logger.warn(`[bulkToggleByType] Emit failed: ${emitErr.message}`);
@@ -1078,10 +1131,15 @@ const bulkToggleByLocation = async (req, res) => {
     if (typeof state !== 'boolean') {
       return res.status(400).json({ message: 'state boolean required' });
     }
-    const match = { location };
-    if (req.user.role !== 'admin') {
-      match._id = { $in: req.user.assignedDevices };
+    
+    // Build base access query
+    const accessQuery = buildDeviceAccessQuery(req.user);
+    if (accessQuery === null) {
+      return res.status(403).json({ message: 'No devices accessible for bulk operations' });
     }
+    
+    // Combine access control with location filter
+    const match = { ...accessQuery, location };
     const devices = await Device.find(match);
     let switchesChanged = 0;
     for (const device of devices) {
@@ -1123,7 +1181,7 @@ const bulkToggleByLocation = async (req, res) => {
       }
     }
     try {
-      const ids = devices.map(d => d.id);
+      const ids = devices.map(d => d._id.toString());
       req.app.get('io').emit('bulk_switch_intent', { desiredState: state, deviceIds: ids, filter: { location }, ts: Date.now() });
     } catch { }
     res.json({ success: true, location, state, switchesChanged });

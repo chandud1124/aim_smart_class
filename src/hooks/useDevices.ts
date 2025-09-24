@@ -167,6 +167,7 @@ const useDevicesInternal = () => {
       const raw = response.data.data || [];
       const mapped = raw.map((d: any) => ({
         ...d,
+        id: d.id || d._id?.toString(),
         switches: Array.isArray(d.switches) ? d.switches.map((sw: any) => ({
           ...sw,
           id: sw.id || sw._id?.toString(),
@@ -513,6 +514,7 @@ const useDevicesInternal = () => {
       }
 
       const newDeviceRaw = response.data.data || response.data;
+      const deviceSecret = response.data.deviceSecret;
       const newDevice = {
         ...newDeviceRaw,
         switches: Array.isArray(newDeviceRaw.switches) ? newDeviceRaw.switches.map((sw: any) => ({
@@ -524,7 +526,7 @@ const useDevicesInternal = () => {
       console.log('Device added:', newDevice);
 
       setDevices(prev => [...prev, newDevice]);
-      return newDevice;
+      return { device: newDevice, deviceSecret };
     } catch (err: any) {
       console.error('Error adding device:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to add device';

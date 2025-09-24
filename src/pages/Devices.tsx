@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Switch as ToggleSwitch } from '@/components/ui/switch';
 import DeviceCard from '@/components/DeviceCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -220,11 +221,23 @@ const Devices = () => {
 
   const handleAddDevice = async (deviceData: Device) => {
     try {
-      await addDevice(deviceData);
+      const result = await addDevice(deviceData);
       toast({
         title: "Success",
         description: "Device added successfully"
       });
+
+      // Show device secret if available
+      if (result.deviceSecret) {
+        toast({
+          title: "Device Secret Key",
+          description: `Secret: ${result.deviceSecret}`,
+          duration: 10000, // Show for 10 seconds
+        });
+        // Also log to console for easy copying
+        console.log('Device Secret Key:', result.deviceSecret);
+      }
+
       setShowConfigDialog(false);
     } catch (error) {
       toast({
@@ -242,11 +255,23 @@ const Devices = () => {
           <div className="text-center">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Loading devices...</p>
+//
           </div>
         </div>
       </div>
     );
   }
+
+
+
+// ...existing code...
+
+const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
+
+const handleGlobalAiToggle = (checked: boolean) => {
+  setGlobalAiEnabled(checked);
+  // TODO: Persist to backend if needed
+};
 
   return (
     <>
@@ -259,6 +284,12 @@ const Devices = () => {
       />
 
       <div className="container mx-auto py-6 px-4 sm:px-6">
+        {/* Global AI/ML Toggle */}
+        <div className="flex items-center gap-3 p-4 bg-card rounded-xl shadow mb-6">
+          <ToggleSwitch checked={globalAiEnabled} onCheckedChange={handleGlobalAiToggle} />
+          <span className="font-semibold">Global AI/ML Control</span>
+          <span className="text-xs text-muted-foreground" title="ON: AI can control all devices. OFF: AI only shows insights.">(affects all devices)</span>
+        </div>
         {/* Header with Connection Status */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-3">

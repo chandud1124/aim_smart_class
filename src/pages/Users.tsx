@@ -409,6 +409,67 @@ const Users = () => {
     }
   };
 
+  // Bulk operation handlers
+  const handleBulkActivate = async () => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      const response = await api.usersAPI.bulkActivateUsers(selectedUserIds);
+      toast({ title: 'Success', description: response.data.message });
+      setSelectedUserIds([]);
+      await fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to activate users', variant: 'destructive' });
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (selectedUserIds.length === 0) return;
+    try {
+      const response = await api.usersAPI.bulkDeactivateUsers(selectedUserIds);
+      toast({ title: 'Success', description: response.data.message });
+      setSelectedUserIds([]);
+      await fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to deactivate users', variant: 'destructive' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedUserIds.length} users? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const response = await api.usersAPI.bulkDeleteUsers(selectedUserIds);
+      toast({ title: 'Success', description: response.data.message });
+      setSelectedUserIds([]);
+      await fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to delete users', variant: 'destructive' });
+    }
+  };
+
+  const handleBulkAssignRole = async () => {
+    if (selectedUserIds.length === 0) return;
+    const role = prompt('Enter role to assign (super-admin, admin, principal, dean, hod, faculty, teacher, student):');
+    if (!role) return;
+
+    const validRoles = ['super-admin', 'admin', 'principal', 'dean', 'hod', 'faculty', 'teacher', 'student'];
+    if (!validRoles.includes(role)) {
+      toast({ title: 'Error', description: 'Invalid role specified', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const response = await api.usersAPI.bulkAssignRole(selectedUserIds, role);
+      toast({ title: 'Success', description: response.data.message });
+      setSelectedUserIds([]);
+      await fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to assign role', variant: 'destructive' });
+    }
+  };
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return <Shield className="w-4 h-4" />;
@@ -515,10 +576,10 @@ const Users = () => {
       {selectedUserIds.length > 0 && (
         <div className="flex gap-2 mb-4">
           <span className="font-medium">Bulk actions for {selectedUserIds.length} users:</span>
-          <Button size="sm" variant="outline" onClick={() => {/* bulk activate logic */}}>Activate</Button>
-          <Button size="sm" variant="outline" onClick={() => {/* bulk deactivate logic */}}>Deactivate</Button>
-          <Button size="sm" variant="destructive" onClick={() => {/* bulk delete logic */}}>Delete</Button>
-          <Button size="sm" variant="outline" onClick={() => {/* bulk assign role logic */}}>Assign Role</Button>
+          <Button size="sm" variant="outline" onClick={handleBulkActivate}>Activate</Button>
+          <Button size="sm" variant="outline" onClick={handleBulkDeactivate}>Deactivate</Button>
+          <Button size="sm" variant="destructive" onClick={handleBulkDelete}>Delete</Button>
+          <Button size="sm" variant="outline" onClick={handleBulkAssignRole}>Assign Role</Button>
         </div>
       )}
 

@@ -134,7 +134,7 @@ export const MasterSwitchCard: React.FC<MasterSwitchCardProps> = ({
                     <div className="max-w-xs text-xs">
                       <p className="font-semibold mb-1">Offline Devices:</p>
                       {offlineList.length === 0 && <p>None</p>}
-                      {offlineList.slice(0, 8).map(d => (
+                                            {offlineList.slice(0, 8).map(d => (
                         <p key={d.id}>{d.name}</p>
                       ))}
                       {offlineList.length > 8 && (

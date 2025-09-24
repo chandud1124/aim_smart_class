@@ -499,11 +499,171 @@ function generateTempPassword() {
   return Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
 }
 
+// Bulk activate users
+const bulkActivateUsers = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: 'User IDs array is required' });
+    }
+
+    // Check permissions for each user
+    for (const userId of userIds) {
+      if (!canToggleUserStatus(req.user, userId)) {
+        return res.status(403).json({ message: `Insufficient permissions to activate user ${userId}` });
+      }
+    }
+
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      { isActive: true, lastModifiedBy: req.user._id, lastModifiedAt: new Date() }
+    );
+
+    logger.info(`Bulk activated ${result.modifiedCount} users by ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: `Successfully activated ${result.modifiedCount} users`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    logger.error('Bulk activate users error:', error);
+    res.status(500).json({ message: 'Error activating users' });
+  }
+};
+
+// Bulk deactivate users
+const bulkDeactivateUsers = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: 'User IDs array is required' });
+    }
+
+    // Check permissions for each user
+    for (const userId of userIds) {
+      if (!canToggleUserStatus(req.user, userId)) {
+        return res.status(403).json({ message: `Insufficient permissions to deactivate user ${userId}` });
+      }
+    }
+
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      { isActive: false, lastModifiedBy: req.user._id, lastModifiedAt: new Date() }
+    );
+
+    logger.info(`Bulk deactivated ${result.modifiedCount} users by ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: `Successfully deactivated ${result.modifiedCount} users`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    logger.error('Bulk deactivate users error:', error);
+    res.status(500).json({ message: 'Error deactivating users' });
+  }
+};
+
+// Bulk delete users
+const bulkDeleteUsers = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: 'User IDs array is required' });
+    }
+
+    // Check permissions for each user
+    for (const userId of userIds) {
+      if (!canDeleteUser(req.user, userId)) {
+        return res.status(403).json({ message: `Insufficient permissions to delete user ${userId}` });
+      }
+    }
+
+    const result = await User.deleteMany({ _id: { $in: userIds } });
+
+    logger.info(`Bulk deleted ${result.deletedCount} users by ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} users`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    logger.error('Bulk delete users error:', error);
+    res.status(500).json({ message: 'Error deleting users' });
+  }
+};
+
+// Bulk assign role to users
+const bulkAssignRole = async (req, res) => {
+  try {
+    const { userIds, role } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: 'User IDs array is required' });
+    }
+
+    if (!role) {
+      return res.status(400).json({ message: 'Role is required' });
+    }
+
+    // Validate role
+    const validRoles = ['super-admin', 'admin', 'principal', 'dean', 'hod', 'faculty', 'teacher', 'student'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role specified' });
+    }
+
+    // Check if assigner can assign this role
+    const roleHierarchy = {
+      'super-admin': ['super-admin', 'admin', 'principal', 'dean', 'hod', 'faculty', 'teacher', 'student'],
+      'admin': ['admin', 'principal', 'dean', 'hod', 'faculty', 'teacher', 'student'],
+      'principal': ['dean', 'hod', 'faculty', 'teacher', 'student'],
+      'dean': ['hod', 'faculty', 'teacher', 'student'],
+      'hod': ['faculty', 'teacher', 'student']
+    };
+
+    if (!roleHierarchy[req.user.role] || !roleHierarchy[req.user.role].includes(role)) {
+      return res.status(403).json({ message: 'Insufficient permissions to assign this role' });
+    }
+
+    // Check permissions for each user
+    for (const userId of userIds) {
+      if (!canUpdateUser(req.user, userId)) {
+        return res.status(403).json({ message: `Insufficient permissions to update user ${userId}` });
+      }
+    }
+
+    const result = await User.updateMany(
+      { _id: { $in: userIds } },
+      { role: role, lastModifiedBy: req.user._id, lastModifiedAt: new Date() }
+    );
+
+    logger.info(`Bulk assigned role ${role} to ${result.modifiedCount} users by ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: `Successfully assigned role ${role} to ${result.modifiedCount} users`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    logger.error('Bulk assign role error:', error);
+    res.status(500).json({ message: 'Error assigning role to users' });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUser,
   createUser,
   updateUser,
   deleteUser,
-  toggleUserStatus
+  toggleUserStatus,
+  bulkActivateUsers,
+  bulkDeactivateUsers,
+  bulkDeleteUsers,
+  bulkAssignRole
 };

@@ -2,6 +2,7 @@ const ActivityLog = require('../models/ActivityLog');
 const ErrorLog = require('../models/ErrorLog');
 const ManualSwitchLog = require('../models/ManualSwitchLog');
 const DeviceStatusLog = require('../models/DeviceStatusLog');
+const PowerConsumptionLog = require('../models/PowerConsumptionLog');
 
 class EnhancedLoggingService {
   
@@ -373,6 +374,26 @@ class EnhancedLoggingService {
     } catch (error) {
       console.error('[STATS-ERROR]', error);
       return null;
+    }
+  }
+
+  // Power consumption logging
+  static async logPowerConsumption(data) {
+    try {
+      const powerLog = new PowerConsumptionLog({
+        timestamp: data.timestamp || new Date(),
+        totalConsumption: data.totalConsumption,
+        byDevice: data.byDevice,
+        byClassroom: data.byClassroom,
+        byDeviceType: data.byDeviceType
+      });
+
+      await powerLog.save();
+      console.log(`[POWER-CONSUMPTION] Logged ${data.totalConsumption}W total consumption`);
+      return powerLog;
+    } catch (error) {
+      console.error('[POWER-CONSUMPTION-LOG-ERROR]', error);
+      // Don't throw to prevent logging errors from crashing operations
     }
   }
 }

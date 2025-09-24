@@ -1,0 +1,23 @@
+# Alerting rules for Prometheus
+# Example: Alert if device offline or power usage spike
+
+groups:
+  - name: device_alerts
+    rules:
+      - alert: DeviceOffline
+        expr: device_online == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Device is offline"
+          description: "Device has not reported online status for 2 minutes."
+
+      - alert: PowerUsageSpike
+        expr: total_power_usage_watts > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Power usage spike detected"
+          description: "Total power usage exceeded 1000W for 1 minute."

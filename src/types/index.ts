@@ -14,6 +14,7 @@ export interface Device {
   location?: string;
   classroom?: string;
   assignedUsers?: string[];
+  aiEnabled?: boolean; // AI/ML control toggle
 }
 
 export interface Switch {

@@ -1,0 +1,98 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": 1620000000000,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {},
+      "targets": [
+        {
+          "expr": "device_on_count",
+          "interval": "",
+          "legendFormat": "Devices ON",
+          "refId": "A"
+        },
+        {
+          "expr": "device_off_count",
+          "interval": "",
+          "legendFormat": "Devices OFF",
+          "refId": "B"
+        }
+      ],
+      "title": "Device ON/OFF Count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 2,
+      "options": {},
+      "targets": [
+        {
+          "expr": "total_power_usage_watts",
+          "interval": "",
+          "legendFormat": "Power Usage (W)",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Power Usage (Watts)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": [
+    "classroom",
+    "iot"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Classroom Device Usage",
+  "uid": "classroom-usage",
+  "version": 1
+}

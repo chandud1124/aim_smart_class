@@ -36,13 +36,16 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-scroll-area'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-scroll-area', '@radix-ui/react-select'],
+          charts: ['recharts'],
+          utils: ['axios', 'socket.io-client', '@tanstack/react-query'],
         },
       },
     },
     chunkSizeWarningLimit: 1000,
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'],
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'axios'],
+    exclude: ['@vite/client', '@vite/env'],
   },
 }));

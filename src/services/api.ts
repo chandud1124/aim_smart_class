@@ -1,3 +1,14 @@
+// --- AI/ML Microservice API ---
+const AI_ML_BASE_URL = 'http://127.0.0.1:8002'; // Update if deployed elsewhere
+
+export const aiMlAPI = {
+  forecast: (device_id: string, history: number[], periods = 5) =>
+    axios.post(`${AI_ML_BASE_URL}/forecast`, { device_id, history, periods }),
+  schedule: (device_id: string, constraints?: Record<string, unknown>) =>
+    axios.post(`${AI_ML_BASE_URL}/schedule`, { device_id, constraints }),
+  anomaly: (device_id: string, values: number[]) =>
+    axios.post(`${AI_ML_BASE_URL}/anomaly`, { device_id, values }),
+};
 
 
 import type { Device, Schedule } from '../types';
@@ -191,7 +202,7 @@ export const deviceAPI = {
   getStats: () => api.get('/devices/stats'),
   // Secure admin-only: fetch single device with secret (?includeSecret=1)
   getDeviceWithSecret: (deviceId: string, pin?: string) =>
-    api.get(`/devices/${deviceId}`, { params: { includeSecret: 1, secretPin: pin } }),
+    api.get(`/devices/${deviceId}`, { params: { includeSecret: 1, ...(pin && { secretPin: pin }) } }),
 
   // GPIO pin information and validation
   getGpioPinInfo: (deviceId?: string) => api.get(`/devices/gpio-info/${deviceId || 'new'}`),
@@ -555,6 +566,15 @@ export const usersAPI = {
 
   // Delete profile picture
   deleteProfilePicture: () => api.delete('/users/me/profile-picture'),
+
+  // Bulk operations
+  bulkActivateUsers: (userIds: string[]) => api.post('/users/bulk/activate', { userIds }),
+
+  bulkDeactivateUsers: (userIds: string[]) => api.post('/users/bulk/deactivate', { userIds }),
+
+  bulkDeleteUsers: (userIds: string[]) => api.post('/users/bulk/delete', { userIds }),
+
+  bulkAssignRole: (userIds: string[], role: string) => api.post('/users/bulk/assign-role', { userIds, role }),
 };
 
 export const settingsAPI = {
@@ -663,3 +683,6 @@ export const enhancedLogsAPI = {
 };
 
 export default api;
+
+// Export the main axios instance as apiService for backward compatibility
+export const apiService = api;

@@ -154,6 +154,25 @@ class ScheduleService {
         this.removeJob(schedule._id.toString());
       }
 
+      // Notify about schedule execution
+      if (global.io) {
+        const socketService = global.socketService;
+        if (socketService && typeof socketService.notifyScheduleExecution === 'function') {
+          const results = schedule.switches.map(switchRef => ({
+            deviceId: switchRef.deviceId,
+            switchId: switchRef.switchId,
+            success: true,
+            action: schedule.action
+          }));
+
+          socketService.notifyScheduleExecution(
+            schedule._id.toString(),
+            schedule.name,
+            results
+          );
+        }
+      }
+
     } catch (error) {
       console.error(`Error executing schedule ${schedule.name}:`, error);
     }

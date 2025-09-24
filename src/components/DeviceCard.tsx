@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch as ToggleSwitch } from '@/components/ui/switch';
 import { 
   Cpu, 
   Wifi, 
@@ -25,58 +26,69 @@ interface DeviceCardProps {
   compact?: boolean; // If true, show only basic details and online/offline
 }
 
-export default function DeviceCard({ device, onToggleSwitch, onEditDevice, onDeleteDevice, showSwitches = true, showActions = true, compact = false }: DeviceCardProps) {
-  // In dashboard (showActions === false), highlight card green if online, red if offline
-  const isOnline = device.status === 'online';
-  const dashboardOnline = !showActions && isOnline;
-  const dashboardOffline = !showActions && !isOnline;
-  const deviceOffline = !isOnline; // Apply red styling to offline devices in all views
-  // Remove selection logic: do not add any onClick or selection handlers to Card
+  export default memo(function DeviceCard({ device, onToggleSwitch, onEditDevice, onDeleteDevice, showSwitches = true, showActions = true, compact = false }: DeviceCardProps) {
+    const [aiEnabled, setAiEnabled] = useState(device.aiEnabled ?? false);
 
-  return (
-    <Card
-      style={{
-        minWidth: '250px',
-        maxWidth: '100%',
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-start',
-        padding: '0.75rem',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        backgroundColor: dashboardOnline
-          ? '#166534' // Tailwind green-800 for dark online
-          : (dashboardOffline || deviceOffline)
-            ? '#b91c1c' // Tailwind red-700 for offline
-            : undefined,
-        color: (dashboardOffline || deviceOffline) ? '#fff' : undefined,
-        fontWeight: (dashboardOffline || deviceOffline) ? 'bold' : undefined
-      }}
-      className={`shadow-md hover:shadow-lg transition-shadow duration-200 sm:max-w-xs sm:p-2 sm:overflow-hidden relative${dashboardOnline ? ' ring-4 ring-green-600' : ''}${(dashboardOffline || deviceOffline) ? ' opacity-70 grayscale' : ''}`}
-    >
-      {/* Status Indicator - Top Left */}
-      <div className="absolute top-2 left-2 z-10">
-        <Badge
-          variant={isOnline ? 'secondary' : 'destructive'}
-          className={`text-xs ${isOnline
-            ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-            : 'bg-red-100 text-red-700 border-red-200'
-          } ${deviceOffline ? 'bg-white/20 text-white border-white/30' : ''}`}
-        >
-          {isOnline ? (
-            <>
-              <div className="w-2 h-2 bg-emerald-500 rounded-full mr-1 animate-pulse" />
-              Online
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-3 h-3 mr-1" />
-              Offline
-            </>
-          )}
-        </Badge>
-      </div>
+    const handleAiToggle = (checked: boolean) => {
+      setAiEnabled(checked);
+      // TODO: Persist to backend if needed
+    };
+
+    // In dashboard (showActions === false), highlight card green if online, red if offline
+    const isOnline = device.status === 'online';
+    const dashboardOnline = !showActions && isOnline;
+    const dashboardOffline = !showActions && !isOnline;
+    const deviceOffline = !isOnline; // Apply red styling to offline devices in all views
+
+    return (
+      <Card
+        style={{
+          minWidth: '250px',
+          maxWidth: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          padding: '0.75rem',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          backgroundColor: dashboardOnline
+            ? '#166534' // Tailwind green-800 for dark online
+            : (dashboardOffline || deviceOffline)
+              ? '#b91c1c' // Tailwind red-700 for offline
+              : undefined,
+          color: (dashboardOffline || deviceOffline) ? '#fff' : undefined,
+          fontWeight: (dashboardOffline || deviceOffline) ? 'bold' : undefined
+        }}
+        className={`shadow-md hover:shadow-lg transition-shadow duration-200 sm:max-w-xs sm:p-2 sm:overflow-hidden relative${dashboardOnline ? ' ring-4 ring-green-600' : ''}${(dashboardOffline || deviceOffline) ? ' opacity-70 grayscale' : ''}`}
+      >
+        {/* AI/ML Toggle */}
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+          <ToggleSwitch checked={aiEnabled} onCheckedChange={handleAiToggle} />
+          <span className="text-xs" title="AI/ML Control: ON = AI can control device, OFF = AI only shows insights">AI</span>
+        </div>
+        {/* Status Indicator - Top Left */}
+        <div className="absolute top-2 left-2 z-10">
+          <Badge
+            variant={isOnline ? 'secondary' : 'destructive'}
+            className={`text-xs ${isOnline
+              ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+              : 'bg-red-100 text-red-700 border-red-200'
+            } ${!isOnline ? 'bg-white/20 text-white border-white/30' : ''}`}
+          >
+            {isOnline ? (
+              <>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full mr-1 animate-pulse" />
+                Online
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Offline
+              </>
+            )}
+          </Badge>
+        </div>
 
       {/* Settings & Delete Buttons in compact mode - Top Right */}
       {compact && showActions && (
@@ -249,5 +261,6 @@ export default function DeviceCard({ device, onToggleSwitch, onEditDevice, onDel
       )}
     </Card>
   );
-};
+});
+
 

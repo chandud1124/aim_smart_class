@@ -150,14 +150,95 @@ export function useDeviceNotifications() {
   const [notifications, setNotifications] = useState<DeviceNotification[]>([]);
 
   useEffect(() => {
-    const handleNotification = (data: DeviceNotification) => {
-      setNotifications(prev => [data, ...prev].slice(0, 50)); // Keep last 50 notifications
+    const handleDeviceNotification = (data: any) => {
+      const notification: DeviceNotification = {
+        type: data.type,
+        message: data.message,
+        deviceId: data.deviceId,
+        deviceName: data.deviceName,
+        location: data.location,
+        timestamp: data.timestamp || new Date(),
+        ...data
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50)); // Keep last 50 notifications
     };
 
-    socketService.on('device_notification', handleNotification);
+    const handleSwitchChange = (data: any) => {
+      const notification: DeviceNotification = {
+        type: 'switch_changed',
+        message: `Switch ${data.switchName} turned ${data.newState ? 'ON' : 'OFF'} on ${data.deviceName}`,
+        deviceId: data.deviceId,
+        deviceName: data.deviceName,
+        location: data.location,
+        switchId: data.switchId,
+        switchName: data.switchName,
+        newState: data.newState,
+        timestamp: data.timestamp || new Date()
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50));
+    };
+
+    const handleBulkOperation = (data: any) => {
+      const notification: DeviceNotification = {
+        type: 'bulk_operation',
+        message: `Bulk ${data.operation} completed: ${data.successCount} successful, ${data.failureCount} failed`,
+        operation: data.operation,
+        results: data.results,
+        timestamp: data.timestamp || new Date()
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50));
+    };
+
+    const handleScheduleExecuted = (data: any) => {
+      const notification: DeviceNotification = {
+        type: 'schedule_executed',
+        message: `Schedule "${data.scheduleName}" executed: ${data.successCount} successful, ${data.failureCount} failed`,
+        scheduleId: data.scheduleId,
+        scheduleName: data.scheduleName,
+        results: data.results,
+        timestamp: data.timestamp || new Date()
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50));
+    };
+
+    const handleDeviceError = (data: any) => {
+      const notification: DeviceNotification = {
+        type: 'device_error',
+        message: data.error,
+        deviceId: data.deviceId,
+        deviceName: data.deviceName,
+        location: data.location,
+        severity: 'high',
+        timestamp: data.timestamp || new Date()
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50));
+    };
+
+    const handleSystemAlert = (data: any) => {
+      const notification: DeviceNotification = {
+        type: 'system_alert',
+        message: data.message,
+        severity: data.severity || 'medium',
+        timestamp: data.timestamp || new Date()
+      };
+      setNotifications(prev => [notification, ...prev].slice(0, 50));
+    };
+
+    // Listen to all notification events
+    socketService.on('device_notification', handleDeviceNotification);
+    socketService.on('switch:changed', handleSwitchChange);
+    socketService.on('bulk_operation_complete', handleBulkOperation);
+    socketService.on('schedule_executed', handleScheduleExecuted);
+    socketService.on('device_error_alert', handleDeviceError);
+    socketService.on('system_alert', handleSystemAlert);
 
     return () => {
-      socketService.off('device_notification', handleNotification);
+      socketService.off('device_notification', handleDeviceNotification);
+      socketService.off('switch:changed', handleSwitchChange);
+      socketService.off('bulk_operation_complete', handleBulkOperation);
+      socketService.off('schedule_executed', handleScheduleExecuted);
+      socketService.off('device_error_alert', handleDeviceError);
+      socketService.off('system_alert', handleSystemAlert);
     };
   }, []);
 

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ToggleLeft, ToggleRight, Zap, Radar, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ interface SwitchControlProps {
   isPirActive?: boolean;
 }
 
-export const SwitchControl: React.FC<SwitchControlProps> = ({ 
+export const SwitchControl: React.FC<SwitchControlProps> = memo(({ 
   switch: switchData, 
   onToggle, 
   disabled = false,
@@ -113,4 +113,4 @@ export const SwitchControl: React.FC<SwitchControlProps> = ({
       </div>
     </Button>
   );
-};
+});

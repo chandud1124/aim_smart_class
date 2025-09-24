@@ -26,11 +26,19 @@ export interface SwitchResult {
 }
 
 export interface DeviceNotification {
-  type: 'device_connected' | 'device_disconnected' | 'device_updated' | 'device_deleted';
+  type: 'device_connected' | 'device_disconnected' | 'device_updated' | 'device_deleted' | 'device_created' | 'switch_changed' | 'bulk_operation' | 'schedule_executed' | 'device_error' | 'system_alert';
   message: string;
-  deviceId: string;
-  deviceName: string;
-  location: string;
+  deviceId?: string;
+  deviceName?: string;
+  location?: string;
+  switchId?: string;
+  switchName?: string;
+  newState?: boolean;
+  operation?: string;
+  results?: any[];
+  scheduleId?: string;
+  scheduleName?: string;
+  severity?: string;
   timestamp: Date;
 }
 
