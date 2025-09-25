@@ -527,11 +527,14 @@ const updateDevice = async (req, res) => {
 };
 
 const toggleSwitch = async (req, res) => {
+  const startTime = Date.now();
+  let dbQueryTime = 0, dbUpdateTime = 0, activityLogTime = 0, wsSendTime = 0;
   try {
     const { deviceId, switchId } = req.params;
     const { state, triggeredBy = 'user' } = req.body;
 
     const device = await Device.findById(deviceId);
+    const dbQueryTime = Date.now() - startTime;
     if (!device) {
       return res.status(404).json({ message: 'Device not found' });
     }
@@ -595,6 +598,7 @@ const toggleSwitch = async (req, res) => {
       { $set: { 'switches.$.state': desiredState, 'switches.$.lastStateChange': now, lastModifiedBy: req.user.id } },
       { new: true }
     );
+    const dbUpdateTime = Date.now() - startTime - dbQueryTime;
     if (!updated) {
       return res.status(404).json({ message: 'Switch not found' });
     }
@@ -602,6 +606,7 @@ const toggleSwitch = async (req, res) => {
     // Log activity
     // Resolve updated switch for logging and push
     const updatedSwitch = updated.switches.find(sw => sw._id.toString() === switchId) || updated.switches[switchIndex];
+    const activityLogStart = Date.now();
     await ActivityLog.create({
       deviceId: updated._id,
       deviceName: updated.name,
@@ -616,6 +621,7 @@ const toggleSwitch = async (req, res) => {
       ip: req.ip,
       userAgent: req.get('User-Agent')
     });
+    const activityLogTime = Date.now() - activityLogStart;
 
     // Do not broadcast device_state_changed immediately to avoid UI desync if hardware fails.
     // Instead, emit a lightweight intent event; authoritative updates will come from switch_result/state_update.
@@ -648,7 +654,9 @@ const toggleSwitch = async (req, res) => {
           try {
             logger.info('[hw] switch_command push', { mac: updated.macAddress, gpio: payload.gpio, state: payload.state, deviceId: updated._id.toString(), switchId });
           } catch { }
+          const wsSendStart = Date.now();
           ws.send(JSON.stringify(payload));
+          const wsSendTime = Date.now() - wsSendStart;
           dispatchedToHardware = true;
           hwReason = 'sent';
         } else {
@@ -661,6 +669,10 @@ const toggleSwitch = async (req, res) => {
       console.error('[switch_command push failed]', e.message);
       hwReason = 'exception_' + e.message;
     }
+
+    // Log performance timing
+    const totalTime = Date.now() - startTime;
+    process.stderr.write(`[PERF] toggleSwitch timing - Total: ${totalTime}ms, DB Query: ${dbQueryTime}ms, DB Update: ${dbUpdateTime}ms, Activity Log: ${activityLogTime}ms, WS Send: ${wsSendTime}ms\n`);
 
     res.json({
       success: true,

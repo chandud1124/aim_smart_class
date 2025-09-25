@@ -497,84 +497,12 @@ export const devicePermissionsAPI = {
   }) => api.post(`/device-permissions/${permissionId}/override`, data),
 };
 
+// User management API endpoints
 export const usersAPI = {
-  // Get all users with pagination and filtering
-  getUsers: (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    role?: string;
-    department?: string;
-    status?: string;
-  }) => api.get('/users', { params }),
-
-  // Create new user
-  createUser: (data: {
-    name: string;
-    email: string;
-    password?: string;
-    role: string;
-    department?: string;
-    accessLevel?: string;
-  }) => api.post('/users', data),
-
-  // Get single user
-  getUser: (userId: string) => api.get(`/users/${userId}`),
-
-  // Update user
-  updateUser: (userId: string, data: {
-    name?: string;
-    email?: string;
-    role?: string;
-    department?: string;
-    accessLevel?: string;
-    assignedDevices?: string[];
-    isActive?: boolean;
-  }) => api.put(`/users/${userId}`, data),
-
-  // Delete user
-  deleteUser: (userId: string) => api.delete(`/users/${userId}`),
-
-  // Reset user password
-  resetUserPassword: (userId: string, data: { password: string }) =>
-    api.patch(`/users/${userId}/password`, data),
-
-  // Toggle user active status
-  toggleUserStatus: (userId: string, data: { isActive: boolean }) =>
-    api.post(`/users/${userId}/status`, data),
-
-  // Get online users
-  getOnlineUsers: () => api.get('/users/online'),
-
-  // Self-service password change
-  changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.patch('/users/me/password', data),
-
-  // Get user flags (like first login reset required)
-  getUserFlags: () => api.get('/users/me/flags'),
-
-  // Upload profile picture
-  uploadProfilePicture: (file: File) => {
-    const formData = new FormData();
-    formData.append('profilePicture', file);
-    return api.patch('/users/me/profile-picture', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-
-  // Delete profile picture
-  deleteProfilePicture: () => api.delete('/users/me/profile-picture'),
-
-  // Bulk operations
-  bulkActivateUsers: (userIds: string[]) => api.post('/users/bulk/activate', { userIds }),
-
-  bulkDeactivateUsers: (userIds: string[]) => api.post('/users/bulk/deactivate', { userIds }),
-
-  bulkDeleteUsers: (userIds: string[]) => api.post('/users/bulk/delete', { userIds }),
-
-  bulkAssignRole: (userIds: string[], role: string) => api.post('/users/bulk/assign-role', { userIds, role }),
+  bulkActivateUsers: (userIds: string[]) => api.patch('/users/bulk-activate', { userIds }),
+  bulkDeactivateUsers: (userIds: string[]) => api.patch('/users/bulk-deactivate', { userIds }),
+  bulkDeleteUsers: (userIds: string[]) => api.delete('/users/bulk-delete', { data: { userIds } }),
+  bulkAssignRole: (userIds: string[], role: string) => api.patch('/users/bulk-assign-role', { userIds, role }),
 };
 
 export const settingsAPI = {

@@ -324,7 +324,9 @@ class WebSocketHandler {
                 name: sw.name,
                 relayGpio: sw.relayGpio,
                 manualSwitchEnabled: sw.manualSwitchEnabled,
-                manualSwitchGpio: sw.manualSwitchGpio
+                manualSwitchGpio: sw.manualSwitchGpio,
+                state: sw.state,
+                manualOverride: sw.manualOverride
             }))
         };
     }

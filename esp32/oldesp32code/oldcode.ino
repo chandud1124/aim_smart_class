@@ -41,13 +41,13 @@
 #endif
 
 // Debounce multiple rapid local state changes into one state_update
-#define STATE_DEBOUNCE_MS 200
+#define STATE_DEBOUNCE_MS 100 // Balanced: faster than 200ms but stable
 #define MANUAL_DEBOUNCE_MS 80 // Increased debounce to 80ms for better filtering
 #define MANUAL_REPEAT_IGNORE_MS 200 // Ignore repeated toggles within 200ms
 
 // Command queue size and processing interval
 #define MAX_COMMAND_QUEUE 16
-#define COMMAND_PROCESS_INTERVAL 100 // Process commands every 100ms
+#define COMMAND_PROCESS_INTERVAL 25 // Balanced: faster than 100ms but not too aggressive
 
 // WiFi reconnection constants
 #define WIFI_RETRY_INTERVAL_MS 30000UL
@@ -461,13 +461,20 @@ void queueSwitchCommand(int gpio, bool state)
 void processCommandQueue()
 {
  unsigned long now = millis();
- if (now - lastCommandProcess < COMMAND_PROCESS_INTERVAL)
+ 
+ // Check if we have pending commands - if so, process more frequently
+ UBaseType_t queueItems = uxQueueMessagesWaiting(cmdQueue);
+ bool hasPendingCommands = queueItems > 0;
+ 
+ // Process immediately if we have pending commands, otherwise use normal interval
+ if (!hasPendingCommands && now - lastCommandProcess < COMMAND_PROCESS_INTERVAL)
  return;
+ 
  lastCommandProcess = now;
  
  // CRASH PREVENTION: Process multiple commands but limit batch size  
  int processedCount = 0;
- const int MAX_BATCH_SIZE = 5; // Process max 5 commands per cycle
+ const int MAX_BATCH_SIZE = hasPendingCommands ? 8 : 5; // Process more when commands are pending but not too many
 
  Command cmd;
  while (uxQueueMessagesWaiting(cmdQueue) > 0 && processedCount < MAX_BATCH_SIZE)
@@ -531,12 +538,6 @@ void loadConfigFromJsonArray(JsonArray arr)
 {
  Serial.println("[CONFIG] Loading server configuration...");
  
- // Save current manual override states before clearing
- std::map<int, bool> manualOverrides;
- for (auto &sw : switchesLocal) {
-   manualOverrides[sw.gpio] = sw.manualOverride;
- }
- 
  switchesLocal.clear();
  
  for (JsonObject o : arr)
@@ -547,31 +548,30 @@ void loadConfigFromJsonArray(JsonArray arr)
  
  // Server can override safety defaults - this is AUTHORIZED configuration
  bool desiredState = o["state"].is<bool>() ? o["state"].as<bool>() : false;
+ bool manualOverride = o["manualOverride"].is<bool>() ? o["manualOverride"].as<bool>() : false;
  
  SwitchState sw{};
  sw.gpio = g;
- sw.state = desiredState;
- sw.defaultState = desiredState; // Store server's desired state as default
  sw.name = String(o["name"].is<const char *>() ? o["name"].as<const char *>() : "");
  
- // Restore manual override if it was set before
- if (manualOverrides.find(g) != manualOverrides.end()) {
-   sw.manualOverride = manualOverrides[g];
-   // If manually overridden, preserve current state instead of server's desired state
-   if (sw.manualOverride) {
-     // Find current state from NVS or keep as is
-     // For now, keep server's state but mark as overridden
-     // Actually, to preserve, we need to load current state
-     // But since we're rebuilding, let's load from NVS for overridden switches
-     prefs.begin("switchcfg", true);
-     bool savedState = prefs.getBool(("state" + String(g)).c_str(), desiredState);
-     prefs.end();
-     sw.state = savedState;
-     Serial.printf("[CONFIG] Preserving manual override for GPIO %d, state=%s\n", g, sw.state ? "ON" : "OFF");
-   }
+ // Handle manual override: if backend says this switch was manually overridden,
+ // preserve the current state from NVS instead of applying server's desired state
+ if (manualOverride) {
+   // Load the manually set state from NVS
+   prefs.begin("switchcfg", true);
+   bool savedState = prefs.getBool(("state" + String(g)).c_str(), desiredState);
+   prefs.end();
+   sw.state = savedState;
+   sw.manualOverride = true;
+   Serial.printf("[CONFIG] Manual override active for GPIO %d, preserving state=%s\n", g, sw.state ? "ON" : "OFF");
  } else {
+   // No manual override, apply server's desired state
+   sw.state = desiredState;
    sw.manualOverride = false;
+   Serial.printf("[CONFIG] Applying server state for GPIO %d, state=%s\n", g, sw.state ? "ON" : "OFF");
  }
+ 
+ sw.defaultState = sw.state; // Store current state as default
 
  // Manual switch config (optional)
  if (o["manualSwitchEnabled"].is<bool>() && o["manualSwitchEnabled"].as<bool>() && o["manualSwitchGpio"].is<int>())
@@ -858,8 +858,10 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  Serial.printf("[CMD] Raw: %.*s\n", (int)len, payload);
  Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
 
- // Queue the command instead of executing immediately
+ // Queue the command and process immediately for faster response
  queueSwitchCommand(gpio, requested);
+ // Process the queue immediately after queuing
+ processCommandQueue();
  return;
  }
  // Bulk switch command support
@@ -886,6 +888,10 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  }
  }
  Serial.printf("[CMD] bulk_switch_command processed %d commands\n", processed);
+ 
+ // Process commands immediately for faster response
+ processCommandQueue();
+ 
  DynamicJsonDocument res(256);
  res["type"] = "bulk_switch_result";
  res["processed"] = processed;
@@ -1260,8 +1266,6 @@ void loop()
  // Handle manual switches
  handleManualSwitches();
 
- // ...existing code...
-
  // Send heartbeat
  sendHeartbeat();
 
@@ -1277,6 +1281,7 @@ void loop()
  // Check system health periodically
  checkSystemHealth();
 
- // Small delay to prevent CPU hogging
- delay(10);
+ // Small delay to prevent CPU hogging - reduce when commands are pending
+ UBaseType_t pendingCmds = uxQueueMessagesWaiting(cmdQueue);
+ delay(pendingCmds > 0 ? 5 : 10); // Balanced: 5ms when busy, 10ms when idle
 }

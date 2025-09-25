@@ -79,6 +79,10 @@ const switchSchema = new mongoose.Schema({
   dontAutoOff: {
     type: Boolean,
     default: false
+  },
+  manualOverride: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 
