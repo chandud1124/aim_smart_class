@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch as ToggleSwitch } from '@/components/ui/switch';
 import { Info, Settings, Download, RefreshCw, Monitor, Lightbulb, Fan, Server, Wifi, WifiOff, MapPin } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -46,19 +47,63 @@ const AIMLPanel: React.FC = () => {
     fetchDevicesAndClassrooms();
   }, []);
 
+  // Update selected device when classroom changes
+  useEffect(() => {
+    if (classroom && devices.length > 0) {
+      const available = getAvailableDevices();
+      const currentDeviceValid = available.some(d => d.id === device);
+
+      // If current device is not available in the new classroom, select the first available device
+      if (!currentDeviceValid && available.length > 0) {
+        setDevice(available[0].id);
+      } else if (available.length === 0) {
+        // No devices available for this classroom
+        setDevice('');
+      }
+    }
+  }, [classroom, devices]);
+
   const fetchDevicesAndClassrooms = async () => {
     try {
       setLoading(true);
       const dashboardRes = await apiService.get('/analytics/dashboard');
       if (dashboardRes.data.devices) {
         setDevices(dashboardRes.data.devices);
-        // Extract unique classrooms
-        const uniqueClassrooms = [...new Set(dashboardRes.data.devices.map((d: any) => d.classroom).filter((c: any) => c))];
-        setClassrooms(uniqueClassrooms.map(name => ({ id: name, name })));
+
+        // Extract and validate unique classrooms
+        const uniqueClassrooms = [...new Set(
+          dashboardRes.data.devices
+            .map((d: any) => d.classroom)
+            .filter((c: any) => c && c.trim() && c !== 'unassigned' && c.length > 0)
+        )];
+
+        // Create classroom objects with proper structure and type detection
+        const classroomObjects = uniqueClassrooms.map(name => {
+          const classroomName = typeof name === 'string' ? name.trim() : String(name).trim();
+          let type = 'room';
+
+          // Detect classroom type based on naming patterns
+          if (classroomName.toLowerCase().includes('lab')) {
+            type = 'lab';
+          } else if (classroomName.toLowerCase().includes('class')) {
+            type = 'classroom';
+          } else if (classroomName.match(/\d+/)) {
+            // If it contains numbers, likely a classroom
+            type = 'classroom';
+          }
+
+          return {
+            id: classroomName,
+            name: classroomName,
+            type: type
+          };
+        });
+
+        setClassrooms(classroomObjects);
 
         // Set default classroom and device
-        if (uniqueClassrooms.length > 0 && !classroom) {
-          setClassroom(uniqueClassrooms[0] as string);
+        if (classroomObjects.length > 0 && !classroom) {
+          setClassroom(classroomObjects[0].id);
         }
       }
     } catch (err) {
@@ -792,24 +837,42 @@ ${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes det
                     <MapPin className="w-4 h-4" />
                     Select Classroom
                   </label>
-                  <select className="input input-bordered w-full" value={classroom} onChange={e => setClassroom(e.target.value)}>
-                    {classrooms.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.type || 'Room'})
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={classroom} onValueChange={setClassroom}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a classroom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classrooms.length === 0 ? (
+                        <SelectItem value="" disabled>No classrooms available</SelectItem>
+                      ) : (
+                        classrooms.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name} ({c.type || 'Room'})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-muted-foreground">Select Device for Analysis</label>
-                  <select className="input input-bordered w-full" value={device} onChange={e => setDevice(e.target.value)}>
-                    {availableDevices.map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.status || 'Unknown'})
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={device} onValueChange={setDevice}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a device" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableDevices.length === 0 ? (
+                        <SelectItem value="" disabled>No devices available for selected classroom</SelectItem>
+                      ) : (
+                        availableDevices.map(d => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name} ({d.status || 'Unknown'})
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center gap-2 sm:justify-end">

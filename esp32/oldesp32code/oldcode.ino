@@ -97,6 +97,21 @@ struct GpioSeq
  long seq;
 };
 
+// Offline event buffer for manual switch events when backend is disconnected
+struct OfflineEvent
+{
+ int gpio;
+ bool previousState;
+ bool newState;
+ unsigned long timestamp;
+ bool valid;
+};
+
+// Safety limits for offline event buffer
+#define MAX_OFFLINE_EVENTS 50  // Maximum events to store (prevents memory overflow)
+#define OFFLINE_EVENT_TIMEOUT_MS 3600000UL  // 1 hour - discard old events
+#define MAX_OFFLINE_MEMORY_KB 8  // Maximum memory for offline events (8KB safety limit)
+
 // ========= Global Variables =========
 WebSocketsClient ws;
 Preferences prefs;
@@ -106,6 +121,7 @@ const unsigned long HEALTH_CHECK_INTERVAL_MS = 10000;
 std::vector<SwitchState> switchesLocal; // dynamically populated
 bool isOfflineMode = true;
 std::vector<GpioSeq> lastSeqs;
+std::vector<OfflineEvent> offlineEvents; // Buffer for offline manual switch events
 
 // ========= Enhanced Error Handling =========
 unsigned long lastErrorReport = 0;
@@ -145,13 +161,14 @@ void logHealth(const char *context)
  UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
  size_t totalHeap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
 
- Serial.printf("[HEALTH] %s | Heap: %u/%u KB (%u KB min) | Stack HWM: %u | Switches: %d | Mode: %s\n",
+ Serial.printf("[HEALTH] %s | Heap: %u/%u KB (%u KB min) | Stack HWM: %u | Switches: %d | Offline Events: %d | Mode: %s\n",
  context,
  freeHeap / 1024,
  totalHeap / 1024,
  minFreeHeap / 1024,
  stackHighWaterMark,
  switchesLocal.size(),
+ offlineEvents.size(),
  isOfflineMode ? "OFFLINE" : "ONLINE");
 
  // Warning if heap is getting low
@@ -224,6 +241,15 @@ void checkSystemHealth()
  {
  Serial.printf("[HEALTH] Many switches active: %d/%d\n", activeSwitches, switchesLocal.size());
  }
+
+ // Check offline event buffer health
+ if (!offlineEvents.empty())
+ {
+ Serial.printf("[HEALTH] Offline events queued: %d/%d\n", offlineEvents.size(), MAX_OFFLINE_EVENTS);
+ 
+ // Clean up old events periodically
+ cleanupOfflineEvents();
+ }
  }
 }
 
@@ -262,6 +288,14 @@ void setupRelays();
 void processCommandQueue();
 void blinkStatus();
 void handleManualSwitches();
+
+// Offline event buffer management functions
+void queueOfflineEvent(int gpio, bool previousState, bool newState);
+void saveOfflineEventsToNVS();
+void loadOfflineEventsFromNVS();
+void sendQueuedOfflineEvents();
+void cleanupOfflineEvents();
+bool checkOfflineMemoryLimit();
 
 // -----------------------------------------------------------------------------
 // Utility helpers
@@ -373,10 +407,11 @@ void sendHeartbeat()
 
 void sendManualSwitchEvent(int gpio, bool previousState, bool newState)
 {
- // Don't send if not connected
+ // If not connected, queue the event for later transmission
  if (!ws.isConnected())
  {
- Serial.printf("[WS] Cannot send manual switch event - not connected\n");
+ Serial.printf("[WS] Backend offline - queuing manual switch event for GPIO %d\n", gpio);
+ queueOfflineEvent(gpio, previousState, newState);
  return;
  }
 
@@ -415,6 +450,237 @@ void sendManualSwitchEvent(int gpio, bool previousState, bool newState)
  }
  }
  Serial.printf("[WS] Manual switch event failed - GPIO %d not found\n", gpio);
+}
+
+// ========= Offline Event Buffer Management =========
+
+// Queue a manual switch event for later transmission when offline
+void queueOfflineEvent(int gpio, bool previousState, bool newState)
+{
+ // Safety check: ensure we don't exceed memory limits
+ if (!checkOfflineMemoryLimit())
+ {
+ Serial.println("[OFFLINE] Memory limit exceeded, cannot queue event");
+ return;
+ }
+
+ // Create new offline event
+ OfflineEvent event;
+ event.gpio = gpio;
+ event.previousState = previousState;
+ event.newState = newState;
+ event.timestamp = millis();
+ event.valid = true;
+
+ // Add to buffer
+ offlineEvents.push_back(event);
+
+ // Safety: enforce maximum event limit
+ if (offlineEvents.size() > MAX_OFFLINE_EVENTS)
+ {
+ // Remove oldest events (FIFO)
+ int excess = offlineEvents.size() - MAX_OFFLINE_EVENTS;
+ offlineEvents.erase(offlineEvents.begin(), offlineEvents.begin() + excess);
+ Serial.printf("[OFFLINE] Removed %d old events to stay within limit\n", excess);
+ }
+
+ // Save to NVS immediately for persistence
+ saveOfflineEventsToNVS();
+
+ Serial.printf("[OFFLINE] Queued event: GPIO %d %s -> %s (buffer: %d/%d)\n", 
+ gpio, previousState ? "ON" : "OFF", newState ? "ON" : "OFF", 
+ offlineEvents.size(), MAX_OFFLINE_EVENTS);
+}
+
+// Check if we're within memory limits for offline events
+bool checkOfflineMemoryLimit()
+{
+ size_t estimatedSize = offlineEvents.size() * sizeof(OfflineEvent);
+ size_t maxSize = MAX_OFFLINE_MEMORY_KB * 1024; // Convert KB to bytes
+
+ if (estimatedSize >= maxSize)
+ {
+ Serial.printf("[OFFLINE] Memory limit check failed: %d/%d bytes\n", estimatedSize, maxSize);
+ return false;
+ }
+
+ // Also check heap memory
+ size_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+ if (freeHeap < 20000) // Less than 20KB free heap
+ {
+ Serial.printf("[OFFLINE] Low heap memory (%d bytes free), skipping event queue\n", freeHeap);
+ return false;
+ }
+
+ return true;
+}
+
+// Save offline events to NVS for persistence across reboots
+void saveOfflineEventsToNVS()
+{
+ prefs.begin("offline_events", false);
+
+ // Save number of events
+ int numEvents = min((int)offlineEvents.size(), MAX_OFFLINE_EVENTS);
+ prefs.putInt("count", numEvents);
+
+ // Save events
+ for (int i = 0; i < numEvents; i++)
+ {
+ if (offlineEvents[i].valid)
+ {
+ prefs.putInt(("gpio" + String(i)).c_str(), offlineEvents[i].gpio);
+ prefs.putBool(("prev" + String(i)).c_str(), offlineEvents[i].previousState);
+ prefs.putBool(("new" + String(i)).c_str(), offlineEvents[i].newState);
+ prefs.putULong(("time" + String(i)).c_str(), offlineEvents[i].timestamp);
+ }
+ }
+
+ prefs.end();
+ Serial.printf("[NVS] Saved %d offline events\n", numEvents);
+}
+
+// Load offline events from NVS on startup
+void loadOfflineEventsFromNVS()
+{
+ prefs.begin("offline_events", true);
+
+ int numEvents = prefs.getInt("count", 0);
+ if (numEvents <= 0 || numEvents > MAX_OFFLINE_EVENTS)
+ {
+ prefs.end();
+ return;
+ }
+
+ offlineEvents.clear();
+ for (int i = 0; i < numEvents; i++)
+ {
+ OfflineEvent event;
+ event.gpio = prefs.getInt(("gpio" + String(i)).c_str(), -1);
+ if (event.gpio >= 0)
+ {
+ event.previousState = prefs.getBool(("prev" + String(i)).c_str(), false);
+ event.newState = prefs.getBool(("new" + String(i)).c_str(), false);
+ event.timestamp = prefs.getULong(("time" + String(i)).c_str(), 0);
+ event.valid = true;
+ offlineEvents.push_back(event);
+ }
+ }
+
+ prefs.end();
+ Serial.printf("[NVS] Loaded %d offline events\n", offlineEvents.size());
+}
+
+// Send all queued offline events when connection is restored
+void sendQueuedOfflineEvents()
+{
+ if (offlineEvents.empty())
+ return;
+
+ if (!ws.isConnected())
+ {
+ Serial.println("[OFFLINE] Cannot send queued events - not connected");
+ return;
+ }
+
+ Serial.printf("[OFFLINE] Sending %d queued events...\n", offlineEvents.size());
+
+ int sent = 0;
+ int failed = 0;
+
+ // Send events in chronological order
+ for (auto &event : offlineEvents)
+ {
+ if (!event.valid)
+ continue;
+
+ // Find the switch to get its details
+ bool switchFound = false;
+ for (auto &sw : switchesLocal)
+ {
+ if (sw.gpio == event.gpio)
+ {
+ DynamicJsonDocument doc(512);
+ doc["type"] = "manual_switch";
+ doc["mac"] = WiFi.macAddress();
+ doc["switchId"] = String(event.gpio);
+ doc["gpio"] = event.gpio;
+ doc["action"] = event.newState ? "manual_on" : "manual_off";
+ doc["previousState"] = event.previousState ? "on" : "off";
+ doc["newState"] = event.newState ? "on" : "off";
+ doc["detectedBy"] = "gpio_interrupt";
+ doc["responseTime"] = millis() % 1000;
+ doc["physicalPin"] = sw.manualGpio;
+ doc["timestamp"] = event.timestamp; // Original timestamp
+ doc["offline_queued"] = true; // Mark as queued event
+
+ if (strlen(DEVICE_SECRET) > 0)
+ {
+ String base = WiFi.macAddress();
+ base += "|";
+ base += String(event.gpio);
+ base += "|";
+ base += String(event.timestamp);
+ doc["sig"] = hmacSha256(DEVICE_SECRET, base);
+ }
+
+ sendJson(doc);
+ sent++;
+ switchFound = true;
+
+ // Small delay between events to prevent overwhelming the backend
+ delay(50);
+ break;
+ }
+ }
+
+ if (!switchFound)
+ {
+ Serial.printf("[OFFLINE] Switch GPIO %d not found, skipping event\n", event.gpio);
+ failed++;
+ }
+ }
+
+ Serial.printf("[OFFLINE] Sent %d events, %d failed\n", sent, failed);
+
+ // Clear the queue after successful transmission
+ if (sent > 0)
+ {
+ offlineEvents.clear();
+ saveOfflineEventsToNVS(); // Clear NVS as well
+ Serial.println("[OFFLINE] Cleared offline event queue");
+ }
+}
+
+// Clean up old offline events to prevent memory buildup
+void cleanupOfflineEvents()
+{
+ if (offlineEvents.empty())
+ return;
+
+ unsigned long now = millis();
+ int cleaned = 0;
+
+ // Remove events older than timeout
+ auto it = offlineEvents.begin();
+ while (it != offlineEvents.end())
+ {
+ if (now - it->timestamp > OFFLINE_EVENT_TIMEOUT_MS)
+ {
+ it = offlineEvents.erase(it);
+ cleaned++;
+ }
+ else
+ {
+ ++it;
+ }
+ }
+
+ if (cleaned > 0)
+ {
+ Serial.printf("[OFFLINE] Cleaned %d old events (timeout: %lu ms)\n", cleaned, OFFLINE_EVENT_TIMEOUT_MS);
+ saveOfflineEventsToNVS();
+ }
 }
 
 long getLastSeq(int gpio)
@@ -770,6 +1036,10 @@ void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
  // Send latest switch states to backend/UI immediately upon reconnect
  // But don't change physical switch states until server confirms
  sendStateUpdate(true);
+
+ // Send any queued offline events
+ sendQueuedOfflineEvents();
+
  logHealth("WebSocket Connected");
  break;
  case WStype_TEXT:
@@ -1120,6 +1390,9 @@ void setup()
  // Setup relays and load configuration from NVS if available
  setupRelays();
 
+ // Load any queued offline events from previous sessions
+ loadOfflineEventsFromNVS();
+
  if (STATUS_LED_PIN != 255)
  {
  pinMode(STATUS_LED_PIN, OUTPUT);
@@ -1189,6 +1462,15 @@ void loop()
  esp_task_wdt_reset();
  delay(100);
  return;
+ }
+
+ // CRASH PREVENTION: Monitor offline event buffer memory usage
+ size_t offlineMemoryUsage = offlineEvents.size() * sizeof(OfflineEvent);
+ if (offlineMemoryUsage > MAX_OFFLINE_MEMORY_KB * 1024) {
+ Serial.printf("[EMERGENCY] Offline events using too much memory: %d/%d KB. Clearing buffer.\n", 
+               offlineMemoryUsage / 1024, MAX_OFFLINE_MEMORY_KB);
+ offlineEvents.clear();
+ saveOfflineEventsToNVS();
  }
 
  // Handle WiFi connection
