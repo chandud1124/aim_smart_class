@@ -11,6 +11,48 @@ const { logger } = require('./middleware/logger');
 const routeMonitor = require('./middleware/routeMonitor');
 const { auth } = require('./middleware/auth');
 
+// Initialize MQTT client
+const mqtt = require('mqtt');
+const mqttClient = mqtt.connect('mqtt://localhost:1883', {
+  clientId: 'backend_server',
+  clean: true,
+  connectTimeout: 4000,
+  reconnectPeriod: 1000,
+});
+
+mqttClient.on('connect', () => {
+  console.log('Connected to MQTT broker');
+  mqttClient.subscribe('esp32/state', (err) => {
+    if (!err) {
+      console.log('Subscribed to esp32/state');
+    }
+  });
+});
+
+mqttClient.on('message', (topic, message) => {
+  console.log(`Received MQTT message on ${topic}: ${message.toString()}`);
+  // Handle ESP32 state updates here
+  if (topic === 'esp32/state') {
+    // Process state updates
+    const states = message.toString().split(',');
+    console.log('ESP32 states:', states);
+  }
+});
+
+mqttClient.on('error', (error) => {
+  console.error('MQTT connection error:', error);
+});
+
+// Function to send switch commands via MQTT
+function sendMqttSwitchCommand(relay, state) {
+  const message = `${relay}:${state}`;
+  mqttClient.publish('esp32/switches', message);
+  console.log(`Sent MQTT command: ${message}`);
+}
+
+// Make MQTT functions available globally
+global.sendMqttSwitchCommand = sendMqttSwitchCommand;
+
 // Load secure configuration if available
 let secureConfig = {};
 try {

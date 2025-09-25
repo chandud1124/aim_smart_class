@@ -100,4 +100,18 @@ router.get('/:deviceId/pir/data',
   require('../controllers/deviceController').getPirData
 );
 
+// MQTT switch command
+router.post('/mqtt/switch/:relay/:state', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), (req, res) => {
+  const { relay, state } = req.params;
+  if (!global.sendMqttSwitchCommand) {
+    return res.status(500).json({ error: 'MQTT client not available' });
+  }
+  try {
+    global.sendMqttSwitchCommand(relay, state);
+    res.json({ success: true, message: `MQTT command sent: ${relay}:${state}` });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to send MQTT command' });
+  }
+});
+
 module.exports = router;

@@ -1,20 +1,21 @@
 // -----------------------------------------------------------------------------
-// Enhanced ESP32 <-> Backend WebSocket implementation with offline functionality
+// Enhanced ESP32 <-> Backend MQTT implementation with offline functionality
 // Supports operation without WiFi/backend connection and prevents crashes
-// Endpoint: ws://<HOST>:3001/esp32-ws (server.js)
+// MQTT Broker: mqtt://<HOST>:1883
 // -----------------------------------------------------------------------------
-// Core messages:
-// -> identify {type:'identify', mac, secret}
-// <- identified {type:'identified', mode, switches:[{gpio,relayGpio,name,...}]}
-// <- config_update {type:'config_update', switches:[...]} (after UI edits)
-// <- switch_command{type:'switch_command', gpio|relayGpio, state}
-// -> state_update {type:'state_update', switches:[{gpio,state}]}
-// -> heartbeat {type:'heartbeat', uptime}
-// <- state_ack {type:'state_ack', changed}
+// Core topics:
+// esp32/identify -> {type:'identify', mac, secret}
+// esp32/identified <- {type:'identified', mode, switches:[{gpio,relayGpio,name,...}]}
+// esp32/config_update <- {type:'config_update', switches:[...]} (after UI edits)
+// esp32/switch_command <- {type:'switch_command', gpio|relayGpio, state}
+// esp32/state_update -> {type:'state_update', switches:[{gpio,state}]}
+// esp32/heartbeat -> {type:'heartbeat', uptime}
+// esp32/state_ack <- {type:'state_ack', changed}
+// esp32/manual_switch -> {type:'manual_switch', gpio, previousState, newState}
 // -----------------------------------------------------------------------------
 
 #include <WiFi.h>
-#include <WebSocketsClient.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <esp_task_wdt.h>
@@ -29,11 +30,26 @@
 
 #define WIFI_SSID "AIMS-WIFI"
 #define WIFI_PASSWORD "Aimswifi#2025"
-#define BACKEND_HOST "172.16.3.171" // backend LAN IP
-#define BACKEND_PORT 3001
-#define WS_PATH "/esp32-ws"
-#define HEARTBEAT_MS 30000UL // 30s heartbeat interval
-#define DEVICE_SECRET "eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def" // device secret from backend
+#define MQTT_BROKER MQTT_BROKER_HOST
+#define MQTT_PORT MQTT_BROKER_PORT
+#define MQTT_USER "" // Leave empty if no auth
+#define MQTT_PASSWORD "" // Leave empty if no auth
+#define DEVICE_SECRET DEVICE_SECRET_KEY // Use config.h definition
+
+// MQTT Topics
+#define TOPIC_IDENTIFY "esp32/identify"
+#define TOPIC_IDENTIFIED "esp32/identified"
+#define TOPIC_CONFIG_UPDATE "esp32/config_update"
+#define TOPIC_SWITCH_COMMAND "esp32/switch_command"
+#define TOPIC_STATE_UPDATE "esp32/state_update"
+#define TOPIC_HEARTBEAT "esp32/heartbeat"
+#define TOPIC_STATE_ACK "esp32/state_ack"
+#define TOPIC_MANUAL_SWITCH "esp32/manual_switch"
+
+// Timing constants
+#define HEARTBEAT_MS 30000  // 30 seconds
+#define MQTT_RETRY_INTERVAL_MS 5000  // 5 seconds
+#define IDENTIFY_RETRY_MS 10000  // 10 seconds
 
 // Optional status LED (set to 255 to disable if your board lacks LED_BUILTIN)
 #ifndef STATUS_LED_PIN
@@ -49,10 +65,9 @@
 #define MAX_COMMAND_QUEUE 16
 #define COMMAND_PROCESS_INTERVAL 25 // Balanced: faster than 100ms but not too aggressive
 
-// WiFi reconnection constants
-#define WIFI_RETRY_INTERVAL_MS 30000UL
-#define IDENTIFY_RETRY_MS 10000UL
-#define WS_RECONNECT_INTERVAL_MS 15000UL // WebSocket reconnection interval
+// MQTT broker configuration (now uses config.h definitions)
+#define MQTT_BROKER_HOST MQTT_BROKER
+#define MQTT_BROKER_PORT MQTT_PORT
 
 // Watchdog timeout (30 seconds)
 #define WDT_TIMEOUT_MS 30000
@@ -113,7 +128,8 @@ struct OfflineEvent
 #define MAX_OFFLINE_MEMORY_KB 8  // Maximum memory for offline events (8KB safety limit)
 
 // ========= Global Variables =========
-WebSocketsClient ws;
+WiFiClient espClient;
+PubSubClient mqtt(espClient);
 Preferences prefs;
 QueueHandle_t cmdQueue;
 unsigned long lastHealthCheck = 0;
@@ -214,13 +230,13 @@ void checkSystemHealth()
  Serial.printf("[HEALTH] WiFi connected, IP: %s\n", WiFi.localIP().toString().c_str());
  }
 
- if (!ws.isConnected() && !isOfflineMode)
+ if (!mqtt.connected() && !isOfflineMode)
  {
- Serial.println("[HEALTH] WebSocket disconnected!");
+ Serial.println("[HEALTH] MQTT disconnected!");
  }
- else if (ws.isConnected())
+ else if (mqtt.connected())
  {
- Serial.printf("[HEALTH] WebSocket connected, identified: %s\n", identified ? "YES" : "NO");
+ Serial.println("[HEALTH] MQTT connected");
  }
 
  // Check command queue health
@@ -266,7 +282,7 @@ unsigned long lastStateSent = 0;
 unsigned long lastCommandProcess = 0;
 unsigned long lastWiFiRetry = 0;
 unsigned long lastIdentifyAttempt = 0;
-unsigned long lastWsReconnectAttempt = 0; // Track WebSocket reconnection attempts
+unsigned long lastMqttReconnectAttempt = 0; // Track MQTT reconnection attempts
 bool pendingState = false;
 int reconnectionAttempts = 0;
 
@@ -283,7 +299,7 @@ void sendManualSwitchEvent(int gpio, bool previousState, bool newState); // Add 
 void loadConfigFromJsonArray(JsonArray arr);
 void saveConfigToNVS();
 void loadConfigFromNVS();
-void onWsEvent(WStype_t type, uint8_t *payload, size_t length);
+void mqttCallback(char* topic, byte* payload, unsigned int length);
 void setupRelays();
 void processCommandQueue();
 void blinkStatus();
@@ -298,16 +314,30 @@ void cleanupOfflineEvents();
 bool checkOfflineMemoryLimit();
 
 // -----------------------------------------------------------------------------
-// Utility helpers
-// -----------------------------------------------------------------------------
+// MQTT publishing function
+void publishMqttMessage(const char* topic, const JsonDocument& doc) {
+  if (!mqtt.connected()) {
+    Serial.println("[MQTT] Not connected, cannot publish message");
+    return;
+  }
+
+  String out;
+  serializeJson(doc, out);
+
+  bool success = mqtt.publish(topic, out.c_str());
+  if (success) {
+    Serial.printf("[MQTT] -> %s: %s\n", topic, out.c_str());
+  } else {
+    Serial.printf("[MQTT] Failed to publish to %s\n", topic);
+    reportError("MQTT_PUBLISH", "Failed to publish message");
+  }
+}
+
+// Legacy sendJson function - now uses MQTT
 void sendJson(const JsonDocument &doc)
 {
- if (!ws.isConnected())
- return;
-
- String out;
- serializeJson(doc, out);
- ws.sendTXT(out);
+  // Default to state topic for backward compatibility
+  publishMqttMessage("esp32/state", doc);
 }
 
 String hmacSha256(const String &key, const String &msg)
@@ -342,7 +372,7 @@ void identify()
  doc["mac"] = WiFi.macAddress();
  doc["secret"] = DEVICE_SECRET; // simple shared secret (upgrade to HMAC if needed)
  doc["offline_capable"] = true; // Indicate this device supports offline mode
- sendJson(doc);
+ publishMqttMessage("esp32/identify", doc);
  lastIdentifyAttempt = millis();
 }
 
@@ -358,7 +388,7 @@ void sendStateUpdate(bool force)
  lastStateSent = now;
 
  // Don't try to send if not connected
- if (!ws.isConnected())
+ if (!mqtt.connected())
  return;
 
  DynamicJsonDocument doc(512);
@@ -382,8 +412,8 @@ void sendStateUpdate(bool force)
  base += (long)doc["ts"];
  doc["sig"] = hmacSha256(DEVICE_SECRET, base);
  }
- sendJson(doc);
- Serial.println(F("[WS] -> state_update"));
+ publishMqttMessage("esp32/state", doc);
+ Serial.println(F("[MQTT] -> state_update"));
 }
 
 void sendHeartbeat()
@@ -393,24 +423,24 @@ void sendHeartbeat()
  return;
  lastHeartbeat = now;
 
- if (ws.isConnected())
+ if (mqtt.connected())
  {
  DynamicJsonDocument doc(256);
  doc["type"] = "heartbeat";
  doc["mac"] = WiFi.macAddress();
  doc["uptime"] = millis() / 1000;
  doc["offline_mode"] = isOfflineMode;
- sendJson(doc);
- Serial.println("[WS] -> heartbeat");
+ publishMqttMessage("esp32/state", doc);
+ Serial.println("[MQTT] -> heartbeat");
  }
 }
 
 void sendManualSwitchEvent(int gpio, bool previousState, bool newState)
 {
  // If not connected, queue the event for later transmission
- if (!ws.isConnected())
+ if (!mqtt.connected())
  {
- Serial.printf("[WS] Backend offline - queuing manual switch event for GPIO %d\n", gpio);
+ Serial.printf("[MQTT] Backend offline - queuing manual switch event for GPIO %d\n", gpio);
  queueOfflineEvent(gpio, previousState, newState);
  return;
  }
@@ -443,13 +473,13 @@ void sendManualSwitchEvent(int gpio, bool previousState, bool newState)
  doc["sig"] = hmacSha256(DEVICE_SECRET, base);
  }
 
- sendJson(doc);
- Serial.printf("[WS] -> manual_switch: GPIO %d %s -> %s (manual pin %d)\n", gpio, 
+ publishMqttMessage("esp32/state", doc);
+ Serial.printf("[MQTT] -> manual_switch: GPIO %d %s -> %s (manual pin %d)\n", gpio, 
  previousState ? "ON" : "OFF", newState ? "ON" : "OFF", sw.manualGpio);
  return;
  }
  }
- Serial.printf("[WS] Manual switch event failed - GPIO %d not found\n", gpio);
+ Serial.printf("[MQTT] Manual switch event failed - GPIO %d not found\n", gpio);
 }
 
 // ========= Offline Event Buffer Management =========
@@ -577,13 +607,13 @@ void sendQueuedOfflineEvents()
  if (offlineEvents.empty())
  return;
 
- if (!ws.isConnected())
+ if (!mqtt.connected())
  {
- Serial.println("[OFFLINE] Cannot send queued events - not connected");
+ Serial.println("[MQTT] Cannot send queued events - not connected");
  return;
  }
 
- Serial.printf("[OFFLINE] Sending %d queued events...\n", offlineEvents.size());
+ Serial.printf("[MQTT] Sending %d queued events...\n", offlineEvents.size());
 
  int sent = 0;
  int failed = 0;
@@ -624,7 +654,7 @@ void sendQueuedOfflineEvents()
  doc["sig"] = hmacSha256(DEVICE_SECRET, base);
  }
 
- sendJson(doc);
+ publishMqttMessage("esp32/state", doc);
  sent++;
  switchFound = true;
 
@@ -636,19 +666,19 @@ void sendQueuedOfflineEvents()
 
  if (!switchFound)
  {
- Serial.printf("[OFFLINE] Switch GPIO %d not found, skipping event\n", event.gpio);
+ Serial.printf("[MQTT] Switch GPIO %d not found, skipping event\n", event.gpio);
  failed++;
  }
  }
 
- Serial.printf("[OFFLINE] Sent %d events, %d failed\n", sent, failed);
+ Serial.printf("[MQTT] Sent %d events, %d failed\n", sent, failed);
 
  // Clear the queue after successful transmission
  if (sent > 0)
  {
  offlineEvents.clear();
  saveOfflineEventsToNVS(); // Clear NVS as well
- Serial.println("[OFFLINE] Cleared offline event queue");
+ Serial.println("[MQTT] Cleared offline event queue");
  }
 }
 
@@ -1013,190 +1043,140 @@ void loadConfigFromNVS()
  Serial.printf("[NVS] Loaded %d switches, restored last known states\n", (int)switchesLocal.size());
 }
 
-void onWsEvent(WStype_t type, uint8_t *payload, size_t len)
-{
- // Reset watchdog at start of WebSocket event processing
- esp_task_wdt_reset();
- 
- switch (type)
- {
- case WStype_CONNECTED:
- Serial.println("WS connected");
- identified = false;
- isOfflineMode = false;
- connState = BACKEND_CONNECTED;
- lastWsReconnectAttempt = millis(); // Reset reconnection timer on successful connection
- if (STATUS_LED_PIN != 255)
- digitalWrite(STATUS_LED_PIN, HIGH);
- 
- // Immediate identification without delay
- Serial.println("[WS] Sending immediate identification...");
- identify();
- 
- // Send latest switch states to backend/UI immediately upon reconnect
- // But don't change physical switch states until server confirms
- sendStateUpdate(true);
+// MQTT callback function to handle incoming messages
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  // Reset watchdog at start of MQTT message processing
+  esp_task_wdt_reset();
 
- // Send any queued offline events
- sendQueuedOfflineEvents();
+  Serial.printf("[MQTT] Message received on topic: %s\n", topic);
 
- logHealth("WebSocket Connected");
- break;
- case WStype_TEXT:
- {
- // CRASH PREVENTION: Check message size before processing
- if (len > 2048) {
- Serial.printf("[WS] Message too large (%d bytes), ignoring to prevent crash\n", len);
- return;
- }
- 
- // CRASH PREVENTION: Use larger JSON buffer and validate allocation
- DynamicJsonDocument doc(1536); // Increased from 1024 to 1536 bytes
- if (doc.capacity() == 0) {
- Serial.println(F("[WS] Failed to allocate JSON memory"));
- reportError("MEMORY", "JSON allocation failed");
- return;
- }
- 
- // Use try-catch to prevent crashes from malformed JSON
- try
- {
- DeserializationError jsonError = deserializeJson(doc, payload, len);
- if (jsonError != DeserializationError::Ok)
- {
- Serial.printf("[WS] JSON parse error: %s\n", jsonError.c_str());
- reportError("JSON_PARSE", "Failed to parse WebSocket message");
- return;
- }
- 
- // CRASH PREVENTION: Log memory usage
- Serial.printf("[WS] JSON parsed successfully, memory used: %d/%d bytes\n", 
-              doc.memoryUsage(), doc.capacity());
- const char *msgType = doc["type"] | "";
- if (strcmp(msgType, "identified") == 0)
- {
- identified = true;
- isOfflineMode = false;
- if (STATUS_LED_PIN != 255)
- digitalWrite(STATUS_LED_PIN, HIGH);
- const char *_mode = doc["mode"].is<const char *>() ? doc["mode"].as<const char *>() : "n/a";
- Serial.printf("[WS] <- identified mode=%s (FAST CONNECTION)\n", _mode);
- 
- // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
- lastSeqs.clear();
- 
- // Load configuration immediately for faster response
- if (doc["switches"].is<JsonArray>())
- {
- Serial.println("[WS] Loading server configuration immediately...");
- loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
- Serial.println("[WS] Server configuration applied successfully");
- }
- else
- {
- Serial.println(F("[CONFIG] No switches in identified payload (using safe defaults)"));
- }
+  // CRASH PREVENTION: Check message size before processing
+  if (length > 2048) {
+    Serial.printf("[MQTT] Message too large (%d bytes), ignoring to prevent crash\n", length);
+    return;
+  }
 
- // Send immediate acknowledgment
- Serial.println("[WS] ESP32 ready for commands");
- return;
- }
- if (strcmp(msgType, "config_update") == 0)
- {
- if (doc["switches"].is<JsonArray>())
- {
- Serial.println(F("[WS] <- config_update"));
- // Clear seq tracking as mapping may change
- lastSeqs.clear();
- loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
- }
+  // CRASH PREVENTION: Use larger JSON buffer and validate allocation
+  DynamicJsonDocument doc(1536); // Increased from 1024 to 1536 bytes
+  if (doc.capacity() == 0) {
+    Serial.println(F("[MQTT] Failed to allocate JSON memory"));
+    reportError("MEMORY", "JSON allocation failed");
+    return;
+  }
 
- // ...existing code...
- return;
- }
- if (strcmp(msgType, "state_ack") == 0)
- {
- bool changed = doc["changed"] | false;
- Serial.printf("[WS] <- state_ack changed=%s\n", changed ? "true" : "false");
- return;
- }
- if (strcmp(msgType, "switch_command") == 0)
- {
- int gpio = doc["relayGpio"].is<int>() ? doc["relayGpio"].as<int>() : (doc["gpio"].is<int>() ? doc["gpio"].as<int>() : -1);
- bool requested = doc["state"] | false;
- long seq = doc["seq"].is<long>() ? doc["seq"].as<long>() : -1;
- Serial.printf("[CMD] Raw: %.*s\n", (int)len, payload);
- Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
+  // Use try-catch to prevent crashes from malformed JSON
+  try {
+    DeserializationError jsonError = deserializeJson(doc, payload, length);
+    if (jsonError != DeserializationError::Ok) {
+      Serial.printf("[MQTT] JSON parse error: %s\n", jsonError.c_str());
+      reportError("JSON_PARSE", "Failed to parse MQTT message");
+      return;
+    }
 
- // Queue the command and process immediately for faster response
- queueSwitchCommand(gpio, requested);
- // Process the queue immediately after queuing
- processCommandQueue();
- return;
- }
- // Bulk switch command support
- if (strcmp(msgType, "bulk_switch_command") == 0)
- {
- Serial.printf("[CMD] bulk_switch_command received\n");
- if (doc["commands"].is<JsonArray>())
- {
- JsonArray cmds = doc["commands"].as<JsonArray>();
- int processed = 0;
- for (JsonObject cmd : cmds)
- {
- int gpio = cmd["relayGpio"].is<int>() ? cmd["relayGpio"].as<int>() : (cmd["gpio"].is<int>() ? cmd["gpio"].as<int>() : -1);
- bool requested = cmd["state"].is<bool>() ? cmd["state"].as<bool>() : false;
- long seq = cmd["seq"].is<long>() ? cmd["seq"].as<long>() : -1;
- if (gpio >= 0)
- {
- queueSwitchCommand(gpio, requested);
- processed++;
- }
- else
- {
- Serial.printf("[CMD] bulk: invalid gpio in command\n");
- }
- }
- Serial.printf("[CMD] bulk_switch_command processed %d commands\n", processed);
- 
- // Process commands immediately for faster response
- processCommandQueue();
- 
- DynamicJsonDocument res(256);
- res["type"] = "bulk_switch_result";
- res["processed"] = processed;
- res["total"] = cmds.size();
- sendJson(res);
- }
- else
- {
- Serial.printf("[CMD] bulk_switch_command missing 'commands' array\n");
- }
- return;
- }
- Serial.printf("[WS] <- unhandled type=%s Raw=%.*s\n", msgType, (int)len, payload);
- }
- catch (const std::exception &e)
- {
- Serial.print("Exception in WebSocket handler: ");
- Serial.println(e.what());
- }
- break;
- }
- case WStype_DISCONNECTED:
- Serial.println("WS disconnected");
- identified = false;
- isOfflineMode = true;
- connState = WIFI_ONLY;
- lastWsReconnectAttempt = millis(); // Reset timer to start reconnection attempts
- if (STATUS_LED_PIN != 255)
- digitalWrite(STATUS_LED_PIN, LOW);
- reportError("WEBSOCKET", "Connection lost");
- Serial.printf("[WS] Will attempt reconnection in %lu seconds\n", WS_RECONNECT_INTERVAL_MS / 1000);
- break;
- default:
- break;
- }
+    // CRASH PREVENTION: Log memory usage
+    Serial.printf("[MQTT] JSON parsed successfully, memory used: %d/%d bytes\n",
+                 doc.memoryUsage(), doc.capacity());
+
+    const char *msgType = doc["type"] | "";
+
+    // Handle identification response
+    if (strcmp(topic, "esp32/identify") == 0 && strcmp(msgType, "identified") == 0) {
+      identified = true;
+      isOfflineMode = false;
+      if (STATUS_LED_PIN != 255)
+        digitalWrite(STATUS_LED_PIN, HIGH);
+      const char *_mode = doc["mode"].is<const char *>() ? doc["mode"].as<const char *>() : "n/a";
+      Serial.printf("[MQTT] <- identified mode=%s\n", _mode);
+
+      // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
+      lastSeqs.clear();
+
+      // Load configuration immediately for faster response
+      if (doc["switches"].is<JsonArray>()) {
+        Serial.println("[MQTT] Loading server configuration immediately...");
+        loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
+        Serial.println("[MQTT] Server configuration applied successfully");
+      } else {
+        Serial.println(F("[CONFIG] No switches in identified payload (using safe defaults)"));
+      }
+
+      // Send immediate acknowledgment
+      Serial.println("[MQTT] ESP32 ready for commands");
+      return;
+    }
+
+    // Handle configuration updates
+    if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "config_update") == 0) {
+      if (doc["switches"].is<JsonArray>()) {
+        Serial.println(F("[MQTT] <- config_update"));
+        // Clear seq tracking as mapping may change
+        lastSeqs.clear();
+        loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
+      }
+      return;
+    }
+
+    // Handle state acknowledgments
+    if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "state_ack") == 0) {
+      bool changed = doc["changed"] | false;
+      Serial.printf("[MQTT] <- state_ack changed=%s\n", changed ? "true" : "false");
+      return;
+    }
+
+    // Handle switch commands
+    if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "switch_command") == 0) {
+      int gpio = doc["relayGpio"].is<int>() ? doc["relayGpio"].as<int>() : (doc["gpio"].is<int>() ? doc["gpio"].as<int>() : -1);
+      bool requested = doc["state"] | false;
+      long seq = doc["seq"].is<long>() ? doc["seq"].as<long>() : -1;
+      Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
+
+      // Queue the command and process immediately for faster response
+      queueSwitchCommand(gpio, requested);
+      // Process the queue immediately after queuing
+      processCommandQueue();
+      return;
+    }
+
+    // Handle bulk switch commands
+    if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "bulk_switch_command") == 0) {
+      Serial.printf("[CMD] bulk_switch_command received\n");
+      if (doc["commands"].is<JsonArray>()) {
+        JsonArray cmds = doc["commands"].as<JsonArray>();
+        int processed = 0;
+        for (JsonObject cmd : cmds) {
+          int gpio = cmd["relayGpio"].is<int>() ? cmd["relayGpio"].as<int>() : (cmd["gpio"].is<int>() ? cmd["gpio"].as<int>() : -1);
+          bool requested = cmd["state"].is<bool>() ? cmd["state"].as<bool>() : false;
+          long seq = cmd["seq"].is<long>() ? cmd["seq"].as<long>() : -1;
+          if (gpio >= 0) {
+            queueSwitchCommand(gpio, requested);
+            processed++;
+          } else {
+            Serial.printf("[CMD] bulk: invalid gpio in command\n");
+          }
+        }
+        Serial.printf("[CMD] bulk_switch_command processed %d commands\n", processed);
+
+        // Process commands immediately for faster response
+        processCommandQueue();
+
+        // Send result back via MQTT
+        DynamicJsonDocument res(256);
+        res["type"] = "bulk_switch_result";
+        res["processed"] = processed;
+        res["total"] = cmds.size();
+        publishMqttMessage("esp32/state", res);
+      } else {
+        Serial.printf("[CMD] bulk_switch_command missing 'commands' array\n");
+      }
+      return;
+    }
+
+    Serial.printf("[MQTT] <- unhandled topic=%s type=%s\n", topic, msgType);
+  }
+  catch (const std::exception &e) {
+    Serial.print("Exception in MQTT handler: ");
+    Serial.println(e.what());
+  }
 }
 
 void setupRelays()
@@ -1424,10 +1404,9 @@ void setup()
  // Configure time
  configTime(0, 0, "pool.ntp.org");
 
- // Setup WebSocket connection
- ws.begin(BACKEND_HOST, BACKEND_PORT, WS_PATH);
- ws.onEvent(onWsEvent);
- ws.setReconnectInterval(5000);
+ // Setup MQTT connection
+ mqtt.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+ mqtt.setCallback(mqttCallback);
  isOfflineMode = false;
  }
  else
@@ -1440,7 +1419,7 @@ void setup()
  lastCommandProcess = millis();
  lastWiFiRetry = millis();
  lastHealthCheck = millis();
- lastWsReconnectAttempt = millis(); // Initialize WebSocket reconnection timer
+ lastMqttReconnectAttempt = millis(); // Initialize MQTT reconnection timer
 
  // Log initial health status
  logHealth("Setup Complete");
@@ -1502,33 +1481,66 @@ void loop()
  }
  else
  {
- if (!ws.isConnected())
+ if (!mqtt.connected() && !isOfflineMode)
  {
  connState = WIFI_ONLY;
  isOfflineMode = true;
  unsigned long now = millis();
  
- // Try to reconnect WebSocket if enough time has passed
- if (now - lastWsReconnectAttempt >= WS_RECONNECT_INTERVAL_MS)
+ // Try to reconnect MQTT if enough time has passed
+ if (now - lastMqttReconnectAttempt >= MQTT_RETRY_INTERVAL_MS)
  {
- lastWsReconnectAttempt = now;
- Serial.println("[WS] Attempting WebSocket reconnection...");
- esp_task_wdt_reset(); // Reset before WebSocket operations
- ws.disconnect();
- delay(100); // Small delay before reconnecting
- ws.begin(BACKEND_HOST, BACKEND_PORT, WS_PATH);
- ws.onEvent(onWsEvent);
- ws.setReconnectInterval(5000);
- esp_task_wdt_reset(); // Reset after WebSocket setup
+ lastMqttReconnectAttempt = now;
+ Serial.println("[MQTT] Attempting MQTT reconnection...");
+ esp_task_wdt_reset(); // Reset before MQTT operations
+ 
+ // Attempt to connect to MQTT broker
+ String clientId = "ESP32-" + WiFi.macAddress();
+ bool connected = mqtt.connect(clientId.c_str());
+ 
+ if (connected) {
+   Serial.println("[MQTT] Connected to broker");
+   
+   // Subscribe to topics
+   mqtt.subscribe("esp32/identify");
+   mqtt.subscribe("esp32/state");
+   mqtt.subscribe("esp32/command");
+   
+   // Reset identification and connection state
+   identified = false;
+   isOfflineMode = false;
+   connState = BACKEND_CONNECTED;
+   
+   if (STATUS_LED_PIN != 255)
+     digitalWrite(STATUS_LED_PIN, HIGH);
+   
+   // Immediate identification without delay
+   Serial.println("[MQTT] Sending immediate identification...");
+   identify();
+   
+   // Send latest switch states to backend/UI immediately upon reconnect
+   sendStateUpdate(true);
+   
+   // Send any queued offline events
+   sendQueuedOfflineEvents();
+   
+   logHealth("MQTT Connected");
+ } else {
+   Serial.println("[MQTT] Connection failed");
+   reportError("MQTT", "Connection failed");
+   Serial.printf("[MQTT] Will attempt reconnection in %lu seconds\n", MQTT_RETRY_INTERVAL_MS / 1000);
+ }
+ 
+ esp_task_wdt_reset(); // Reset after MQTT setup
  }
  
  // Also try to identify if connection exists but not identified
- if (identified == false && now - lastIdentifyAttempt >= IDENTIFY_RETRY_MS)
+ if (mqtt.connected() && identified == false && millis() - lastIdentifyAttempt >= IDENTIFY_RETRY_MS)
  {
  identify();
  }
  }
- else
+ else if (mqtt.connected())
  {
  connState = BACKEND_CONNECTED;
  isOfflineMode = false;
@@ -1538,9 +1550,9 @@ void loop()
  // CRASH PREVENTION: Reset watchdog before intensive operations
  esp_task_wdt_reset();
 
- // Process WebSocket events (can be intensive)
- ws.loop();
- esp_task_wdt_reset(); // Reset watchdog after WebSocket operations
+ // Process MQTT events (can be intensive)
+ mqtt.loop();
+ esp_task_wdt_reset(); // Reset watchdog after MQTT operations
 
  // Process command queue (with built-in rate limiting)
  processCommandQueue();
