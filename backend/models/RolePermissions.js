@@ -111,16 +111,6 @@ const rolePermissionsSchema = new mongoose.Schema({
     canCancelExtensions: { type: Boolean, default: false }
   },
 
-  // Google Calendar Integration Permissions
-  calendarIntegration: {
-    canViewCalendar: { type: Boolean, default: false },
-    canCreateCalendarEvents: { type: Boolean, default: false },
-    canEditCalendarEvents: { type: Boolean, default: false },
-    canDeleteCalendarEvents: { type: Boolean, default: false },
-    canSyncCalendar: { type: Boolean, default: false },
-    canManageCalendarSettings: { type: Boolean, default: false }
-  },
-
   // ESP32 Device Permissions
   esp32Management: {
     canViewESP32Devices: { type: Boolean, default: false },
@@ -255,10 +245,6 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       extensionManagement: {
         canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true, canCancelExtensions: true
       },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true, canEditCalendarEvents: true,
-        canDeleteCalendarEvents: true, canSyncCalendar: true, canManageCalendarSettings: true
-      },
       esp32Management: {
         canViewESP32Devices: true, canConfigureESP32: true, canUpdateESP32Firmware: true,
         canMonitorESP32Status: true, canDebugESP32: true
@@ -297,9 +283,6 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       },
       extensionManagement: {
         canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true
-      },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true, canEditCalendarEvents: true
       },
       bulkOperations: {
         canPerformBulkDeviceControl: true, canBulkUpdateDevices: true
@@ -346,10 +329,6 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       extensionManagement: {
         canRequestExtensions: true, canApproveExtensions: true, canViewExtensionRequests: true, canCancelExtensions: true
       },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true, canEditCalendarEvents: true,
-        canDeleteCalendarEvents: true, canSyncCalendar: true, canManageCalendarSettings: true
-      },
       esp32Management: {
         canViewESP32Devices: true, canConfigureESP32: true, canUpdateESP32Firmware: true,
         canMonitorESP32Status: true, canDebugESP32: true
@@ -386,9 +365,6 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       extensionManagement: {
         canRequestExtensions: true, canViewExtensionRequests: true
       },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true
-      },
       departmentRestrictions: { restrictedToDepartment: true },
       timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '18:00' },
       apiAccess: { canAccessAPI: true, apiRateLimit: 100 }
@@ -414,9 +390,6 @@ rolePermissionsSchema.methods.setDefaultPermissionsForRole = function () {
       },
       extensionManagement: {
         canRequestExtensions: true, canViewExtensionRequests: true
-      },
-      calendarIntegration: {
-        canViewCalendar: true, canCreateCalendarEvents: true
       },
       departmentRestrictions: { restrictedToDepartment: true },
       timeRestrictions: { restrictedHours: true, allowedStartTime: '08:00', allowedEndTime: '18:00' },
@@ -523,7 +496,7 @@ rolePermissionsSchema.methods.getAllPermissions = function () {
   const categories = [
     'userManagement', 'deviceManagement', 'classroomManagement', 'scheduleManagement',
     'activityManagement', 'securityManagement', 'ticketManagement', 'systemManagement',
-    'extensionManagement', 'calendarIntegration', 'esp32Management', 'bulkOperations'
+    'extensionManagement', 'esp32Management', 'bulkOperations'
   ];
 
   categories.forEach(category => {

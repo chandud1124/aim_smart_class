@@ -127,8 +127,6 @@ class SecureConfigManager {
             config.MONGODB_URI = await question('MongoDB URI: ') || 'mongodb://localhost:27017/iot_classroom';
             config.EMAIL_USERNAME = await question('Email Username: ') || '';
             config.EMAIL_PASSWORD = await question('Email Password: ') || '';
-            config.GOOGLE_CLIENT_ID = await question('Google Client ID: ') || '';
-            config.GOOGLE_CLIENT_SECRET = await question('Google Client Secret: ') || '';
 
             // ESP32 Configuration
             console.log('\n🤖 ESP32 Device Configuration:');

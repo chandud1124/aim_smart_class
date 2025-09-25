@@ -4,13 +4,12 @@ const Holiday = require('../models/Holiday');
 
 class CalendarService {
   constructor() {
-    this.apiKey = process.env.CALENDAR_API_KEY;
-    this.calendarId = process.env.CALENDAR_ID;
+    // Removed Google Calendar API configuration
   }
 
   async checkIfHoliday(date) {
     try {
-      // Check local database first
+      // Check local database for holidays
       const localHoliday = await Holiday.findOne({
         date: {
           $gte: new Date(date.setHours(0, 0, 0, 0)),
@@ -27,53 +26,9 @@ class CalendarService {
         };
       }
 
-      // Check Google Calendar if API key is provided
-      if (this.apiKey && this.calendarId) {
-        return await this.checkGoogleCalendar(date);
-      }
-
       return { isHoliday: false };
     } catch (error) {
       console.error('Error checking holiday:', error);
-      return { isHoliday: false };
-    }
-  }
-
-  async checkGoogleCalendar(date) {
-    try {
-      const startOfDay = new Date(date.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(date.setHours(23, 59, 59, 999)).toISOString();
-
-      const response = await axios.get(
-        `https://www.googleapis.com/calendar/v3/calendars/${this.calendarId}/events`,
-        {
-          params: {
-            key: this.apiKey,
-            timeMin: startOfDay,
-            timeMax: endOfDay,
-            singleEvents: true,
-            orderBy: 'startTime'
-          }
-        }
-      );
-
-      const events = response.data.items || [];
-      const holiday = events.find(event => 
-        event.summary && event.summary.toLowerCase().includes('holiday')
-      );
-
-      if (holiday) {
-        return {
-          isHoliday: true,
-          name: holiday.summary,
-          type: 'google',
-          source: 'google_calendar'
-        };
-      }
-
-      return { isHoliday: false };
-    } catch (error) {
-      console.error('Error checking Google Calendar:', error);
       return { isHoliday: false };
     }
   }

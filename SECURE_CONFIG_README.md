@@ -37,7 +37,6 @@ The setup will ask for:
 - JWT Secret (auto-generated if empty)
 - MongoDB URI
 - Email credentials
-- Google OAuth credentials
 - ESP32 device configuration
 - WiFi credentials
 
@@ -89,8 +88,6 @@ node scripts/secure-config.js validate
 | `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/iot_classroom` |
 | `EMAIL_USERNAME` | SMTP username | `your-email@gmail.com` |
 | `EMAIL_PASSWORD` | SMTP password | `your-app-password` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | `your-client-id.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | `your-client-secret` |
 | `ESP32_SECRET_KEY` | ESP32 device authentication key | `eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def` |
 | `WIFI_SSID` | WiFi network name | `AIMS-WIFI` |
 | `WIFI_PASSWORD` | WiFi password | `your-wifi-password` |

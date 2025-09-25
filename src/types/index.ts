@@ -169,7 +169,7 @@ export interface Holiday {
   id: string;
   name: string;
   date: Date;
-  type: 'college' | 'national' | 'religious' | 'google';
+  type: 'college' | 'national' | 'religious';
   createdBy?: string;
 }
 

@@ -428,20 +428,6 @@ export const classroomAPI = {
   revokeClassroomAccess: (accessId: string) => api.delete(`/facility/${accessId}`),
 };
 
-export const googleCalendarAPI = {
-  // Get Google OAuth authorization URL
-  getAuthUrl: (state?: string) => api.get('/google-calendar/auth-url', { params: { state } }),
-
-  // Get Google Calendar events
-  getEvents: () => api.get('/google-calendar/events'),
-
-  // Get Google Calendar connection status
-  getStatus: () => api.get('/google-calendar/status'),
-
-  // Disconnect from Google Calendar
-  disconnect: () => api.post('/google-calendar/disconnect'),
-};
-
 export const devicePermissionsAPI = {
   // Grant device permission to user
   grantDevicePermission: (data: {
