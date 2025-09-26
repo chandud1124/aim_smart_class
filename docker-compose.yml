@@ -1,20 +1,40 @@
 services:
-  # MongoDB Database
-  mongodb:
-    image: mongo:6.0
-    container_name: iot-mongodb
+  # MongoDB Database - Using localhost MongoDB
+  # mongodb:
+  #   image: mongo:6.0
+  #   container_name: iot-mongodb
+  #   restart: unless-stopped
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: admin
+  #     MONGO_INITDB_ROOT_PASSWORD: password123
+  #     MONGO_INITDB_DATABASE: iot-automation
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #     - ./backend/scripts:/docker-entrypoint-initdb.d
+  #   ports:
+  #     - "27017:27017"
+  #   networks:
+  #     - iot-network
+
+  # AI/ML Microservice
+  ai-ml-service:
+    build:
+      context: ./ai_ml_service
+      dockerfile: Dockerfile
+    container_name: iot-ai-ml
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: iot-automation
-    volumes:
-      - mongodb_data:/data/db
-      - ./backend/scripts:/docker-entrypoint-initdb.d
+      PYTHONPATH: /app
     ports:
-      - "27017:27017"
+      - "8002:8002"
     networks:
       - iot-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Backend API
   backend:
@@ -25,20 +45,16 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/iot-automation?authSource=admin
+      MONGODB_URI: mongodb://host.docker.internal:27017/iot_classroom
       PORT: 3001
       JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      AI_ML_SERVICE_URL: http://ai-ml-service:8002
     ports:
       - "3001:3001"
     depends_on:
-      - mongodb
+      - ai-ml-service
     networks:
       - iot-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Frontend
   frontend:
@@ -67,9 +83,101 @@ services:
     networks:
       - iot-network
 
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - iot-network
+      - monitoring
+    depends_on:
+      - backend
+      - ai-ml-service
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: iot-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: iot-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  mongodb-exporter:
+    image: bitnami/mongodb-exporter:latest
+    container_name: iot-mongodb-exporter
+    environment:
+      - MONGODB_URI=mongodb://host.docker.internal:27017/iot_classroom
+    ports:
+      - "9216:9216"
+    restart: unless-stopped
+    networks:
+      - monitoring
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: iot-redis-exporter
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+    ports:
+      - "9121:9121"
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - iot-network
+      - monitoring
+
 volumes:
-  mongodb_data:
+  # mongodb_data:  # Not needed when using localhost MongoDB
+  prometheus_data:
+  grafana_data:
 
 networks:
   iot-network:
+    driver: bridge
+  monitoring:
     driver: bridge

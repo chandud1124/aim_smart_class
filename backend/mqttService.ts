@@ -3,7 +3,7 @@
 
 import mqtt from 'mqtt';
 
-const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://172.16.3.171:3002';
 const client = mqtt.connect(MQTT_BROKER_URL);
 
 const classroomTopics = (id: string) => [

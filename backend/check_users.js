@@ -3,7 +3,7 @@ require('dotenv').config();
 
 async function checkUsers() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
     const User = require('./models/User');
     const users = await User.find({}).select('name email role isApproved isActive');
     console.log('Users in database:');

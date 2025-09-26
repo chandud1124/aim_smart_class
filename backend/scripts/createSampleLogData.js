@@ -5,7 +5,7 @@ const ErrorLog = require('../models/ErrorLog');
 const ManualSwitchLog = require('../models/ManualSwitchLog');
 const DeviceStatusLog = require('../models/DeviceStatusLog');
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });

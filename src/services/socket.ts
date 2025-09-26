@@ -88,18 +88,21 @@ class SocketService {
           // Start with polling transport to avoid WebSocket upgrade issues
           transports: ['polling', 'websocket'],
           timeout: 20000,
-          forceNew: true,
+          forceNew: false, // Don't force new connections
           reconnection: true,
           reconnectionAttempts: this.maxReconnectAttempts,
           reconnectionDelay: 1000,
-          // Disable perMessageDeflate to avoid frame corruption
+          // Disable perMessageDeflate to match server settings
           perMessageDeflate: { threshold: 0 },
           // Force polling initially, then allow upgrade
           rememberUpgrade: true,
           // Add auth token if available
           auth: {
             token: localStorage.getItem('auth_token')
-          }
+          },
+          // Additional stability settings
+          upgrade: true,
+          randomizationFactor: 0.5
         });
 
         this.setupEventListeners();

@@ -127,7 +127,6 @@ export interface ActivityLog {
   triggeredBy: 'user' | 'schedule' | 'pir' | 'master' | 'system';
   userId?: string;
   userName?: string;
-  facility: string;
   location: string;
   timestamp: Date;
   ip?: string;
@@ -146,22 +145,6 @@ export interface ActivityLog {
     signalStrength?: number;
   };
   isManualOverride?: boolean;
-  metadata?: any;
-}
-
-export interface SecurityAlert {
-  id: string;
-  deviceId: string;
-  deviceName: string;
-  location: string;
-  classroom: string;
-  message: string;
-  type: 'timeout' | 'unauthorized_access' | 'device_offline' | 'motion_override';
-  severity: 'low' | 'medium' | 'high';
-  timestamp: Date;
-  acknowledged: boolean;
-  acknowledgedBy?: string;
-  acknowledgedAt?: Date;
   metadata?: any;
 }
 

@@ -30,11 +30,12 @@
 
 #define WIFI_SSID "AIMS-WIFI"
 #define WIFI_PASSWORD "Aimswifi#2025"
-#define MQTT_BROKER MQTT_BROKER_HOST
-#define MQTT_PORT MQTT_BROKER_PORT
+// Use direct definitions instead of macros to avoid compilation issues
+#define MQTT_BROKER "172.16.3.171"
+#define MQTT_PORT 3002
 #define MQTT_USER "" // Leave empty if no auth
 #define MQTT_PASSWORD "" // Leave empty if no auth
-#define DEVICE_SECRET DEVICE_SECRET_KEY // Use config.h definition
+#define DEVICE_SECRET "eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def"
 
 // MQTT Topics
 #define TOPIC_IDENTIFY "esp32/identify"
@@ -47,9 +48,9 @@
 #define TOPIC_MANUAL_SWITCH "esp32/manual_switch"
 
 // Timing constants
-#define HEARTBEAT_MS 30000  // 30 seconds
-#define MQTT_RETRY_INTERVAL_MS 5000  // 5 seconds
-#define IDENTIFY_RETRY_MS 10000  // 10 seconds
+#define HEARTBEAT_MS 30000 // 30 seconds
+#define MQTT_RETRY_INTERVAL_MS 5000 // 5 seconds
+#define IDENTIFY_RETRY_MS 10000 // 10 seconds
 
 // Optional status LED (set to 255 to disable if your board lacks LED_BUILTIN)
 #ifndef STATUS_LED_PIN
@@ -123,9 +124,9 @@ struct OfflineEvent
 };
 
 // Safety limits for offline event buffer
-#define MAX_OFFLINE_EVENTS 50  // Maximum events to store (prevents memory overflow)
-#define OFFLINE_EVENT_TIMEOUT_MS 3600000UL  // 1 hour - discard old events
-#define MAX_OFFLINE_MEMORY_KB 8  // Maximum memory for offline events (8KB safety limit)
+#define MAX_OFFLINE_EVENTS 50 // Maximum events to store (prevents memory overflow)
+#define OFFLINE_EVENT_TIMEOUT_MS 3600000UL // 1 hour - discard old events
+#define MAX_OFFLINE_MEMORY_KB 8 // Maximum memory for offline events (8KB safety limit)
 
 // ========= Global Variables =========
 WiFiClient espClient;
@@ -200,7 +201,7 @@ void logHealth(const char *context)
  }
  }
  else if (freeHeap < 80000)
- { // Less than 80KB free - WARNING  
+ { // Less than 80KB free - WARNING 
  Serial.printf("[WARNING] Heap memory getting low: %u bytes free\n", freeHeap);
  }
 
@@ -210,6 +211,8 @@ void logHealth(const char *context)
  Serial.printf("[WARNING] Low stack space: %u bytes remaining!\n", stackHighWaterMark);
  }
 }
+
+void cleanupOfflineEvents();
 
 // Check system health periodically
 void checkSystemHealth()
@@ -310,34 +313,33 @@ void queueOfflineEvent(int gpio, bool previousState, bool newState);
 void saveOfflineEventsToNVS();
 void loadOfflineEventsFromNVS();
 void sendQueuedOfflineEvents();
-void cleanupOfflineEvents();
 bool checkOfflineMemoryLimit();
 
 // -----------------------------------------------------------------------------
 // MQTT publishing function
 void publishMqttMessage(const char* topic, const JsonDocument& doc) {
-  if (!mqtt.connected()) {
-    Serial.println("[MQTT] Not connected, cannot publish message");
-    return;
-  }
+ if (!mqtt.connected()) {
+ Serial.println("[MQTT] Not connected, cannot publish message");
+ return;
+ }
 
-  String out;
-  serializeJson(doc, out);
+ String out;
+ serializeJson(doc, out);
 
-  bool success = mqtt.publish(topic, out.c_str());
-  if (success) {
-    Serial.printf("[MQTT] -> %s: %s\n", topic, out.c_str());
-  } else {
-    Serial.printf("[MQTT] Failed to publish to %s\n", topic);
-    reportError("MQTT_PUBLISH", "Failed to publish message");
-  }
+ bool success = mqtt.publish(topic, out.c_str());
+ if (success) {
+ Serial.printf("[MQTT] -> %s: %s\n", topic, out.c_str());
+ } else {
+ Serial.printf("[MQTT] Failed to publish to %s\n", topic);
+ reportError("MQTT_PUBLISH", "Failed to publish message");
+ }
 }
 
 // Legacy sendJson function - now uses MQTT
 void sendJson(const JsonDocument &doc)
 {
-  // Default to state topic for backward compatibility
-  publishMqttMessage("esp32/state", doc);
+ // Default to state topic for backward compatibility
+ publishMqttMessage("esp32/state", doc);
 }
 
 String hmacSha256(const String &key, const String &msg)
@@ -768,7 +770,7 @@ void processCommandQueue()
  
  lastCommandProcess = now;
  
- // CRASH PREVENTION: Process multiple commands but limit batch size  
+ // CRASH PREVENTION: Process multiple commands but limit batch size 
  int processedCount = 0;
  const int MAX_BATCH_SIZE = hasPendingCommands ? 8 : 5; // Process more when commands are pending but not too many
 
@@ -801,7 +803,7 @@ void processCommandQueue()
  UBaseType_t remainingItems = uxQueueMessagesWaiting(cmdQueue);
  if (remainingItems > MAX_COMMAND_QUEUE / 2) {
  Serial.printf("[WARNING] Command queue backing up: %d/%d items\n", 
-              remainingItems, MAX_COMMAND_QUEUE);
+ remainingItems, MAX_COMMAND_QUEUE);
  }
 }
 
@@ -853,18 +855,18 @@ void loadConfigFromJsonArray(JsonArray arr)
  // Handle manual override: if backend says this switch was manually overridden,
  // preserve the current state from NVS instead of applying server's desired state
  if (manualOverride) {
-   // Load the manually set state from NVS
-   prefs.begin("switchcfg", true);
-   bool savedState = prefs.getBool(("state" + String(g)).c_str(), desiredState);
-   prefs.end();
-   sw.state = savedState;
-   sw.manualOverride = true;
-   Serial.printf("[CONFIG] Manual override active for GPIO %d, preserving state=%s\n", g, sw.state ? "ON" : "OFF");
+ // Load the manually set state from NVS
+ prefs.begin("switchcfg", true);
+ bool savedState = prefs.getBool(("state" + String(g)).c_str(), desiredState);
+ prefs.end();
+ sw.state = savedState;
+ sw.manualOverride = true;
+ Serial.printf("[CONFIG] Manual override active for GPIO %d, preserving state=%s\n", g, sw.state ? "ON" : "OFF");
  } else {
-   // No manual override, apply server's desired state
-   sw.state = desiredState;
-   sw.manualOverride = false;
-   Serial.printf("[CONFIG] Applying server state for GPIO %d, state=%s\n", g, sw.state ? "ON" : "OFF");
+ // No manual override, apply server's desired state
+ sw.state = desiredState;
+ sw.manualOverride = false;
+ Serial.printf("[CONFIG] Applying server state for GPIO %d, state=%s\n", g, sw.state ? "ON" : "OFF");
  }
  
  sw.defaultState = sw.state; // Store current state as default
@@ -1045,138 +1047,138 @@ void loadConfigFromNVS()
 
 // MQTT callback function to handle incoming messages
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Reset watchdog at start of MQTT message processing
-  esp_task_wdt_reset();
+ // Reset watchdog at start of MQTT message processing
+ esp_task_wdt_reset();
 
-  Serial.printf("[MQTT] Message received on topic: %s\n", topic);
+ Serial.printf("[MQTT] Message received on topic: %s\n", topic);
 
-  // CRASH PREVENTION: Check message size before processing
-  if (length > 2048) {
-    Serial.printf("[MQTT] Message too large (%d bytes), ignoring to prevent crash\n", length);
-    return;
-  }
+ // CRASH PREVENTION: Check message size before processing
+ if (length > 2048) {
+ Serial.printf("[MQTT] Message too large (%d bytes), ignoring to prevent crash\n", length);
+ return;
+ }
 
-  // CRASH PREVENTION: Use larger JSON buffer and validate allocation
-  DynamicJsonDocument doc(1536); // Increased from 1024 to 1536 bytes
-  if (doc.capacity() == 0) {
-    Serial.println(F("[MQTT] Failed to allocate JSON memory"));
-    reportError("MEMORY", "JSON allocation failed");
-    return;
-  }
+ // CRASH PREVENTION: Use larger JSON buffer and validate allocation
+ DynamicJsonDocument doc(1536); // Increased from 1024 to 1536 bytes
+ if (doc.capacity() == 0) {
+ Serial.println(F("[MQTT] Failed to allocate JSON memory"));
+ reportError("MEMORY", "JSON allocation failed");
+ return;
+ }
 
-  // Use try-catch to prevent crashes from malformed JSON
-  try {
-    DeserializationError jsonError = deserializeJson(doc, payload, length);
-    if (jsonError != DeserializationError::Ok) {
-      Serial.printf("[MQTT] JSON parse error: %s\n", jsonError.c_str());
-      reportError("JSON_PARSE", "Failed to parse MQTT message");
-      return;
-    }
+ // Use try-catch to prevent crashes from malformed JSON
+ try {
+ DeserializationError jsonError = deserializeJson(doc, payload, length);
+ if (jsonError != DeserializationError::Ok) {
+ Serial.printf("[MQTT] JSON parse error: %s\n", jsonError.c_str());
+ reportError("JSON_PARSE", "Failed to parse MQTT message");
+ return;
+ }
 
-    // CRASH PREVENTION: Log memory usage
-    Serial.printf("[MQTT] JSON parsed successfully, memory used: %d/%d bytes\n",
-                 doc.memoryUsage(), doc.capacity());
+ // CRASH PREVENTION: Log memory usage
+ Serial.printf("[MQTT] JSON parsed successfully, memory used: %d/%d bytes\n",
+ doc.memoryUsage(), doc.capacity());
 
-    const char *msgType = doc["type"] | "";
+ const char *msgType = doc["type"] | "";
 
-    // Handle identification response
-    if (strcmp(topic, "esp32/identify") == 0 && strcmp(msgType, "identified") == 0) {
-      identified = true;
-      isOfflineMode = false;
-      if (STATUS_LED_PIN != 255)
-        digitalWrite(STATUS_LED_PIN, HIGH);
-      const char *_mode = doc["mode"].is<const char *>() ? doc["mode"].as<const char *>() : "n/a";
-      Serial.printf("[MQTT] <- identified mode=%s\n", _mode);
+ // Handle identification response
+ if (strcmp(topic, "esp32/identify") == 0 && strcmp(msgType, "identified") == 0) {
+ identified = true;
+ isOfflineMode = false;
+ if (STATUS_LED_PIN != 255)
+ digitalWrite(STATUS_LED_PIN, HIGH);
+ const char *_mode = doc["mode"].is<const char *>() ? doc["mode"].as<const char *>() : "n/a";
+ Serial.printf("[MQTT] <- identified mode=%s\n", _mode);
 
-      // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
-      lastSeqs.clear();
+ // Reset per-GPIO sequence tracking on fresh identify to avoid stale_seq after server restarts
+ lastSeqs.clear();
 
-      // Load configuration immediately for faster response
-      if (doc["switches"].is<JsonArray>()) {
-        Serial.println("[MQTT] Loading server configuration immediately...");
-        loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
-        Serial.println("[MQTT] Server configuration applied successfully");
-      } else {
-        Serial.println(F("[CONFIG] No switches in identified payload (using safe defaults)"));
-      }
+ // Load configuration immediately for faster response
+ if (doc["switches"].is<JsonArray>()) {
+ Serial.println("[MQTT] Loading server configuration immediately...");
+ loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
+ Serial.println("[MQTT] Server configuration applied successfully");
+ } else {
+ Serial.println(F("[CONFIG] No switches in identified payload (using safe defaults)"));
+ }
 
-      // Send immediate acknowledgment
-      Serial.println("[MQTT] ESP32 ready for commands");
-      return;
-    }
+ // Send immediate acknowledgment
+ Serial.println("[MQTT] ESP32 ready for commands");
+ return;
+ }
 
-    // Handle configuration updates
-    if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "config_update") == 0) {
-      if (doc["switches"].is<JsonArray>()) {
-        Serial.println(F("[MQTT] <- config_update"));
-        // Clear seq tracking as mapping may change
-        lastSeqs.clear();
-        loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
-      }
-      return;
-    }
+ // Handle configuration updates
+ if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "config_update") == 0) {
+ if (doc["switches"].is<JsonArray>()) {
+ Serial.println(F("[MQTT] <- config_update"));
+ // Clear seq tracking as mapping may change
+ lastSeqs.clear();
+ loadConfigFromJsonArray(doc["switches"].as<JsonArray>());
+ }
+ return;
+ }
 
-    // Handle state acknowledgments
-    if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "state_ack") == 0) {
-      bool changed = doc["changed"] | false;
-      Serial.printf("[MQTT] <- state_ack changed=%s\n", changed ? "true" : "false");
-      return;
-    }
+ // Handle state acknowledgments
+ if (strcmp(topic, "esp32/state") == 0 && strcmp(msgType, "state_ack") == 0) {
+ bool changed = doc["changed"] | false;
+ Serial.printf("[MQTT] <- state_ack changed=%s\n", changed ? "true" : "false");
+ return;
+ }
 
-    // Handle switch commands
-    if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "switch_command") == 0) {
-      int gpio = doc["relayGpio"].is<int>() ? doc["relayGpio"].as<int>() : (doc["gpio"].is<int>() ? doc["gpio"].as<int>() : -1);
-      bool requested = doc["state"] | false;
-      long seq = doc["seq"].is<long>() ? doc["seq"].as<long>() : -1;
-      Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
+ // Handle switch commands
+ if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "switch_command") == 0) {
+ int gpio = doc["relayGpio"].is<int>() ? doc["relayGpio"].as<int>() : (doc["gpio"].is<int>() ? doc["gpio"].as<int>() : -1);
+ bool requested = doc["state"] | false;
+ long seq = doc["seq"].is<long>() ? doc["seq"].as<long>() : -1;
+ Serial.printf("[CMD] switch_command gpio=%d state=%s seq=%ld\n", gpio, requested ? "ON" : "OFF", seq);
 
-      // Queue the command and process immediately for faster response
-      queueSwitchCommand(gpio, requested);
-      // Process the queue immediately after queuing
-      processCommandQueue();
-      return;
-    }
+ // Queue the command and process immediately for faster response
+ queueSwitchCommand(gpio, requested);
+ // Process the queue immediately after queuing
+ processCommandQueue();
+ return;
+ }
 
-    // Handle bulk switch commands
-    if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "bulk_switch_command") == 0) {
-      Serial.printf("[CMD] bulk_switch_command received\n");
-      if (doc["commands"].is<JsonArray>()) {
-        JsonArray cmds = doc["commands"].as<JsonArray>();
-        int processed = 0;
-        for (JsonObject cmd : cmds) {
-          int gpio = cmd["relayGpio"].is<int>() ? cmd["relayGpio"].as<int>() : (cmd["gpio"].is<int>() ? cmd["gpio"].as<int>() : -1);
-          bool requested = cmd["state"].is<bool>() ? cmd["state"].as<bool>() : false;
-          long seq = cmd["seq"].is<long>() ? cmd["seq"].as<long>() : -1;
-          if (gpio >= 0) {
-            queueSwitchCommand(gpio, requested);
-            processed++;
-          } else {
-            Serial.printf("[CMD] bulk: invalid gpio in command\n");
-          }
-        }
-        Serial.printf("[CMD] bulk_switch_command processed %d commands\n", processed);
+ // Handle bulk switch commands
+ if (strcmp(topic, "esp32/command") == 0 && strcmp(msgType, "bulk_switch_command") == 0) {
+ Serial.printf("[CMD] bulk_switch_command received\n");
+ if (doc["commands"].is<JsonArray>()) {
+ JsonArray cmds = doc["commands"].as<JsonArray>();
+ int processed = 0;
+ for (JsonObject cmd : cmds) {
+ int gpio = cmd["relayGpio"].is<int>() ? cmd["relayGpio"].as<int>() : (cmd["gpio"].is<int>() ? cmd["gpio"].as<int>() : -1);
+ bool requested = cmd["state"].is<bool>() ? cmd["state"].as<bool>() : false;
+ long seq = cmd["seq"].is<long>() ? cmd["seq"].as<long>() : -1;
+ if (gpio >= 0) {
+ queueSwitchCommand(gpio, requested);
+ processed++;
+ } else {
+ Serial.printf("[CMD] bulk: invalid gpio in command\n");
+ }
+ }
+ Serial.printf("[CMD] bulk_switch_command processed %d commands\n", processed);
 
-        // Process commands immediately for faster response
-        processCommandQueue();
+ // Process commands immediately for faster response
+ processCommandQueue();
 
-        // Send result back via MQTT
-        DynamicJsonDocument res(256);
-        res["type"] = "bulk_switch_result";
-        res["processed"] = processed;
-        res["total"] = cmds.size();
-        publishMqttMessage("esp32/state", res);
-      } else {
-        Serial.printf("[CMD] bulk_switch_command missing 'commands' array\n");
-      }
-      return;
-    }
+ // Send result back via MQTT
+ DynamicJsonDocument res(256);
+ res["type"] = "bulk_switch_result";
+ res["processed"] = processed;
+ res["total"] = cmds.size();
+ publishMqttMessage("esp32/state", res);
+ } else {
+ Serial.printf("[CMD] bulk_switch_command missing 'commands' array\n");
+ }
+ return;
+ }
 
-    Serial.printf("[MQTT] <- unhandled topic=%s type=%s\n", topic, msgType);
-  }
-  catch (const std::exception &e) {
-    Serial.print("Exception in MQTT handler: ");
-    Serial.println(e.what());
-  }
+ Serial.printf("[MQTT] <- unhandled topic=%s type=%s\n", topic, msgType);
+ }
+ catch (const std::exception &e) {
+ Serial.print("Exception in MQTT handler: ");
+ Serial.println(e.what());
+ }
 }
 
 void setupRelays()
@@ -1188,40 +1190,40 @@ void setupRelays()
  loadConfigFromNVS();
 
  if (switchesLocal.empty()) {
-   Serial.println("[SETUP] No saved config, using defaults from config.h");
-   for (int i = 0; i < MAX_SWITCHES; i++) {
-     SwitchState sw{};
-     sw.gpio = defaultSwitchConfigs[i].relayPin;
-     sw.state = false; // Default to OFF if no saved state
-     sw.defaultState = false;
-     sw.name = defaultSwitchConfigs[i].name;
-     sw.manualOverride = false;
-     sw.manualEnabled = true;
-     sw.manualGpio = defaultSwitchConfigs[i].manualPin;
-     sw.manualActiveLow = defaultSwitchConfigs[i].manualActiveLow;
-     sw.manualMomentary = false;
+ Serial.println("[SETUP] No saved config, using defaults from config.h");
+ for (int i = 0; i < MAX_SWITCHES; i++) {
+ SwitchState sw{};
+ sw.gpio = defaultSwitchConfigs[i].relayPin;
+ sw.state = false; // Default to OFF if no saved state
+ sw.defaultState = false;
+ sw.name = defaultSwitchConfigs[i].name;
+ sw.manualOverride = false;
+ sw.manualEnabled = true;
+ sw.manualGpio = defaultSwitchConfigs[i].manualPin;
+ sw.manualActiveLow = defaultSwitchConfigs[i].manualActiveLow;
+ sw.manualMomentary = false;
 
-     pinMode(sw.gpio, OUTPUT);
-     digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+ pinMode(sw.gpio, OUTPUT);
+ digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
 
-     if (sw.manualGpio >= 34 && sw.manualGpio <= 39) {
-       pinMode(sw.manualGpio, INPUT);
-     } else {
-       pinMode(sw.manualGpio, INPUT_PULLUP);
-     }
-     sw.lastManualLevel = digitalRead(sw.manualGpio);
-     sw.stableManualLevel = sw.lastManualLevel;
-     sw.lastManualActive = sw.manualActiveLow ? (sw.stableManualLevel == LOW) : (sw.stableManualLevel == HIGH);
-     switchesLocal.push_back(sw);
-   }
-   saveConfigToNVS();
+ if (sw.manualGpio >= 34 && sw.manualGpio <= 39) {
+ pinMode(sw.manualGpio, INPUT);
  } else {
-   Serial.println("[SETUP] Restoring relay states from NVS");
-   for (auto &sw : switchesLocal) {
-     pinMode(sw.gpio, OUTPUT);
-     digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
-     Serial.printf("[RESTORE] Switch %s (GPIO %d) restored to %s\n", sw.name.c_str(), sw.gpio, sw.state ? "ON" : "OFF");
-   }
+ pinMode(sw.manualGpio, INPUT_PULLUP);
+ }
+ sw.lastManualLevel = digitalRead(sw.manualGpio);
+ sw.stableManualLevel = sw.lastManualLevel;
+ sw.lastManualActive = sw.manualActiveLow ? (sw.stableManualLevel == LOW) : (sw.stableManualLevel == HIGH);
+ switchesLocal.push_back(sw);
+ }
+ saveConfigToNVS();
+ } else {
+ Serial.println("[SETUP] Restoring relay states from NVS");
+ for (auto &sw : switchesLocal) {
+ pinMode(sw.gpio, OUTPUT);
+ digitalWrite(sw.gpio, sw.state ? RELAY_ON_LEVEL : RELAY_OFF_LEVEL);
+ Serial.printf("[RESTORE] Switch %s (GPIO %d) restored to %s\n", sw.name.c_str(), sw.gpio, sw.state ? "ON" : "OFF");
+ }
  }
 
  Serial.println("[SETUP] All switches initialized to last known state");
@@ -1265,81 +1267,81 @@ void handleManualSwitches()
  /*
  struct tm timeinfo;
  if (getLocalTime(&timeinfo)) {
-   int hour = timeinfo.tm_hour;
-   bool isNightTime = (hour < 6 || hour > 22); // 10 PM to 6 AM
-   if (isNightTime) {
-     return; // Skip manual switch processing during night hours
-   }
+ int hour = timeinfo.tm_hour;
+ bool isNightTime = (hour < 6 || hour > 22); // 10 PM to 6 AM
+ if (isNightTime) {
+ return; // Skip manual switch processing during night hours
+ }
  }
  */
 
  for (auto &sw : switchesLocal)
  {
-   if (!sw.manualEnabled || sw.manualGpio < 0)
-     continue;
+ if (!sw.manualEnabled || sw.manualGpio < 0)
+ continue;
 
-   // Read current level
-   int rawLevel = digitalRead(sw.manualGpio);
+ // Read current level
+ int rawLevel = digitalRead(sw.manualGpio);
 
-   // If level changed, start debounce
-   if (rawLevel != sw.lastManualLevel)
-   {
-     sw.lastManualLevel = rawLevel;
-     sw.lastManualChangeMs = now;
-   }
+ // If level changed, start debounce
+ if (rawLevel != sw.lastManualLevel)
+ {
+ sw.lastManualLevel = rawLevel;
+ sw.lastManualChangeMs = now;
+ }
 
-   // Check if debounce period passed
-   if (rawLevel != sw.stableManualLevel && (now - sw.lastManualChangeMs >= MANUAL_DEBOUNCE_MS))
-   {
-     // Debounced change detected
-     sw.stableManualLevel = rawLevel;
-     bool active = sw.manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
+ // Check if debounce period passed
+ if (rawLevel != sw.stableManualLevel && (now - sw.lastManualChangeMs >= MANUAL_DEBOUNCE_MS))
+ {
+ // Debounced change detected
+ sw.stableManualLevel = rawLevel;
+ bool active = sw.manualActiveLow ? (rawLevel == LOW) : (rawLevel == HIGH);
 
-     // Prevent repeated toggles within MANUAL_REPEAT_IGNORE_MS
-     static unsigned long lastManualTriggerMs[MAX_SWITCHES] = {0};
-     int swIdx = &sw - &switchesLocal[0];
-     if (swIdx >= 0 && swIdx < MAX_SWITCHES) {
-       if (now - lastManualTriggerMs[swIdx] < MANUAL_REPEAT_IGNORE_MS) {
-         // Ignore repeated toggles
-         Serial.printf("[MANUAL] Ignored repeated toggle for GPIO %d within %d ms\n", sw.gpio, MANUAL_REPEAT_IGNORE_MS);
-         sw.lastManualActive = active;
-         continue;
-       }
-       lastManualTriggerMs[swIdx] = now;
-     }
+ // Prevent repeated toggles within MANUAL_REPEAT_IGNORE_MS
+ static unsigned long lastManualTriggerMs[MAX_SWITCHES] = {0};
+ int swIdx = &sw - &switchesLocal[0];
+ if (swIdx >= 0 && swIdx < MAX_SWITCHES) {
+ if (now - lastManualTriggerMs[swIdx] < MANUAL_REPEAT_IGNORE_MS) {
+ // Ignore repeated toggles
+ Serial.printf("[MANUAL] Ignored repeated toggle for GPIO %d within %d ms\n", sw.gpio, MANUAL_REPEAT_IGNORE_MS);
+ sw.lastManualActive = active;
+ continue;
+ }
+ lastManualTriggerMs[swIdx] = now;
+ }
 
-     if (sw.manualMomentary)
-     {
-       // For momentary switches, toggle on active edge
-       if (active && !sw.lastManualActive)
-       {
-         // Toggle on active edge
-         bool previousState = sw.state;
-         Serial.printf("[MANUAL] Momentary switch GPIO %d (pin %d) pressed - toggling %s -> %s\n", 
-           sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", !previousState ? "ON" : "OFF");
-         queueSwitchCommand(sw.gpio, !sw.state);
-         sw.manualOverride = true;
-         // Send manual switch event to backend
-         sendManualSwitchEvent(sw.gpio, previousState, !previousState);
-       }
-     }
-     else
-     {
-       // For maintained switches, follow switch position
-       if (active != sw.state)
-       {
-         bool previousState = sw.state;
-         Serial.printf("[MANUAL] Maintained switch GPIO %d (pin %d) changed - %s -> %s\n", 
-           sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", active ? "ON" : "OFF");
-         queueSwitchCommand(sw.gpio, active);
-         sw.manualOverride = true;
-         // Send manual switch event to backend
-         sendManualSwitchEvent(sw.gpio, previousState, active);
-       }
-     }
+ if (sw.manualMomentary)
+ {
+ // For momentary switches, toggle on active edge
+ if (active && !sw.lastManualActive)
+ {
+ // Toggle on active edge
+ bool previousState = sw.state;
+ Serial.printf("[MANUAL] Momentary switch GPIO %d (pin %d) pressed - toggling %s -> %s\n", 
+ sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", !previousState ? "ON" : "OFF");
+ queueSwitchCommand(sw.gpio, !sw.state);
+ sw.manualOverride = true;
+ // Send manual switch event to backend
+ sendManualSwitchEvent(sw.gpio, previousState, !previousState);
+ }
+ }
+ else
+ {
+ // For maintained switches, follow switch position
+ if (active != sw.state)
+ {
+ bool previousState = sw.state;
+ Serial.printf("[MANUAL] Maintained switch GPIO %d (pin %d) changed - %s -> %s\n", 
+ sw.gpio, sw.manualGpio, previousState ? "ON" : "OFF", active ? "ON" : "OFF");
+ queueSwitchCommand(sw.gpio, active);
+ sw.manualOverride = true;
+ // Send manual switch event to backend
+ sendManualSwitchEvent(sw.gpio, previousState, active);
+ }
+ }
 
-     sw.lastManualActive = active;
-   }
+ sw.lastManualActive = active;
+ }
  }
 }
 
@@ -1447,7 +1449,7 @@ void loop()
  size_t offlineMemoryUsage = offlineEvents.size() * sizeof(OfflineEvent);
  if (offlineMemoryUsage > MAX_OFFLINE_MEMORY_KB * 1024) {
  Serial.printf("[EMERGENCY] Offline events using too much memory: %d/%d KB. Clearing buffer.\n", 
-               offlineMemoryUsage / 1024, MAX_OFFLINE_MEMORY_KB);
+ offlineMemoryUsage / 1024, MAX_OFFLINE_MEMORY_KB);
  offlineEvents.clear();
  saveOfflineEventsToNVS();
  }
@@ -1499,36 +1501,36 @@ void loop()
  bool connected = mqtt.connect(clientId.c_str());
  
  if (connected) {
-   Serial.println("[MQTT] Connected to broker");
-   
-   // Subscribe to topics
-   mqtt.subscribe("esp32/identify");
-   mqtt.subscribe("esp32/state");
-   mqtt.subscribe("esp32/command");
-   
-   // Reset identification and connection state
-   identified = false;
-   isOfflineMode = false;
-   connState = BACKEND_CONNECTED;
-   
-   if (STATUS_LED_PIN != 255)
-     digitalWrite(STATUS_LED_PIN, HIGH);
-   
-   // Immediate identification without delay
-   Serial.println("[MQTT] Sending immediate identification...");
-   identify();
-   
-   // Send latest switch states to backend/UI immediately upon reconnect
-   sendStateUpdate(true);
-   
-   // Send any queued offline events
-   sendQueuedOfflineEvents();
-   
-   logHealth("MQTT Connected");
+ Serial.println("[MQTT] Connected to broker");
+ 
+ // Subscribe to topics
+ mqtt.subscribe("esp32/identify");
+ mqtt.subscribe("esp32/state");
+ mqtt.subscribe("esp32/command");
+ 
+ // Reset identification and connection state
+ identified = false;
+ isOfflineMode = false;
+ connState = BACKEND_CONNECTED;
+ 
+ if (STATUS_LED_PIN != 255)
+ digitalWrite(STATUS_LED_PIN, HIGH);
+ 
+ // Immediate identification without delay
+ Serial.println("[MQTT] Sending immediate identification...");
+ identify();
+ 
+ // Send latest switch states to backend/UI immediately upon reconnect
+ sendStateUpdate(true);
+ 
+ // Send any queued offline events
+ sendQueuedOfflineEvents();
+ 
+ logHealth("MQTT Connected");
  } else {
-   Serial.println("[MQTT] Connection failed");
-   reportError("MQTT", "Connection failed");
-   Serial.printf("[MQTT] Will attempt reconnection in %lu seconds\n", MQTT_RETRY_INTERVAL_MS / 1000);
+ Serial.println("[MQTT] Connection failed");
+ reportError("MQTT", "Connection failed");
+ Serial.printf("[MQTT] Will attempt reconnection in %lu seconds\n", MQTT_RETRY_INTERVAL_MS / 1000);
  }
  
  esp_task_wdt_reset(); // Reset after MQTT setup

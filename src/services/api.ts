@@ -271,26 +271,9 @@ export const scheduleAPI = {
 export const activityAPI = {
   getActivities: (filters?: Record<string, unknown>) => api.get('/activities', { params: filters }),
 
-  getStats: (period?: string) => api.get('/activities/stats', { params: { period } }),
-
   getDeviceActivities: (deviceId: string) => api.get(`/activities/device/${deviceId}`),
 
   getUserActivities: (userId: string) => api.get(`/activities/user/${userId}`),
-};
-
-export const securityAPI = {
-  getAlerts: (params?: Record<string, unknown>) => api.get('/security/alerts', { params }),
-
-  getBlacklist: () => api.get('/security/blacklist'),
-
-  getMetrics: (range?: string) => api.get('/security/metrics', { params: { range } }),
-
-  acknowledgeAlert: (alertId: string) => api.post(`/security/alerts/${alertId}/acknowledge`),
-
-  resolveAlert: (alertId: string, resolution?: string) => 
-    api.post(`/security/alerts/${alertId}/resolve`, { resolution }),
-
-  createAlert: (alertData: Record<string, unknown>) => api.post('/security/alerts', alertData),
 };
 
 export const ticketAPI = {
@@ -330,15 +313,6 @@ export const ticketAPI = {
   deleteTicket: (ticketId: string) => api.delete(`/tickets/${ticketId}`),
 
   getTicketStats: () => api.get('/tickets/stats'),
-};
-
-export const bulkAPI = {
-  createDevices: (devices: Device[]) => api.post('/bulk/devices', { devices }),
-  
-  toggleSwitches: (devices: string[], switchId: string, state: boolean) => 
-    api.post('/bulk/toggle', { devices, switchId, state }),
-  
-  updateDevices: (updates: Partial<Device>[]) => api.put('/bulk/devices', { updates }),
 };
 
 export const rolePermissionsAPI = {
@@ -391,41 +365,6 @@ export const rolePermissionsAPI = {
   // Check if a role has a specific permission
   checkPermission: (role: string, category: string, permission: string) =>
     api.get(`/role-permissions/check/${role}/${category}/${permission}`),
-};
-
-export const classroomAPI = {
-  // Get classrooms summary
-  getClassroomsSummary: () => api.get('/facility/summary'),
-
-  // Get all classroom access records
-  getAllClassroomAccess: () => api.get('/facility/all'),
-
-  // Get user's classroom access
-  getUserClassroomAccess: (userId: string) => api.get(`/facility/user/${userId}`),
-
-  // Grant classroom access
-  grantClassroomAccess: (data: {
-    userId: string;
-    classroom: string;
-    permissions: {
-      canControlDevices: boolean;
-      canViewSensors: boolean;
-      canModifySchedule: boolean;
-      canAccessAfterHours: boolean;
-      canOverrideSecurity: boolean;
-    };
-    timeRestrictions?: {
-      enabled: boolean;
-      allowedDays: string[];
-      startTime: string;
-      endTime: string;
-    };
-    expiresAt?: string;
-    reason: string;
-  }) => api.post('/facility/grant', data),
-
-  // Revoke classroom access
-  revokeClassroomAccess: (accessId: string) => api.delete(`/facility/${accessId}`),
 };
 
 export const devicePermissionsAPI = {
@@ -525,75 +464,6 @@ export const activityLogsAPI = {
     classroom?: string;
     limit?: number;
   }) => api.get('/activity-logs', { params }),
-};
-
-export const enhancedLogsAPI = {
-  // Get activity logs with advanced filtering
-  getActivityLogs: (params?: {
-    page?: number;
-    limit?: number;
-    deviceId?: string;
-    switchId?: string;
-    action?: string;
-    triggeredBy?: string;
-    userId?: string;
-    classroom?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) => api.get('/enhanced-logs/activities', { params }),
-
-  // Get error logs with advanced filtering
-  getErrorLogs: (params?: {
-    page?: number;
-    limit?: number;
-    errorType?: string;
-    severity?: string;
-    resolved?: boolean;
-    deviceId?: string;
-    userId?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-  }) => api.get('/enhanced-logs/errors', { params }),
-
-  // Get manual switch logs
-  getManualSwitchLogs: (params?: {
-    page?: number;
-    limit?: number;
-    deviceId?: string;
-    switchId?: string;
-    action?: string;
-    hasConflict?: boolean;
-    startDate?: string;
-    endDate?: string;
-  }) => api.get('/enhanced-logs/manual-switches', { params }),
-
-  // Get device status logs
-  getDeviceStatusLogs: (params?: {
-    page?: number;
-    limit?: number;
-    deviceId?: string;
-    checkType?: string;
-    hasInconsistencies?: boolean;
-    startDate?: string;
-    endDate?: string;
-  }) => api.get('/enhanced-logs/device-status', { params }),
-
-  // Export logs to Excel
-  exportLogs: (data: {
-    logType: 'activities' | 'errors' | 'manual-switches' | 'device-status';
-  filters?: Record<string, unknown>;
-    includeColumns?: string[];
-  }) => api.post('/enhanced-logs/export/excel', data),
-
-  // Mark error as resolved
-  resolveError: (errorId: string, data?: { notes?: string }) =>
-    api.patch(`/enhanced-logs/errors/${errorId}/resolve`, data),
-
-  // Get log statistics
-  getLogStats: (timeframe?: string) =>
-    api.get('/enhanced-logs/stats', { params: { timeframe } }),
 };
 
 export default api;

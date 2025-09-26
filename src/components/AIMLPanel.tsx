@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch as ToggleSwitch } from '@/components/ui/switch';
-import { Info, Settings, Download, RefreshCw, Monitor, Lightbulb, Fan, Server, Wifi, WifiOff, MapPin } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Info, Settings, Download, RefreshCw, Monitor, Lightbulb, Fan, Server, Wifi, WifiOff, MapPin, Brain, TrendingUp, AlertTriangle, Zap, Calendar, Clock } from 'lucide-react';
 import { apiService } from '@/services/api';
 
 const CLASSROOMS = [
@@ -38,9 +40,9 @@ const AIMLPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [chartData, setChartData] = useState<any>({});
   const [devices, setDevices] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [predictions, setPredictions] = useState<any>({});
 
   // Fetch devices and classrooms on mount
   useEffect(() => {
@@ -137,49 +139,22 @@ const AIMLPanel: React.FC = () => {
   const availableDevices = getAvailableDevices();
   const currentDevice = getCurrentDevice();
 
-  // Feature descriptions and chart types
-  const FEATURE_META: Record<string, { desc: string; action: string; chart: string; inputPlaceholder: string }> = {
+  // Feature descriptions for AI predictions
+  const FEATURE_META: Record<string, { desc: string; action: string; inputPlaceholder: string }> = {
     forecast: {
-      desc: `Predicts ${currentDevice?.name?.toLowerCase() || 'device'} usage patterns based on class schedules and historical data.`,
+      desc: `AI-powered forecasting predicts ${currentDevice?.name?.toLowerCase() || 'device'} usage patterns for optimal planning and resource allocation.`,
       action: 'Generate Forecast',
-      chart: 'line',
-      inputPlaceholder: `Enter past ${currentDevice?.name?.toLowerCase() || 'device'} usage data (e.g., 1,0,1,1,0,1)`,
+      inputPlaceholder: `Analyzing historical patterns for ${currentDevice?.name?.toLowerCase() || 'device'} usage prediction`,
     },
     schedule: {
-      desc: `Optimizes ${currentDevice?.name?.toLowerCase() || 'device'} schedules based on class timetables and energy efficiency.`,
+      desc: `Intelligent scheduling optimizes ${currentDevice?.name?.toLowerCase() || 'device'} operation times based on usage patterns and energy efficiency goals.`,
       action: 'Optimize Schedule',
-      chart: 'bar',
-      inputPlaceholder: `Enter ${currentDevice?.name?.toLowerCase() || 'device'} usage patterns or time preferences`,
+      inputPlaceholder: `AI analyzing usage patterns to create optimal ${currentDevice?.name?.toLowerCase() || 'device'} schedule`,
     },
     anomaly: {
-      desc: `Detects unusual ${currentDevice?.name?.toLowerCase() || 'device'} behavior that may indicate maintenance needs.`,
+      desc: `Machine learning detects unusual ${currentDevice?.name?.toLowerCase() || 'device'} behavior that may indicate maintenance needs or system issues.`,
       action: 'Detect Anomalies',
-      chart: 'spike',
-      inputPlaceholder: `Enter ${currentDevice?.name?.toLowerCase() || 'device'} behavior history to analyze`,
-    },
-    recommend: {
-      desc: `AI-powered energy saving recommendations for ${currentDevice?.name?.toLowerCase() || 'device'} in ${currentClassroom?.name || 'classroom'}.`,
-      action: 'Get Recommendations',
-      chart: 'pie',
-      inputPlaceholder: `Describe your needs for ${currentDevice?.name?.toLowerCase() || 'device'} or current setup`,
-    },
-    maintenance: {
-      desc: `Predicts maintenance needs for ${currentDevice?.name?.toLowerCase() || 'device'} based on usage patterns and age.`,
-      action: 'Predict Maintenance',
-      chart: 'bar',
-      inputPlaceholder: `Enter ${currentDevice?.name?.toLowerCase() || 'device'} usage history for maintenance analysis`,
-    },
-    occupancy: {
-      desc: `Analyzes classroom occupancy patterns to optimize ${currentDevice?.name?.toLowerCase() || 'device'} usage.`,
-      action: 'Analyze Occupancy',
-      chart: 'line',
-      inputPlaceholder: `Enter occupancy data or class schedule information`,
-    },
-    power: {
-      desc: `Real-time power consumption monitoring and analysis for ${currentDevice?.name?.toLowerCase() || 'device'} in ${currentClassroom?.name || 'classroom'}.`,
-      action: 'Monitor Power',
-      chart: 'line',
-      inputPlaceholder: `Enter power consumption data or monitoring parameters`,
+      inputPlaceholder: `AI scanning ${currentDevice?.name?.toLowerCase() || 'device'} behavior for anomalies and irregularities`,
     },
   };
 
@@ -201,198 +176,156 @@ const AIMLPanel: React.FC = () => {
     return multipliers[deviceType as keyof typeof multipliers] || 1.0;
   };
 
-  // Fetch chart data from API
-  const fetchChartData = async (type: string) => {
+  // Fetch AI predictions from the AI/ML service
+  const fetchPredictions = async (type: string) => {
     try {
       setLoading(true);
-      let data: any[] = [];
+      let predictionData: any = {};
 
+      // Call the AI/ML microservice for predictions
       switch (type) {
         case 'forecast':
-          const forecastRes = await apiService.get('/analytics/forecast/energy/24h');
-          data = forecastRes.data.forecast || [];
-          break;
-        case 'schedule':
-          // Use device usage data for scheduling patterns
-          const usageRes = await apiService.get('/analytics/device-usage/7d');
-          data = usageRes.data || [];
+          try {
+            const forecastRes = await apiService.post('/aiml/forecast', {
+              device_id: device,
+              history: [1, 0, 1, 1, 0, 1, 1, 0, 1], // Sample historical data
+              periods: 5
+            });
+            predictionData = forecastRes.data;
+          } catch (err) {
+            // Fallback to mock data
+            predictionData = {
+              device_id: device,
+              forecast: [75, 80, 85, 78, 82],
+              confidence: [0.85, 0.82, 0.88, 0.79, 0.84],
+              timestamp: new Date().toISOString()
+            };
+          }
           break;
         case 'anomaly':
-          const anomalyRes = await apiService.get('/analytics/anomalies/7d');
-          data = anomalyRes.data.anomalies || [];
+          try {
+            const anomalyRes = await apiService.post('/aiml/anomaly', {
+              device_id: device,
+              values: [40, 45, 42, 85, 41, 43, 39, 88, 44, 46] // Sample with anomalies
+            });
+            predictionData = anomalyRes.data;
+          } catch (err) {
+            predictionData = {
+              device_id: device,
+              anomalies: [3, 7],
+              scores: [0.2, 0.15, 0.18, 0.85, 0.12, 0.16, 0.14, 0.92, 0.17, 0.19],
+              threshold: 0.8,
+              timestamp: new Date().toISOString()
+            };
+          }
           break;
-        case 'recommend':
-          // Use efficiency metrics for recommendations
-          const efficiencyRes = await apiService.get('/analytics/efficiency/30d');
-          data = [{
-            name: 'Energy Saving',
-            value: efficiencyRes.data.energyEfficiency || 85,
-            color: '#3b82f6'
-          }];
-          break;
-        case 'maintenance':
-          const maintenanceRes = await apiService.get('/analytics/predictive-maintenance');
-          data = maintenanceRes.data.maintenanceSchedule || [];
-          break;
-        case 'occupancy':
-          const occupancyRes = await apiService.get('/analytics/occupancy');
-          data = occupancyRes.data || [];
-          break;
-        case 'power':
-          const powerRes = await apiService.get('/analytics/energy/24h');
-          data = powerRes.data || [];
+        case 'schedule':
+          try {
+            const scheduleRes = await apiService.post('/aiml/schedule', {
+              device_id: device,
+              constraints: { energy_budget: 80 }
+            });
+            predictionData = scheduleRes.data;
+          } catch (err) {
+            predictionData = {
+              device_id: device,
+              schedule: {
+                "monday": {"start": "08:00", "end": "18:00", "priority": "high"},
+                "tuesday": {"start": "08:00", "end": "18:00", "priority": "high"},
+                "wednesday": {"start": "08:00", "end": "18:00", "priority": "high"},
+                "thursday": {"start": "08:00", "end": "18:00", "priority": "high"},
+                "friday": {"start": "08:00", "end": "18:00", "priority": "high"},
+                "saturday": {"start": "09:00", "end": "17:00", "priority": "medium"},
+                "sunday": {"start": "00:00", "end": "00:00", "priority": "off"}
+              },
+              energy_savings: 28.5,
+              timestamp: new Date().toISOString()
+            };
+          }
           break;
       }
 
-      setChartData(prev => ({
+      setPredictions(prev => ({
         ...prev,
-        [type]: data
+        [type]: predictionData
       }));
       setError(null);
     } catch (err) {
-      console.error(`Error fetching ${type} data:`, err);
-      setError(`Failed to load ${type} data`);
-      // Fallback to mock data for development
-      setChartData(prev => ({
+      console.error(`Error fetching ${type} predictions:`, err);
+      setError(`Failed to load ${type} predictions`);
+      // Set fallback mock data
+      setPredictions(prev => ({
         ...prev,
-        [type]: generateMockChartData(type)
+        [type]: generateMockPredictions(type)
       }));
     } finally {
       setLoading(false);
     }
   };
 
-  // Generate mock data as fallback
-  const generateMockChartData = (type: string) => {
-    const data = [];
+  // Generate mock predictions as fallback
+  const generateMockPredictions = (type: string) => {
     const multiplier = currentDevice ? getDeviceMultiplier(currentDevice.type || 'unknown') : 1.0;
 
     switch (type) {
       case 'forecast':
-        for (let i = 0; i < 24; i++) {
-          const baseUsage = Math.floor(Math.random() * 60) + 20;
-          data.push({
-            time: `${i.toString().padStart(2, '0')}:00`,
-            usage: Math.floor(baseUsage * multiplier),
-            predicted: Math.floor((baseUsage + Math.random() * 20 - 10) * multiplier),
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        }
-        break;
-      case 'schedule':
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        days.forEach(day => {
-          const isWeekend = day === 'Sat' || day === 'Sun';
-          const weekendMultiplier = isWeekend ? 0.7 : 1.0;
-          data.push({
-            day,
-            morning: Math.floor((Math.random() * 40 + 30) * multiplier * weekendMultiplier),
-            afternoon: Math.floor((Math.random() * 50 + 40) * multiplier * weekendMultiplier),
-            evening: Math.floor((Math.random() * 30 + 20) * multiplier * weekendMultiplier),
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        });
-        break;
+        return {
+          device_id: device,
+          forecast: Array.from({length: 5}, () => Math.floor((60 + Math.random() * 40) * multiplier)),
+          confidence: Array.from({length: 5}, () => 0.7 + Math.random() * 0.3),
+          timestamp: new Date().toISOString()
+        };
       case 'anomaly':
-        for (let i = 0; i < 50; i++) {
-          const base = 40 + Math.sin(i * 0.2) * 15 * multiplier;
-          const anomaly = Math.random() > 0.92 ? base + Math.random() * 40 * multiplier : base;
-          data.push({
-            time: i,
-            normal: Math.floor(base),
-            actual: Math.floor(anomaly),
-            threshold: Math.floor(65 * multiplier),
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        }
-        break;
-      case 'recommend':
-        const recommendations = [
-          { name: 'Energy Saving', baseValue: 35 },
-          { name: 'Automation', baseValue: 25 },
-          { name: 'Optimization', baseValue: 20 },
-          { name: 'Maintenance', baseValue: 20 }
-        ];
-
-        recommendations.forEach(rec => {
-          data.push({
-            name: rec.name,
-            value: Math.floor(rec.baseValue * (0.8 + Math.random() * 0.4)),
-            color: ['#3b82f6', '#10b981', '#f59e42', '#ef4444'][recommendations.indexOf(rec)],
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        });
-        break;
-      case 'maintenance':
-        const components = ['Power Supply', 'Control Board', 'Sensors', 'Actuators', 'Display', 'Connectivity'];
-        components.forEach(component => {
-          const healthScore = Math.floor(70 + Math.random() * 25); // 70-95% health
-          const daysToService = Math.floor(Math.random() * 180) + 30; // 30-210 days
-          data.push({
-            component,
-            health: healthScore,
-            daysToService,
-            priority: healthScore < 80 ? 'High' : healthScore < 90 ? 'Medium' : 'Low',
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        });
-        break;
-      case 'occupancy':
-        for (let i = 0; i < 24; i++) {
-          const hour = i;
-          const isClassHour = (hour >= 9 && hour <= 17); // 9 AM to 5 PM
-          const baseOccupancy = isClassHour ? (Math.random() * 40 + 60) : (Math.random() * 20); // Higher during class hours
-          const deviceUsage = Math.floor(baseOccupancy * multiplier * (0.7 + Math.random() * 0.6));
-
-          data.push({
-            hour: `${hour.toString().padStart(2, '0')}:00`,
-            occupancy: Math.floor(baseOccupancy),
-            usage: deviceUsage,
-            efficiency: Math.floor((deviceUsage / Math.max(baseOccupancy, 1)) * 100),
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        }
-        break;
-      case 'power':
-        for (let i = 0; i < 24; i++) {
-          const hour = i;
-          const isPeakHour = (hour >= 9 && hour <= 17); // Peak classroom hours
-          const basePower = isPeakHour ?
-            (Math.random() * 80 + 40) * multiplier : // Higher power during class hours
-            (Math.random() * 30 + 10) * multiplier;  // Lower power off-hours
-
-          const voltage = 220 + Math.random() * 20 - 10; // 210-230V
-          const current = basePower / voltage;
-
-          data.push({
-            hour: `${hour.toString().padStart(2, '0')}:00`,
-            power: Math.floor(basePower),
-            voltage: Math.floor(voltage),
-            current: Math.floor(current * 100) / 100, // Round to 2 decimal places
-            efficiency: Math.floor(85 + Math.random() * 10), // 85-95% efficiency
-            device: currentDevice?.name || 'Unknown Device',
-          });
-        }
-        break;
+        const values = Array.from({length: 10}, () => 40 + Math.random() * 20);
+        // Add some anomalies
+        values[3] = 85; // anomaly
+        values[7] = 88; // anomaly
+        return {
+          device_id: device,
+          anomalies: [3, 7],
+          scores: values.map(v => v > 70 ? 0.9 : 0.2),
+          threshold: 0.8,
+          timestamp: new Date().toISOString()
+        };
+      case 'schedule':
+        return {
+          device_id: device,
+          schedule: {
+            "monday": {"start": "08:00", "end": "18:00", "priority": "high"},
+            "tuesday": {"start": "08:00", "end": "18:00", "priority": "high"},
+            "wednesday": {"start": "08:00", "end": "18:00", "priority": "high"},
+            "thursday": {"start": "08:00", "end": "18:00", "priority": "high"},
+            "friday": {"start": "08:00", "end": "18:00", "priority": "high"},
+            "saturday": {"start": "09:00", "end": "17:00", "priority": "medium"},
+            "sunday": {"start": "00:00", "end": "00:00", "priority": "off"}
+          },
+          energy_savings: 25 + Math.random() * 10,
+          timestamp: new Date().toISOString()
+        };
+      default:
+        return {};
     }
-    return data;
   };
 
-  // Initialize chart data
+  // Initialize predictions
   useEffect(() => {
-    fetchChartData(tab);
-  }, [tab]);
+    if (currentDevice && currentClassroom) {
+      fetchPredictions(tab);
+    }
+  }, [tab, device, classroom]);
 
   // Auto refresh effect
   useEffect(() => {
     if (!autoRefresh) return;
-    
+
     const interval = setInterval(() => {
-      fetchChartData(tab);
+      if (currentDevice && currentClassroom) {
+        fetchPredictions(tab);
+      }
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [autoRefresh, tab]);
+  }, [autoRefresh, tab, device, classroom]);
 
   // Analyze user input for intelligent responses
   const analyzeUsageData = (input: string) => {
@@ -430,332 +363,226 @@ const AIMLPanel: React.FC = () => {
       setError('Please select a classroom and device first');
       return;
     }
-    
+
     setLoading(true);
     setTimeout(() => {
-      // Generate sample usage data for analysis
-      const sampleData = Array.from({length: 10}, () => Math.floor(Math.random() * 2)).join(',');
-      const usageAnalysis = analyzeUsageData(sampleData);
-      
-      const responses = {
-        forecast: (() => {
-          const forecast = generateForecast(usageAnalysis);
-          return `AI Forecast Analysis for ${currentDevice.name} in ${currentClassroom.name}:
-          
-📊 Data Analysis: ${forecast.insights}
-• Average usage: ${Math.floor(usageAnalysis.avg * 100)}%
-• Usage pattern: ${usageAnalysis.pattern}
-
-🔮 Forecast Results:
-• Peak usage predicted: 2-4 PM (${Math.max(...forecast.predictions.map(p => p.predicted))}%)
-• Low usage periods: Early morning and late evening
-• Energy optimization: ${usageAnalysis.pattern === 'high' ? 'Consider demand scheduling' : 'Current usage is efficient'}
-
-💡 Recommendations:
-• Pre-cool system 1 hour before peak usage
-• Implement automated shutdown after ${usageAnalysis.avg < 0.3 ? '30' : '60'} minutes of inactivity
-• Potential energy savings: ${15 + Math.floor(Math.random() * 20)}%`;
-        })(),
-        
-        schedule: `AI Schedule Optimization for ${currentDevice.name} in ${currentClassroom.name}:
-
-📅 Learning from Usage Patterns:
-• Detected ${usageAnalysis.pattern} usage intensity
-• Peak periods: ${usageAnalysis.peaks} high-activity periods identified
-
-🤖 Recommended Schedule:
-• 8:00-12:00: Active (${usageAnalysis.pattern === 'high' ? 'High priority tasks' : 'Standard operation'})
-• 12:00-14:00: Standby (Lunch break - ${usageAnalysis.avg < 0.5 ? 'Auto-shutdown' : 'Low power'})
-• 14:00-18:00: Active (Afternoon sessions)
-• 18:00-22:00: ${usageAnalysis.avg < 0.3 ? 'Auto-shutdown' : 'Low power mode'}
-
-⚡ Energy Impact:
-• Current consumption: ${Math.floor(usageAnalysis.avg * 100)}% average
-• Optimized savings: ${20 + Math.floor(Math.random() * 25)}%
-• Weekly energy reduction: ${Math.floor((usageAnalysis.avg * 168) * 0.25)} kWh
-
-💡 Smart Features:
-• Auto-adjust based on class schedule
-• Occupancy sensor integration`,
-
-        anomaly: `AI Anomaly Detection for ${currentDevice.name} in ${currentClassroom.name}:
-
-🔍 Analysis Results:
-• Total data points analyzed: ${usageAnalysis.data?.length || 0}
-• Normal operating range: ${Math.floor(usageAnalysis.avg * 60)}% - ${Math.floor(usageAnalysis.avg * 140)}%
-• Detected anomalies: ${usageAnalysis.peaks + Math.floor(Math.random() * 3)}
-
-🚨 Current Issues:
-${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes detected` : '• No major anomalies found'}
-• Equipment status: ${currentDevice.status === 'online' ? 'Normal operation' : 'Potential connectivity issues'}
-• Pattern consistency: ${usageAnalysis.pattern === 'medium' ? 'Stable' : usageAnalysis.pattern === 'high' ? 'High variation' : 'Low activity'}
-
-⚠️ Recommendations:
-• ${usageAnalysis.peaks > 2 ? 'Schedule maintenance check immediately' : 'Monitor for 24 hours'}
-• ${currentDevice.status === 'offline' ? 'Check device connectivity' : 'Continue normal monitoring'}
-• Predictive maintenance: ${Math.floor(Math.random() * 30) + 60} days until next service
-
-📊 Anomaly Score: ${Math.floor(usageAnalysis.peaks * 25 + Math.random() * 30)}/100`,
-
-        recommend: `AI Energy Optimization for ${currentDevice.name} in ${currentClassroom.name}:
-
-📈 Usage Analysis:
-• Current efficiency: ${Math.floor((1 - usageAnalysis.avg) * 100)}% optimization potential
-• Usage pattern: ${usageAnalysis.pattern} intensity
-• Peak frequency: ${usageAnalysis.peaks} high-usage periods
-
-💡 Personalized Recommendations:
-
-⚡ Energy Optimization:
-• Smart scheduling implementation: Save ${25 + Math.floor(Math.random() * 20)}% energy
-• Auto-shutdown after ${usageAnalysis.avg < 0.3 ? '30' : '45'} minutes inactivity
-• Load balancing across similar devices
-
-🔧 Maintenance & Reliability:
-• Predictive maintenance scheduling: ${Math.floor(Math.random() * 30) + 30} days remaining
-• Usage pattern monitoring: ${usageAnalysis.peaks < 2 ? 'Normal wear' : 'Accelerated wear detected'}
-• Firmware update recommended for ${Math.random() > 0.7 ? 'performance' : 'security'}
-
-📊 Analytics & Insights:
-• Real-time usage dashboard implementation
-• Automated reporting every ${usageAnalysis.pattern === 'high' ? 'week' : 'month'}
-• Integration with classroom booking system
-
-🎯 Automation Opportunities:
-• Occupancy-based automation: Perfect for ${currentClassroom.type} environment
-• Class schedule integration: Auto-preparation before sessions
-• Energy efficiency scoring: ${85 + Math.floor(Math.random() * 10)}% current rating`,
-
-        maintenance: `Predictive Maintenance Analysis for ${currentDevice.name} in ${currentClassroom.name}:
-
-🔧 Maintenance Assessment:
-• Device age simulation: ${Math.floor(Math.random() * 24) + 6} months in operation
-• Usage intensity: ${usageAnalysis.pattern} (${Math.floor(usageAnalysis.avg * 100)}% average load)
-• Wear indicators: ${usageAnalysis.peaks} high-stress periods detected
-
-📊 Health Metrics:
-• Overall health score: ${Math.floor(85 + Math.random() * 10)}/100
-• Component wear: ${Math.floor(usageAnalysis.peaks * 15 + Math.random() * 20)}%
-• Performance degradation: ${Math.floor(Math.random() * 5)}%
-
-⚠️ Maintenance Schedule:
-• Next routine check: ${Math.floor(Math.random() * 30) + 15} days
-• Major service due: ${Math.floor(Math.random() * 180) + 90} days
-• Critical components to monitor: ${['Power supply', 'Control board', 'Sensors', 'Actuators'][Math.floor(Math.random() * 4)]}
-
-💡 Recommended Actions:
-• ${usageAnalysis.peaks > 3 ? 'Immediate inspection recommended' : 'Continue monitoring'}
-• Clean filters/air vents: ${Math.random() > 0.6 ? 'Due now' : 'Next 30 days'}
-• Calibration check: ${Math.random() > 0.7 ? 'Recommended' : 'Not urgent'}
-
-📈 Predictive Insights:
-• Expected lifespan: ${Math.floor(24 + Math.random() * 36)} more months
-• Failure probability: ${Math.floor(Math.random() * 5)}% in next 30 days
-• Cost savings from prevention: $${Math.floor(Math.random() * 500) + 200}`,
-
-        occupancy: `Occupancy Analysis for ${currentDevice.name} in ${currentClassroom.name}:
-
-👥 Occupancy Patterns:
-• Classroom type: ${currentClassroom.type} (${currentClassroom.type === 'lab' ? 'Variable usage' : 'Scheduled classes'})
-• Peak occupancy hours: 9:00 AM - 5:00 PM
-• Average utilization: ${Math.floor(60 + Math.random() * 25)}%
-
-📊 Usage Correlation:
-• Occupancy vs Device usage: ${Math.random() > 0.7 ? 'Strong correlation' : 'Moderate correlation'}
-• Unoccupied periods: ${Math.floor(usageAnalysis.avg * 40)}% of total time
-• Energy waste potential: ${Math.floor(usageAnalysis.avg * 30)}%
-
-🤖 Smart Automation Rules:
-• Occupancy threshold: Activate when > 20% capacity
-• Auto-shutdown delay: ${usageAnalysis.avg < 0.3 ? '15' : '30'} minutes after empty
-• Pre-class preparation: ${Math.random() > 0.5 ? '15 min before schedule' : 'On first occupancy'}
-
-💡 Optimization Recommendations:
-• Motion sensor integration: Save ${20 + Math.floor(Math.random() * 15)}% energy
-• Class schedule sync: Auto-on/off based on timetable
-• Gradual dimming: During low occupancy periods
-
-📈 Performance Metrics:
-• Occupancy detection accuracy: ${90 + Math.floor(Math.random() * 8)}%
-• Response time: ${(Math.random() * 2 + 1).toFixed(1)} seconds
-• False trigger rate: ${Math.floor(Math.random() * 3)}%`,
-
-        power: `Power Usage Analysis for ${currentDevice.name} in ${currentClassroom.name}:
-
-⚡ Real-Time Power Monitoring:
-• Device type: ${currentDevice.type} (${currentDevice.type === 'display' ? 'High power' : currentDevice.type === 'lighting' ? 'Moderate power' : currentDevice.type === 'climate' ? 'Variable power' : 'Standard power'})
-• Current power draw: ${Math.floor(50 + Math.random() * 100)}W
-• Voltage: ${210 + Math.floor(Math.random() * 20)}V
-• Power factor: ${(0.85 + Math.random() * 0.1).toFixed(2)}
-
-📊 Power Consumption Patterns:
-• Peak hours: 9:00 AM - 5:00 PM (${Math.floor(80 + Math.random() * 40)}W average)
-• Off-peak usage: ${Math.floor(10 + Math.random() * 20)}W average
-• Daily consumption: ${Math.floor(2 + Math.random() * 8)} kWh
-• Monthly estimate: ${Math.floor(60 + Math.random() * 240)} kWh
-
-💰 Cost Analysis:
-• Electricity rate: ₹${6 + Math.random() * 4}/kWh
-• Daily cost: ₹${Math.floor(12 + Math.random() * 48)}
-• Monthly cost: ₹${Math.floor(360 + Math.random() * 1440)}
-• Annual savings potential: ₹${Math.floor(2000 + Math.random() * 8000)}
-
-🔋 Efficiency Metrics:
-• Power efficiency: ${85 + Math.floor(Math.random() * 10)}%
-• Standby power: ${Math.floor(Math.random() * 5)}W
-• Carbon footprint: ${Math.floor(0.5 + Math.random() * 2)} kg CO2/day
-
-⚠️ Power Alerts:
-• Overload threshold: ${150 + Math.floor(Math.random() * 50)}W
-• Surge protection: ${currentDevice.status === 'online' ? 'Active' : 'Check required'}
-• Power quality: ${Math.random() > 0.8 ? 'Issues detected' : 'Optimal'}`,
-
-      };
-      
-      setResult(responses[tab as keyof typeof responses] || `Analysis complete for ${tab} on ${currentDevice.name}`);
+      // Trigger AI prediction for the current tab
+      fetchPredictions(tab);
       setLoading(false);
-    }, 1500); // Slightly longer for "processing"
+    }, 1000); // Short delay for UI feedback
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(chartData[tab] || [], null, 2);
+    const dataStr = JSON.stringify(predictions[tab] || {}, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `${tab}-data-${new Date().toISOString().split('T')[0]}.json`;
-    
+    const exportFileDefaultName = `${tab}-predictions-${new Date().toISOString().split('T')[0]}.json`;
+
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
 
-  const renderChart = (type: string) => {
-    const data = chartData[type] || [];
-    
+  const renderPredictions = (type: string) => {
+    const predictionData = predictions[type];
+
+    if (!predictionData) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">AI predictions will appear here</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (type) {
       case 'forecast':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="usage" stroke="#3b82f6" strokeWidth={2} name="Current Usage" />
-              <Line type="monotone" dataKey="predicted" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" name="AI Prediction" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-blue-500" />
+                  Usage Forecast for {currentDevice?.name}
+                </CardTitle>
+                <CardDescription>
+                  AI-powered predictions for the next 5 time periods
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {predictionData.forecast?.map((value: number, index: number) => (
+                    <div key={index} className="text-center p-4 bg-muted/50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{value}%</div>
+                      <div className="text-sm text-muted-foreground">Period {index + 1}</div>
+                      <Badge variant="outline" className="mt-2">
+                        {predictionData.confidence?.[index] ? `${Math.round(predictionData.confidence[index] * 100)}%` : 'N/A'} confidence
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">AI Insights:</h4>
+                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                    <li>• Peak usage predicted: {Math.max(...(predictionData.forecast || [0]))}% in upcoming periods</li>
+                    <li>• Average confidence: {predictionData.confidence ? Math.round(predictionData.confidence.reduce((a: number, b: number) => a + b, 0) / predictionData.confidence.length * 100) : 0}%</li>
+                    <li>• Trend: {predictionData.forecast?.[4] > predictionData.forecast?.[0] ? 'Increasing' : 'Stable'} usage pattern</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         );
-      case 'schedule':
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="morning" stackId="a" fill="#3b82f6" name="Morning" />
-              <Bar dataKey="afternoon" stackId="a" fill="#10b981" name="Afternoon" />
-              <Bar dataKey="evening" stackId="a" fill="#f59e42" name="Evening" />
-            </BarChart>
-          </ResponsiveContainer>
-        );
+
       case 'anomaly':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="normal" stroke="#6b7280" strokeWidth={1} name="Normal Range" />
-              <Line type="monotone" dataKey="actual" stroke="#ef4444" strokeWidth={2} name="Actual Usage" />
-              <Line type="monotone" dataKey="threshold" stroke="#f59e42" strokeWidth={1} strokeDasharray="5 5" name="Threshold" />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                  Anomaly Detection for {currentDevice?.name}
+                </CardTitle>
+                <CardDescription>
+                  AI analysis of device behavior patterns
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold mb-3">Detection Results</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span>Anomalies Found:</span>
+                        <Badge variant={predictionData.anomalies?.length > 0 ? "destructive" : "secondary"}>
+                          {predictionData.anomalies?.length || 0}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Detection Threshold:</span>
+                        <span className="font-mono">{predictionData.threshold || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Data Points Analyzed:</span>
+                        <span>{predictionData.scores?.length || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-3">Anomaly Locations</h4>
+                    {predictionData.anomalies?.length > 0 ? (
+                      <div className="space-y-2">
+                        {predictionData.anomalies.map((index: number) => (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/20 rounded">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-sm">Data point {index + 1}</span>
+                            <Badge variant="destructive" className="ml-auto">
+                              Score: {predictionData.scores?.[index] ? predictionData.scores[index].toFixed(2) : 'N/A'}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <div className="text-green-500 text-4xl mb-2">✓</div>
+                        No anomalies detected
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         );
-      case 'recommend':
+
+      case 'schedule':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {data.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-green-500" />
+                  Smart Schedule Optimization for {currentDevice?.name}
+                </CardTitle>
+                <CardDescription>
+                  AI-recommended schedule with energy savings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold mb-4">Weekly Schedule</h4>
+                    <div className="space-y-3">
+                      {predictionData.schedule && Object.entries(predictionData.schedule).map(([day, schedule]: [string, any]) => (
+                        <div key={day} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div className="font-medium capitalize">{day}</div>
+                          <div className="text-right">
+                            <div className="text-sm">
+                              {schedule.start === '00:00' && schedule.end === '00:00' ? 'Off' : `${schedule.start} - ${schedule.end}`}
+                            </div>
+                            <Badge variant={
+                              schedule.priority === 'high' ? 'default' :
+                              schedule.priority === 'medium' ? 'secondary' : 'outline'
+                            } className="text-xs">
+                              {schedule.priority}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-4">Energy Impact</h4>
+                    <div className="space-y-4">
+                      <div className="text-center p-6 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                        <div className="text-3xl font-bold text-green-600 mb-2">
+                          {predictionData.energy_savings?.toFixed(1) || 0}%
+                        </div>
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          Estimated Energy Savings
+                        </div>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Current weekly usage:</span>
+                          <span>~{Math.floor(Math.random() * 50 + 100)} kWh</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Optimized usage:</span>
+                          <span>~{Math.floor(Math.random() * 30 + 50)} kWh</span>
+                        </div>
+                        <div className="flex justify-between font-semibold text-green-600">
+                          <span>Weekly savings:</span>
+                          <span>{Math.floor((predictionData.energy_savings || 0) * 2)} kWh</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         );
-      case 'maintenance':
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="component" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="health" fill="#10b981" name="Health Score (%)" />
-            </BarChart>
-          </ResponsiveContainer>
-        );
-      case 'occupancy':
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="occupancy" stroke="#3b82f6" strokeWidth={2} name="Occupancy (%)" />
-              <Line yAxisId="right" type="monotone" dataKey="usage" stroke="#10b981" strokeWidth={2} name="Device Usage (%)" />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-      case 'power':
-        return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="power" stroke="#f59e42" strokeWidth={2} name="Power (W)" />
-              <Line yAxisId="right" type="monotone" dataKey="voltage" stroke="#3b82f6" strokeWidth={2} name="Voltage (V)" />
-              <Line yAxisId="right" type="monotone" dataKey="current" stroke="#10b981" strokeWidth={2} name="Current (A)" />
-            </LineChart>
-          </ResponsiveContainer>
-        );
+
       default:
-        return <div className="text-muted-foreground">Chart not available</div>;
+        return (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Select a prediction type to view AI insights</p>
+            </div>
+          </div>
+        );
     }
   };
 
-  // Tab labels with consistent capitalization
+  // Tab labels with AI-focused descriptions
   const TABS = [
     { value: 'forecast', label: 'Usage Forecasting' },
     { value: 'schedule', label: 'Smart Scheduling' },
     { value: 'anomaly', label: 'Anomaly Detection' },
-    { value: 'recommend', label: 'Energy Optimization' },
-    { value: 'maintenance', label: 'Predictive Maintenance' },
-    { value: 'occupancy', label: 'Occupancy Analysis' },
-    { value: 'power', label: 'Power Usage' },
   ];  return (
     <div className="w-full bg-card shadow-2xl rounded-2xl p-6 sm:p-8 flex flex-col gap-8 border border-border">
       <h2 className="text-3xl font-bold mb-2 text-primary">AI/ML Insights</h2>
@@ -902,7 +729,7 @@ ${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes det
                 <button
                   className="btn btn-outline px-4 py-2"
                   onClick={handleExport}
-                  title="Export chart data"
+                  title="Export prediction data"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export
@@ -910,8 +737,8 @@ ${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes det
 
                 <button
                   className="btn btn-outline px-4 py-2"
-                  onClick={() => fetchChartData(value)}
-                  title="Refresh chart data"
+                  onClick={() => fetchPredictions(value)}
+                  title="Refresh predictions"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
@@ -926,7 +753,7 @@ ${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes det
                 </div>
               )}
 
-              {/* Interactive chart */}
+              {/* AI Predictions Display */}
               <div className="mt-2">
                 <div className="bg-background rounded-lg shadow p-4 min-h-[320px] border border-muted-foreground/10">
                   <div className="flex items-center justify-between mb-4">
@@ -937,7 +764,7 @@ ${usageAnalysis.peaks > 0 ? `• ${usageAnalysis.peaks} unusual usage spikes det
                       Last updated: {new Date().toLocaleTimeString()}
                     </div>
                   </div>
-                  {renderChart(value)}
+                  {renderPredictions(value)}
                 </div>
               </div>
               </div>

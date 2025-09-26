@@ -49,7 +49,6 @@ interface LocalActivityLog {
   userName?: string;
   triggeredBy: string;
   location?: string;
-  facility?: string;
   isManualOverride?: boolean;
   previousState?: boolean;
   newState?: boolean;
@@ -80,7 +79,6 @@ interface ManualSwitchLog {
   };
   responseTime?: number;
   location?: string;
-  facility?: string;
   details?: any;
 }
 
@@ -110,7 +108,6 @@ interface DeviceStatusLog {
     averageResponseTime?: number;
     inconsistenciesFound?: number;
   };
-  facility?: string;
   location?: string;
 }
 
@@ -656,7 +653,7 @@ type LogType = 'activities' | 'manual-switches' | 'device-status';
                               {log.responseTime ? `${log.responseTime}ms` : '-'}
                             </td>
                             <td className="px-4 py-2 text-xs text-muted-foreground">
-                              {log.location || log.facility || '-'}
+                              {log.location || '-'}
                             </td>
                           </tr>
                         ))}

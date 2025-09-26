@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -53,6 +54,8 @@ const AnalyticsPanel: React.FC = () => {
   const [occupancyData, setOccupancyData] = useState<any[]>([]);
   const [anomalyData, setAnomalyData] = useState<any>(null);
   const [energyTimeframe, setEnergyTimeframe] = useState('24h');
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [selectedClassrooms, setSelectedClassrooms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,24 +82,8 @@ const AnalyticsPanel: React.FC = () => {
       ]);
     } catch (err) {
       console.error('Error fetching analytics data:', err);
-      setError('Failed to load analytics data');
-
-      // For debugging, set some mock data so the UI renders
-      setAnalyticsData({
-        devices: [
-          { id: '1', name: 'Projector', classroom: 'Room 101', type: 'display', status: 'online', power: 150, health: 85 },
-          { id: '2', name: 'AC Unit', classroom: 'Room 101', type: 'climate', status: 'online', power: 200, health: 90 }
-        ],
-        classrooms: [
-          { id: '1', name: 'Room 101', type: 'classroom', occupancy: 75 }
-        ],
-        summary: {
-          totalDevices: 2,
-          onlineDevices: 2,
-          totalPowerConsumption: 350,
-          averageHealthScore: 87.5
-        }
-      });
+      setError('Failed to load analytics data. Please check your connection.');
+      // Don't set mock data - show error state instead
     } finally {
       setLoading(false);
     }
@@ -113,16 +100,8 @@ const AnalyticsPanel: React.FC = () => {
       setEnergyData(response.data);
     } catch (err) {
       console.error('Error fetching energy data:', err);
-      // Set mock data for development
-      setEnergyData([
-        { timestamp: new Date(Date.now() - 24*60*60*1000).toISOString(), totalConsumption: 120, byClassroom: { 'Room 101': 45, 'Room 102': 35, 'Room 103': 40 }, byDeviceType: { display: 30, lighting: 50, climate: 25, computing: 15 } },
-        { timestamp: new Date(Date.now() - 20*60*60*1000).toISOString(), totalConsumption: 135, byClassroom: { 'Room 101': 50, 'Room 102': 40, 'Room 103': 45 }, byDeviceType: { display: 35, lighting: 55, climate: 30, computing: 15 } },
-        { timestamp: new Date(Date.now() - 16*60*60*1000).toISOString(), totalConsumption: 110, byClassroom: { 'Room 101': 40, 'Room 102': 30, 'Room 103': 40 }, byDeviceType: { display: 25, lighting: 45, climate: 25, computing: 15 } },
-        { timestamp: new Date(Date.now() - 12*60*60*1000).toISOString(), totalConsumption: 150, byClassroom: { 'Room 101': 55, 'Room 102': 50, 'Room 103': 45 }, byDeviceType: { display: 40, lighting: 60, climate: 35, computing: 15 } },
-        { timestamp: new Date(Date.now() - 8*60*60*1000).toISOString(), totalConsumption: 140, byClassroom: { 'Room 101': 50, 'Room 102': 45, 'Room 103': 45 }, byDeviceType: { display: 35, lighting: 55, climate: 35, computing: 15 } },
-        { timestamp: new Date(Date.now() - 4*60*60*1000).toISOString(), totalConsumption: 130, byClassroom: { 'Room 101': 45, 'Room 102': 40, 'Room 103': 45 }, byDeviceType: { display: 30, lighting: 50, climate: 35, computing: 15 } },
-        { timestamp: new Date().toISOString(), totalConsumption: 125, byClassroom: { 'Room 101': 45, 'Room 102': 35, 'Room 103': 45 }, byDeviceType: { display: 30, lighting: 50, climate: 30, computing: 15 } }
-      ]);
+      // Don't set mock data - let the UI show empty state
+      setEnergyData([]);
     }
   };
 
@@ -133,18 +112,8 @@ const AnalyticsPanel: React.FC = () => {
       setForecastData(response.data);
     } catch (err) {
       console.error('Error fetching forecast data:', err);
-      // Set mock forecast data
-      const forecast = [];
-      for (let i = 0; i < 24; i++) {
-        const timestamp = new Date(Date.now() + i * 60 * 60 * 1000);
-        forecast.push({
-          timestamp: timestamp.toISOString(),
-          predicted: 120 + Math.sin(i / 24 * 2 * Math.PI) * 30 + (Math.random() - 0.5) * 20,
-          confidence: 0.85 - (i / 24) * 0.3,
-          actual: i < 6 ? 125 + (Math.random() - 0.5) * 15 : null
-        });
-      }
-      setForecastData({ type, timeframe, forecast });
+      // Don't set mock data - let the UI show empty state
+      setForecastData(null);
     }
   };
 
@@ -155,17 +124,8 @@ const AnalyticsPanel: React.FC = () => {
       setMaintenanceData(response.data);
     } catch (err) {
       console.error('Error fetching maintenance data:', err);
-      // Set mock maintenance data
-      setMaintenanceData({
-        totalDevices: 5,
-        criticalDevices: 1,
-        maintenanceSchedule: [
-          { deviceId: '1', deviceName: 'Projector A', classroom: 'Room 101', deviceType: 'display', healthScore: 45, daysToFailure: 15, priority: 'high', recommendation: 'Immediate maintenance required', estimatedCost: 250 },
-          { deviceId: '2', deviceName: 'AC Unit B', classroom: 'Room 102', deviceType: 'climate', healthScore: 65, daysToFailure: 45, priority: 'medium', recommendation: 'Schedule maintenance within 30 days', estimatedCost: 150 },
-          { deviceId: '3', deviceName: 'Lighting System', classroom: 'Room 103', deviceType: 'lighting', healthScore: 85, daysToFailure: 120, priority: 'low', recommendation: 'Regular maintenance recommended', estimatedCost: 80 }
-        ],
-        costSavings: 7500
-      });
+      // Don't set mock data - let the UI show empty state
+      setMaintenanceData(null);
     }
   };
 
@@ -176,16 +136,8 @@ const AnalyticsPanel: React.FC = () => {
       setAnomalyData(response.data);
     } catch (err) {
       console.error('Error fetching anomaly data:', err);
-      // Set mock anomaly data
-      setAnomalyData({
-        totalAnomalies: 3,
-        resolvedAnomalies: 2,
-        anomalies: [
-          { id: '1', timestamp: new Date(Date.now() - 2*60*60*1000).toISOString(), deviceId: '1', deviceName: 'Projector A', classroom: 'Room 101', type: 'power_spike', severity: 8, description: 'Power consumption spike detected', resolved: false },
-          { id: '2', timestamp: new Date(Date.now() - 5*60*60*1000).toISOString(), deviceId: '2', deviceName: 'AC Unit B', classroom: 'Room 102', type: 'temperature_anomaly', severity: 6, description: 'Temperature anomaly detected', resolved: true },
-          { id: '3', timestamp: new Date(Date.now() - 24*60*60*1000).toISOString(), deviceId: '3', deviceName: 'Lighting System', classroom: 'Room 103', type: 'connectivity_loss', severity: 4, description: 'Temporary connectivity loss', resolved: true }
-        ]
-      });
+      // Don't set mock data - let the UI show empty state
+      setAnomalyData(null);
     }
   };
 
@@ -198,13 +150,8 @@ const AnalyticsPanel: React.FC = () => {
       setOccupancyData(response.data);
     } catch (err) {
       console.error('Error fetching occupancy data:', err);
-      // Set mock occupancy data
-      setOccupancyData([
-        { classroomId: 'room101', name: 'Room 101', type: 'classroom', currentOccupancy: 75, sensorStatus: 'active' },
-        { classroomId: 'room102', name: 'Room 102', type: 'classroom', currentOccupancy: 45, sensorStatus: 'active' },
-        { classroomId: 'room103', name: 'Room 103', type: 'classroom', currentOccupancy: 90, sensorStatus: 'active' },
-        { classroomId: 'lab201', name: 'Lab 201', type: 'laboratory', currentOccupancy: 30, sensorStatus: 'active' }
-      ]);
+      // Don't set mock data - let the UI show empty state
+      setOccupancyData([]);
     }
   };
 
@@ -266,23 +213,7 @@ const AnalyticsPanel: React.FC = () => {
     { name: 'Offline', value: (analyticsData.summary?.totalDevices ?? 0) - (analyticsData.summary?.onlineDevices ?? 0), color: '#ef4444' }
   ].filter(item => item.value > 0); // Only show items with value > 0
 
-  const deviceTypeData = analyticsData.devices?.reduce((acc, device) => {
-    if (!device || !device.type) return acc;
-    const existing = acc.find(item => item.type === device.type);
-    if (existing) {
-      existing.count++;
-      existing.power += device.power ?? 0;
-    } else {
-      acc.push({
-        type: device.type,
-        count: 1,
-        power: device.power ?? 0
-      });
-    }
-    return acc;
-  }, []) ?? [];
-
-  console.log('Chart data:', { deviceStatusData, deviceTypeData, occupancyData });
+  console.log('Chart data:', { deviceStatusData, occupancyData });
 
   return (
     <div className="w-full space-y-6">
@@ -374,7 +305,7 @@ const AnalyticsPanel: React.FC = () => {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
             {/* Device Status Pie Chart */}
             <Card>
               <CardHeader>
@@ -405,31 +336,6 @@ const AnalyticsPanel: React.FC = () => {
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <p className="text-muted-foreground">No device status data available</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Device Types Bar Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Device Types</CardTitle>
-                <CardDescription>Distribution by device category</CardDescription>
-              </CardHeader>
-              <CardContent className="h-80">
-                {deviceTypeData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={deviceTypeData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="type" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#3b82f6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">No device type data available</p>
                   </div>
                 )}
               </CardContent>
@@ -474,24 +380,78 @@ const AnalyticsPanel: React.FC = () => {
 
         {/* Energy Tab */}
         <TabsContent value="energy" className="space-y-6">
-          {/* Time Range Selector */}
-          <div className="flex items-center justify-between">
+          {/* Time Range Selector and Filters */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <h3 className="text-lg font-semibold">Energy Consumption Analytics</h3>
-            <div className="flex gap-2">
-              {['24h', '7d', '30d'].map((timeframe) => (
-                <Button
-                  key={timeframe}
-                  variant={energyTimeframe === timeframe ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setEnergyTimeframe(timeframe);
-                    fetchEnergyData(timeframe);
-                    fetchForecastData('energy', timeframe);
-                  }}
-                >
-                  {timeframe}
-                </Button>
-              ))}
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Device Filter */}
+              <Select
+                value={selectedDevices.length === 0 ? "all" : "selected"}
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    setSelectedDevices([]);
+                  } else {
+                    // This would be handled by a multi-select, but for now we'll use single select
+                    setSelectedDevices([]);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by Device" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Devices</SelectItem>
+                  {analyticsData?.devices?.map((device) => (
+                    <SelectItem key={device.id} value={device.id}>
+                      {device.name} ({device.classroom})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Classroom Filter */}
+              <Select
+                value={selectedClassrooms.length === 0 ? "all" : "selected"}
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    setSelectedClassrooms([]);
+                  } else {
+                    setSelectedClassrooms([]);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by Classroom" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Classrooms</SelectItem>
+                  {analyticsData?.devices &&
+                    [...new Set(analyticsData.devices.map(d => d.classroom).filter(c => c))].map((classroom) => (
+                      <SelectItem key={classroom} value={classroom}>
+                        {classroom}
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+
+              {/* Time Range */}
+              <div className="flex gap-2">
+                {['24h', '7d', '30d'].map((timeframe) => (
+                  <Button
+                    key={timeframe}
+                    variant={energyTimeframe === timeframe ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setEnergyTimeframe(timeframe);
+                      fetchEnergyData(timeframe);
+                      fetchForecastData('energy', timeframe);
+                    }}
+                  >
+                    {timeframe}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -509,84 +469,37 @@ const AnalyticsPanel: React.FC = () => {
                     dataKey="timestamp"
                     tickFormatter={(value) => new Date(value).toLocaleString()}
                   />
-                  <YAxis />
+                  <YAxis yAxisId="left" orientation="left" />
+                  <YAxis yAxisId="right" orientation="right" />
                   <Tooltip
                     labelFormatter={(value) => new Date(value).toLocaleString()}
-                    formatter={(value: any) => [`${value.toFixed(2)} kWh`, 'Consumption']}
+                    formatter={(value: any, name: string) => [
+                      name === 'Consumption' ? `${value.toFixed(2)} kWh` : `₹${value.toFixed(2)}`,
+                      name
+                    ]}
                   />
+                  <Legend />
                   <Area
+                    yAxisId="left"
                     type="monotone"
                     dataKey="totalConsumption"
                     stroke="#3b82f6"
                     fill="#3b82f6"
                     fillOpacity={0.3}
+                    name="Consumption"
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="totalCostINR"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    name="Cost (₹)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Energy by Classroom */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Energy by Classroom</CardTitle>
-                <CardDescription>Consumption breakdown by classroom</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={energyData.slice(-1)}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="timestamp" tickFormatter={() => 'Latest'} />
-                    <YAxis />
-                    <Tooltip formatter={(value: any) => [`${value.toFixed(2)} kWh`, 'Consumption']} />
-                    <Bar dataKey="byClassroom['Room 101']" stackId="a" fill="#3b82f6" name="Room 101" />
-                    <Bar dataKey="byClassroom['Room 102']" stackId="a" fill="#10b981" name="Room 102" />
-                    <Bar dataKey="byClassroom['Room 103']" stackId="a" fill="#f59e0b" name="Room 103" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Energy by Device Type */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Energy by Device Type</CardTitle>
-                <CardDescription>Consumption breakdown by device category</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Display', value: energyData.slice(-1)[0]?.byDeviceType?.display || 0, color: '#3b82f6' },
-                        { name: 'Lighting', value: energyData.slice(-1)[0]?.byDeviceType?.lighting || 0, color: '#10b981' },
-                        { name: 'Climate', value: energyData.slice(-1)[0]?.byDeviceType?.climate || 0, color: '#f59e0b' },
-                        { name: 'Computing', value: energyData.slice(-1)[0]?.byDeviceType?.computing || 0, color: '#ef4444' }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {[
-                        { name: 'Display', value: energyData.slice(-1)[0]?.byDeviceType?.display || 0, color: '#3b82f6' },
-                        { name: 'Lighting', value: energyData.slice(-1)[0]?.byDeviceType?.lighting || 0, color: '#10b981' },
-                        { name: 'Climate', value: energyData.slice(-1)[0]?.byDeviceType?.climate || 0, color: '#f59e0b' },
-                        { name: 'Computing', value: energyData.slice(-1)[0]?.byDeviceType?.computing || 0, color: '#ef4444' }
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: any) => [`${value.toFixed(2)} kWh`, 'Consumption']} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Forecast vs Actual */}
           {forecastData && (
@@ -869,7 +782,7 @@ const AnalyticsPanel: React.FC = () => {
                     <TrendingUp className="h-4 w-4 text-green-500" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">${maintenanceData.costSavings.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-green-600">₹{maintenanceData.costSavingsINR?.toLocaleString() ?? 0}</div>
                     <p className="text-xs text-muted-foreground">
                       Potential annual savings
                     </p>
@@ -914,10 +827,6 @@ const AnalyticsPanel: React.FC = () => {
                             <Badge className={priorityColor}>
                               {device.priority}
                             </Badge>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">${device.estimatedCost}</p>
-                              <p className="text-xs text-muted-foreground">Est. Cost</p>
-                            </div>
                           </div>
                         </div>
                       );
@@ -942,7 +851,7 @@ const AnalyticsPanel: React.FC = () => {
                             <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
                             <div className="flex-1">
                               <p className="font-medium text-yellow-800">{device.deviceName} - {device.recommendation}</p>
-                              <p className="text-sm text-yellow-700 mt-1">{device.classroom} • Priority: {device.priority} • Est. Cost: ${device.estimatedCost}</p>
+                              <p className="text-sm text-yellow-700 mt-1">{device.classroom} • Priority: {device.priority}</p>
                             </div>
                           </div>
                         </div>

@@ -4,7 +4,7 @@ require('dotenv').config();
 
 const createAdminUser = async () => {
   try {
-  // Use the SAME default DB name as server.js (iot-automation) to avoid creating admins in a different database.
+  // Use the SAME default DB name as server.js (iot_classroom) to avoid creating admins in a different database.
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autovolt');
     
     // Only create this specific email if not present (do not exit just because another admin exists)

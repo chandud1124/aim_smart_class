@@ -9,49 +9,86 @@ const rateLimit = require('express-rate-limit');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 const { logger } = require('./middleware/logger');
 const routeMonitor = require('./middleware/routeMonitor');
-const { auth } = require('./middleware/auth');
 
-// Initialize MQTT client
-const mqtt = require('mqtt');
-const mqttClient = mqtt.connect('mqtt://localhost:1883', {
-  clientId: 'backend_server',
-  clean: true,
-  connectTimeout: 4000,
-  reconnectPeriod: 1000,
+// Initialize MQTT broker using Aedes (simplified)
+const aedes = require('aedes')();
+const net = require('net');
+
+const MQTT_PORT = 5200;
+const mqttServer = net.createServer(aedes.handle);
+
+mqttServer.listen(MQTT_PORT, '0.0.0.0', () => {
+  console.log(`[MQTT] Aedes MQTT broker started and listening on 0.0.0.0:${MQTT_PORT}`);
+  console.log(`[MQTT] Broker accessible from network: true`);
 });
 
-mqttClient.on('connect', () => {
-  console.log('Connected to MQTT broker');
-  mqttClient.subscribe('esp32/state', (err) => {
-    if (!err) {
-      console.log('Subscribed to esp32/state');
-    }
-  });
+mqttServer.on('error', (err) => {
+  console.error('[MQTT] Aedes server error:', err.message);
 });
 
-mqttClient.on('message', (topic, message) => {
-  console.log(`Received MQTT message on ${topic}: ${message.toString()}`);
-  // Handle ESP32 state updates here
-  if (topic === 'esp32/state') {
-    // Process state updates
-    const states = message.toString().split(',');
-    console.log('ESP32 states:', states);
+// Aedes event handlers
+aedes.on('client', (client) => {
+  console.log(`[MQTT] Aedes client connected: ${client.id}`);
+});
+
+aedes.on('clientDisconnect', (client) => {
+  console.log(`[MQTT] Aedes client disconnected: ${client.id}`);
+});
+
+aedes.on('publish', (packet, client) => {
+  if (client) {
+    console.log(`[MQTT] Aedes message published by ${client.id} on topic: ${packet.topic}`);
   }
 });
 
-mqttClient.on('error', (error) => {
-  console.error('MQTT connection error:', error);
+aedes.on('subscribe', (subscriptions, client) => {
+  console.log(`[MQTT] Aedes client ${client.id} subscribed to topics: ${subscriptions.map(s => s.topic).join(', ')}`);
 });
 
-// Function to send switch commands via MQTT
-function sendMqttSwitchCommand(relay, state) {
-  const message = `${relay}:${state}`;
-  mqttClient.publish('esp32/switches', message);
-  console.log(`Sent MQTT command: ${message}`);
-}
+// Initialize MQTT client (connects to our own broker) - delayed to avoid conflicts
+setTimeout(() => {
+  const mqtt = require('mqtt');
+  const mqttClient = mqtt.connect(`mqtt://localhost:${MQTT_PORT}`, {
+    clientId: 'backend_server',
+    clean: true,
+    connectTimeout: 4000,
+    reconnectPeriod: 1000,
+    protocolVersion: 4,
+  });
 
-// Make MQTT functions available globally
-global.sendMqttSwitchCommand = sendMqttSwitchCommand;
+  mqttClient.on('connect', () => {
+    console.log('Connected to MQTT broker');
+    mqttClient.subscribe('esp32/state', (err) => {
+      if (!err) {
+        console.log('Subscribed to esp32/state');
+      }
+    });
+  });
+
+  mqttClient.on('message', (topic, message) => {
+    console.log(`Received MQTT message on ${topic}: ${message.toString()}`);
+    // Handle ESP32 state updates here
+    if (topic === 'esp32/state') {
+      // Process state updates
+      const states = message.toString().split(',');
+      console.log('ESP32 states:', states);
+    }
+  });
+
+  mqttClient.on('error', (error) => {
+    console.error('MQTT connection error:', error);
+  });
+
+  // Function to send switch commands via MQTT
+  function sendMqttSwitchCommand(relay, state) {
+    const message = `${relay}:${state}`;
+    mqttClient.publish('esp32/switches', message);
+    console.log(`Sent MQTT command: ${message}`);
+  }
+
+  // Make MQTT functions available globally
+  global.sendMqttSwitchCommand = sendMqttSwitchCommand;
+}, 2000); // Wait 2 seconds for server to fully start
 
 // Load secure configuration if available
 let secureConfig = {};
@@ -117,13 +154,18 @@ const scheduleRoutes = require('./routes/schedules');
 const userRoutes = require('./routes/users');  // Using the new users route
 const activityRoutes = require('./routes/activities');
 const activityLogRoutes = require('./routes/activityLogs');
-const enhancedLogRoutes = require('./routes/enhancedLogs');
-const securityRoutes = require('./routes/security');
+const logsRoutes = require('./routes/logs');
+const systemHealthRoutes = require('./routes/systemHealth');
+const aimlRoutes = require('./routes/aiml');
 const settingsRoutes = require('./routes/settings');
 const ticketRoutes = require('./routes/tickets');
 const devicePermissionRoutes = require('./routes/devicePermissions');
 const deviceCategoryRoutes = require('./routes/deviceCategories');
 const classExtensionRoutes = require('./routes/classExtensions');
+
+// Import auth middleware
+// Import auth middleware
+const { auth, authorize } = require('./middleware/auth');
 
 // Import services (only those actively used)
 const scheduleService = require('./services/scheduleService');
@@ -143,7 +185,7 @@ crashMonitor.start();
 // --- MongoDB Connection with retry logic and fallback ---
 let dbConnected = false;
 const connectDB = async (retries = 5) => {
-  const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation';
+  const primaryUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom';
   console.log('Connecting to MongoDB:', primaryUri);
   const fallbackUri = process.env.MONGODB_URI_FALLBACK || process.env.MONGODB_URI_DIRECT; // optional
   const opts = {
@@ -270,43 +312,8 @@ app.use((req, res, next) => {
 // CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests from localhost, LAN IPs, and your remote frontend
-    const allowed = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174',
-      'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
-      'http://192.168.1.100:5173', // Example extra network host
-      'http://192.168.0.108:5173', // New IP for your network
-      'http://172.16.3.171:5173', // Your remote frontend
-      'http://172.16.3.171:5174', // Alternative port
-    ];
-    // Dynamically add LAN IPs for multiple ports
-    const os = require('os');
-    const nets = os.networkInterfaces();
-    const ports = [5173, 5174, 3000, 8080];
-    Object.values(nets).forEach(ifaces => {
-      ifaces.forEach(iface => {
-        if (iface.family === 'IPv4' && !iface.internal) {
-          ports.forEach(port => {
-            allowed.push(`http://${iface.address}:${port}`);
-          });
-        }
-      });
-    });
-    
-    console.log(`[DEBUG] CORS check - Origin: ${origin}`);
-    
-    if (!origin) {
-      callback(null, true); // Allow requests with no origin (curl, mobile apps, etc)
-    } else if (allowed.includes(origin)) {
-      callback(null, origin); // Echo allowed origin for credentials
-    } else {
-      console.log(`[ERROR] CORS blocked origin: ${origin}, allowed: ${allowed.slice(0, 5).join(', ')}...`);
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Allow all origins for network access
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -328,40 +335,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const io = socketIo(server, {
   cors: {
     origin: function (origin, callback) {
-      // Use the same CORS logic as Express
-      const allowed = [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'https://8fhvp51m-5173.inc1.devtunnels.ms', // Dev tunnel origin
-        'http://192.168.1.100:5173', // Example extra network host
-        'http://192.168.0.108:5173', // New IP for your network
-        'http://172.16.3.171:5173', // Your remote frontend
-        'http://172.16.3.171:5174', // Alternative port
-      ];
-      // Dynamically add LAN IPs for multiple ports
-      const os = require('os');
-      const nets = os.networkInterfaces();
-      const ports = [5173, 5174, 3000, 8080];
-      Object.values(nets).forEach(ifaces => {
-        ifaces.forEach(iface => {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            ports.forEach(port => {
-              allowed.push(`http://${iface.address}:${port}`);
-            });
-          }
-        });
-      });
-
-      if (!origin) {
-        callback(null, true); // Allow requests with no origin
-      } else if (allowed.includes(origin)) {
-        callback(null, origin); // Echo allowed origin for credentials
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      // Allow all origins for network access
+      callback(null, true);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -373,16 +348,19 @@ const io = socketIo(server, {
   // Force polling initially, allow WebSocket upgrade
   transports: ['polling', 'websocket'],
   // More conservative timeouts and buffer sizes
-  pingTimeout: 20000, // 20 seconds (reduced from 60)
-  pingInterval: 10000, // 10 seconds (reduced from 25)
-  upgradeTimeout: 10000, // 10 seconds (reduced from 30)
+  pingTimeout: 60000, // 60 seconds (increased)
+  pingInterval: 25000, // 25 seconds (increased)
+  upgradeTimeout: 30000, // 30 seconds (increased)
   maxHttpBufferSize: 1e6, // 1MB (reduced from 100MB)
   // Connection stability settings
   allowEIO3: true,
   forceNew: false, // Don't force new connections
   // Additional stability options
-  connectTimeout: 20000,
-  timeout: 20000
+  connectTimeout: 45000, // 45 seconds (increased)
+  timeout: 45000, // 45 seconds (increased)
+  // Disable WebSocket upgrade initially to avoid frame issues
+  allowUpgrades: true,
+  cookie: false
 });
 
 io.engine.on('connection_error', (err) => {
@@ -503,7 +481,6 @@ apiRouter.use('/auth/reset-password', authLimiter);
 apiRouter.use('/auth', authRoutes);
 
 // Apply API rate limiting to other routes
-apiRouter.use('/bulk', apiLimiter, require('./routes/bulk'));
 apiRouter.use('/helper', apiLimiter, require('./routes/helper'));
 apiRouter.use('/devices', apiLimiter, deviceRoutes);
 apiRouter.use('/device-api', apiLimiter, deviceApiRoutes);
@@ -512,12 +489,12 @@ apiRouter.use('/schedules', apiLimiter, scheduleRoutes);
 apiRouter.use('/users', apiLimiter, userRoutes);
 apiRouter.use('/activities', apiLimiter, activityRoutes);
 apiRouter.use('/activity-logs', apiLimiter, activityLogRoutes);
-apiRouter.use('/logs', apiLimiter, enhancedLogRoutes);
-apiRouter.use('/security', apiLimiter, securityRoutes);
+apiRouter.use('/logs', apiLimiter, logsRoutes);
+apiRouter.use('/system-health', apiLimiter, auth, authorize('admin', 'super-admin'), systemHealthRoutes);
 apiRouter.use('/analytics', apiLimiter, require('./routes/analytics'));
+apiRouter.use('/aiml', apiLimiter, aimlRoutes);
 apiRouter.use('/settings', apiLimiter, settingsRoutes);
 apiRouter.use('/tickets', apiLimiter, ticketRoutes);
-apiRouter.use('/facility', apiLimiter, require('./routes/classroom'));
 apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
 apiRouter.use('/class-extensions', apiLimiter, classExtensionRoutes);
@@ -526,14 +503,13 @@ apiRouter.use('/role-permissions', apiLimiter, require('./routes/rolePermissions
 // Mount all routes under /api
 // Health check endpoint
 app.get('/health', (req, res) => {
-  const health = {
+  res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     database: dbConnected ? 'connected' : 'disconnected',
     environment: process.env.NODE_ENV || 'development'
-  };
-  res.status(200).json(health);
+  });
 });
 
 app.use('/api', apiRouter);
@@ -1222,7 +1198,7 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   console.log(`Environment: ${process.env.NODE_ENV}`);
 
   // Connect to database after server starts
-  // connectDB().catch(() => { });
+  connectDB().catch(() => { });
 
   // Start enhanced services after successful startup
   setTimeout(() => {

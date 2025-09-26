@@ -18,15 +18,66 @@ import Settings from "./pages/Settings";
 import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 import ActiveLogs from "./pages/ActiveLogs";
-import EnhancedLogs from "./pages/EnhancedLogs";
-import FacilityAccessPage from "./pages/FacilityAccessPage";
-// New feature pages
-import ActivityStatisticsPage from "./pages/ActivityStatisticsPage";
-import BulkOperationsPage from "./pages/BulkOperationsPage";
-import SecurityDashboardPage from "./pages/SecurityDashboardPage";
 import SystemHealthPage from "./pages/SystemHealthPage";
 
 export const navItems = [
+  // ===== DASHBOARD =====
+  {
+    title: "Power Dashboard",
+    to: "/",
+    icon: <Home className="h-4 w-4" />,
+    page: <Index />,
+  },
+
+  // ===== CORE OPERATIONS =====
+  {
+    title: "Devices",
+    to: "/devices",
+    icon: <Zap className="h-4 w-4" />,
+    page: <Devices />,
+  },
+  {
+    title: "Switches",
+    to: "/switches",
+    icon: <Zap className="h-4 w-4" />,
+    page: <Switches />,
+  },
+  {
+    title: "Master Control",
+    to: "/master",
+    icon: <Shield className="h-4 w-4" />,
+    page: <Master />,
+  },
+
+  // ===== SCHEDULING =====
+  {
+    title: "Schedule",
+    to: "/schedule",
+    icon: <Calendar className="h-4 w-4" />,
+    page: <Schedule />,
+  },
+
+  // ===== USER MANAGEMENT =====
+  {
+    title: "Users",
+    to: "/users",
+    icon: <UsersIcon className="h-4 w-4" />,
+    page: <Users />,
+  },
+  {
+    title: "Role Management",
+    to: "/roles",
+    icon: <Shield className="h-4 w-4" />,
+    page: <PermissionManagement />,
+  },
+  {
+    title: "Permissions",
+    to: "/permissions",
+    icon: <UserCheck className="h-4 w-4" />,
+    page: <PermissionManagement />,
+  },
+
+  // ===== ANALYTICS & MONITORING =====
   {
     title: "Analytics & Monitoring",
     to: "/analytics",
@@ -51,109 +102,8 @@ export const navItems = [
     icon: <Monitor className="h-4 w-4" />,
     page: <PrometheusPage />,
   },
-  // Core Operations
-  {
-    title: "Power Dashboard",
-    to: "/",
-    icon: <Home className="h-4 w-4" />,
-    page: <Index />,
-  },
-  {
-    title: "Devices",
-    to: "/devices",
-    icon: <Zap className="h-4 w-4" />,
-    page: <Devices />,
-  },
-  {
-    title: "Switches",
-    to: "/switches",
-    icon: <Zap className="h-4 w-4" />,
-    page: <Switches />,
-  },
-  {
-    title: "Master Control",
-    to: "/master",
-    icon: <Shield className="h-4 w-4" />,
-    page: <Master />,
-  },
 
-  // Scheduling
-  {
-    title: "Schedule",
-    to: "/schedule",
-    icon: <Calendar className="h-4 w-4" />,
-    page: <Schedule />,
-  },
-
-  // User Management
-  {
-    title: "Users",
-    to: "/users",
-    icon: <UsersIcon className="h-4 w-4" />,
-    page: <Users />,
-  },
-  {
-    title: "Role Management",
-    to: "/roles",
-    icon: <Shield className="h-4 w-4" />,
-    page: <PermissionManagement />, // Reusing existing component
-  },
-  {
-    title: "Permissions",
-    to: "/permissions",
-    icon: <UserCheck className="h-4 w-4" />,
-    page: <PermissionManagement />,
-  },
-  {
-    title: "Facility Access",
-    to: "/facility-access",
-    icon: <Shield className="h-4 w-4" />,
-    page: <FacilityAccessPage />,
-  },
-
-  // Support
-  {
-    title: "Support Tickets",
-    to: "/tickets",
-    icon: <Ticket className="h-4 w-4" />,
-    page: <Tickets />,
-  },
-
-  // Administration
-  {
-    title: "Active Logs",
-    to: "/logs",
-    icon: <FileText className="h-4 w-4" />,
-    page: <ActiveLogs />,
-  },
-  {
-    title: "Enhanced Logs",
-    to: "/enhanced-logs",
-    icon: <Activity className="h-4 w-4" />,
-    page: <EnhancedLogs />,
-  },
-  {
-    title: "Activity Statistics",
-    to: "/activity-stats",
-    icon: <BarChart3 className="h-4 w-4" />,
-    page: <ActivityStatisticsPage />,
-  },
-
-  // Operations
-  {
-    title: "Bulk Operations",
-    to: "/bulk-operations",
-    icon: <Settings2 className="h-4 w-4" />,
-    page: <BulkOperationsPage />,
-  },
-
-  // Security & Monitoring
-  {
-    title: "Security Dashboard",
-    to: "/security",
-    icon: <Shield className="h-4 w-4" />,
-    page: <SecurityDashboardPage />,
-  },
+  // ===== OPERATIONS & MAINTENANCE =====
   {
     title: "System Health",
     to: "/system-health",
@@ -161,15 +111,27 @@ export const navItems = [
     page: <SystemHealthPage />,
   },
 
-  // Account
+  // ===== SUPPORT & LOGS =====
+  {
+    title: "Support Tickets",
+    to: "/tickets",
+    icon: <Ticket className="h-4 w-4" />,
+    page: <Tickets />,
+  },
+  {
+    title: "Active Logs",
+    to: "/logs",
+    icon: <FileText className="h-4 w-4" />,
+    page: <ActiveLogs />,
+  },
+
+  // ===== ACCOUNT & SETTINGS =====
   {
     title: "Profile",
     to: "/profile",
     icon: <User className="h-4 w-4" />,
     page: <UserProfile />,
   },
-
-  // System
   {
     title: "Settings",
     to: "/settings",

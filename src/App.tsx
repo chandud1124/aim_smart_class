@@ -25,17 +25,12 @@ const Login = lazy(() => import("./pages/Login"));
 const Profile = lazy(() => import("./pages/Profile").then(module => ({ default: module.Profile })));
 const PermissionManagement = lazy(() => import("./pages/PermissionManagement"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
-const FacilityAccessPage = lazy(() => import("./pages/FacilityAccessPage"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const ActiveLogs = lazy(() => import("./pages/ActiveLogs"));
-const EnhancedLogs = lazy(() => import("./pages/EnhancedLogs"));
 const ForgotPassword = lazy(() => import("./components/ForgotPassword"));
 const ResetPassword = lazy(() => import("./components/ResetPassword"));
 const Tickets = lazy(() => import("./pages/Tickets"));
 // New feature pages
-const ActivityStatisticsPage = lazy(() => import("./pages/ActivityStatisticsPage"));
-const BulkOperationsPage = lazy(() => import("./pages/BulkOperationsPage"));
-const SecurityDashboardPage = lazy(() => import("./pages/SecurityDashboardPage"));
 const SystemHealthPage = lazy(() => import("./pages/SystemHealthPage"));
 const AIMLPage = lazy(() => import("./pages/AIMLPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
@@ -115,13 +110,7 @@ const App = () => {
                     <Route path="profile" element={<UserProfile />} />
                     <Route path="permissions" element={<PermissionManagement />} />
                     <Route path="roles" element={<RoleManagement />} />
-                    <Route path="facility-access" element={<FacilityAccessPage />} />
-                    <Route path="classroom-access" element={<Navigate to="/facility-access" replace />} />
                     <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
-                    <Route path="enhanced-logs" element={<PrivateRoute><EnhancedLogs /></PrivateRoute>} />
-                    <Route path="activity-stats" element={<ActivityStatisticsPage />} />
-                    <Route path="bulk-operations" element={<BulkOperationsPage />} />
-                    <Route path="security" element={<SecurityDashboardPage />} />
                     <Route path="system-health" element={<SystemHealthPage />} />
                     <Route path="tickets" element={<Tickets />} />
                     <Route path="aiml" element={<AIMLPage />} />

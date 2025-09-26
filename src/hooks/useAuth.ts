@@ -80,7 +80,7 @@ export const useAuth = () => {
       socketService.off('user_profile_updated', handleUserProfileUpdated);
       socketService.off('user_role_changed', handleUserRoleChanged);
     };
-  }, [toast]);
+  }, []); // Remove toast dependency to prevent re-mounting
 
   const checkAuthStatus = async () => {
     if ((window as any).__authProfileInFlight) return; // simple client guard

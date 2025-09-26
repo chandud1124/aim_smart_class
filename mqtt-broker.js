@@ -1,26 +1,29 @@
 // MQTT Broker setup using Aedes (Node.js)
 // Run this file to start a local MQTT broker on port 1883
 
-const aedes = require('aedes')();
-const net = require('net');
+import aedes from 'aedes';
+import net from 'net';
 
-const PORT = 1883;
+const broker = aedes();
+const PORT = 3002; // Try a different port
+const HOST = '0.0.0.0'; // Listen on all interfaces
 
-const server = net.createServer(aedes.handle);
+const server = net.createServer(broker.handle);
 
-server.listen(PORT, function () {
-  console.log(`MQTT broker started and listening on port ${PORT}`);
+server.listen(PORT, HOST, function () {
+  const address = server.address();
+  console.log(`MQTT broker started and listening on ${address.address}:${address.port}`);
 });
 
-aedes.on('client', function (client) {
+broker.on('client', function (client) {
   console.log(`Client Connected: ${client ? client.id : client} to broker`);
 });
 
-aedes.on('clientDisconnect', function (client) {
+broker.on('clientDisconnect', function (client) {
   console.log(`Client Disconnected: ${client ? client.id : client} from broker`);
 });
 
-aedes.on('publish', function (packet, client) {
+broker.on('publish', function (packet, client) {
   if (client) {
     console.log(`Message from client ${client.id}: topic=${packet.topic} payload=${packet.payload.toString()}`);
   }

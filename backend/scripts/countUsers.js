@@ -4,7 +4,7 @@ require('dotenv').config();
 
 async function countUsers() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
     console.log('Connected to MongoDB');
     console.log('==========================================');
     console.log('📊 USER COUNT ANALYSIS');

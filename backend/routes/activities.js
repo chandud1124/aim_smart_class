@@ -54,46 +54,4 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get activity statistics
-router.get('/stats', authorize('admin', 'security'), async (req, res) => {
-  try {
-    const { period = '7d' } = req.query;
-    
-    let dateFilter = new Date();
-    switch (period) {
-      case '24h':
-        dateFilter.setHours(dateFilter.getHours() - 24);
-        break;
-      case '7d':
-        dateFilter.setDate(dateFilter.getDate() - 7);
-        break;
-      case '30d':
-        dateFilter.setDate(dateFilter.getDate() - 30);
-        break;
-      default:
-        dateFilter.setDate(dateFilter.getDate() - 7);
-    }
-
-    const stats = await ActivityLog.aggregate([
-      { $match: { timestamp: { $gte: dateFilter } } },
-      {
-        $group: {
-          _id: null,
-          totalActivities: { $sum: 1 },
-          onActions: { $sum: { $cond: [{ $eq: ['$action', 'on'] }, 1, 0] } },
-          offActions: { $sum: { $cond: [{ $eq: ['$action', 'off'] }, 1, 0] } },
-          userTriggered: { $sum: { $cond: [{ $eq: ['$triggeredBy', 'user'] }, 1, 0] } },
-          scheduleTriggered: { $sum: { $cond: [{ $eq: ['$triggeredBy', 'schedule'] }, 1, 0] } },
-          pirTriggered: { $sum: { $cond: [{ $eq: ['$triggeredBy', 'pir'] }, 1, 0] } },
-          systemTriggered: { $sum: { $cond: [{ $eq: ['$triggeredBy', 'system'] }, 1, 0] } }
-        }
-      }
-    ]);
-
-    res.json({ success: true, data: stats[0] || {} });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
 module.exports = router;

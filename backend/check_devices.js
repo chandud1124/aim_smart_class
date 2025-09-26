@@ -3,7 +3,7 @@ require('dotenv').config();
 
 async function checkDevices() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom');
 
     const Device = require('./models/Device');
     const devices = await Device.find({}, 'name macAddress status lastSeen switches');

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  ai-ml-service:
+    build: .
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - smart-class-network
+
+networks:
+  smart-class-network:
+    driver: bridge

@@ -17,7 +17,10 @@ import {
   Activity,
   Brain,
   BarChart3,
-  Monitor
+  Monitor,
+  Ticket,
+  Settings2,
+  Server
 } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,18 +34,14 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const navigationSections = [
   {
-    title: 'Analytics & AI',
+    title: 'Dashboard',
     items: [
-      { name: 'Analytics & Monitoring', icon: BarChart3, href: '/analytics', current: false, adminOnly: true },
-      { name: 'AI/ML Insights', icon: Brain, href: '/aiml', current: false, adminOnly: true },
-      { name: 'Grafana Analytics', icon: BarChart3, href: '/grafana', current: false, adminOnly: true },
-      { name: 'Prometheus Metrics', icon: Monitor, href: '/prometheus', current: false, adminOnly: true },
+      { name: 'Power Dashboard', icon: Home, href: '/', current: false },
     ]
   },
   {
     title: 'Core Operations',
     items: [
-      { name: 'Power Dashboard', icon: Home, href: '/', current: false },
       { name: 'Devices', icon: Cpu, href: '/devices', current: false, requiresPermission: 'canManageDevices' },
       { name: 'Switches', icon: ToggleLeft, href: '/switches', current: false, requiresPermission: 'canManageDevices' },
       { name: 'Master Control', icon: Power, href: '/master', current: false, requiresPermission: 'canManageDevices' },
@@ -63,19 +62,34 @@ const navigationSections = [
     ]
   },
   {
-    title: 'Account',
+    title: 'Analytics & Monitoring',
     items: [
-      { name: 'Profile', icon: User, href: '/profile', current: false },
+      { name: 'Analytics & Monitoring', icon: BarChart3, href: '/analytics', current: false, adminOnly: true },
+      { name: 'AI/ML Insights', icon: Brain, href: '/aiml', current: false, adminOnly: true },
+      { name: 'Grafana Analytics', icon: BarChart3, href: '/grafana', current: false, adminOnly: true },
+      { name: 'Prometheus Metrics', icon: Monitor, href: '/prometheus', current: false, adminOnly: true },
     ]
   },
-  // ...existing code...
   {
-    title: 'Administration',
+    title: 'Operations & Maintenance',
     items: [
-  { name: 'Active Logs', icon: FileText, href: '/logs', current: false, adminOnly: true },
-    ],
-    adminOnly: true
-  }
+      { name: 'System Health', icon: Server, href: '/system-health', current: false, adminOnly: true },
+    ]
+  },
+  {
+    title: 'Support & Logs',
+    items: [
+      { name: 'Support Tickets', icon: Ticket, href: '/tickets', current: false },
+      { name: 'Active Logs', icon: FileText, href: '/logs', current: false, adminOnly: true },
+    ]
+  },
+  {
+    title: 'Account & Settings',
+    items: [
+      { name: 'Profile', icon: User, href: '/profile', current: false },
+      { name: 'Settings', icon: Settings, href: '/settings', current: false },
+    ]
+  },
 ];
 
 interface SidebarProps {
@@ -118,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
 
   return (
     <div className={cn(
-      "glass flex flex-col transition-all duration-300 h-screen relative z-20 min-w-16 box-border opacity-100 visible rounded-r-lg",
+      "glass flex flex-col transition-all duration-300 h-full relative z-20 min-w-16 box-border opacity-100 visible rounded-r-lg",
       collapsed ? "w-12 sm:w-16" : "w-48 sm:w-64",
       className
     )}>
@@ -138,66 +152,77 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigateClose }) 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent min-h-0 relative z-10 glass">
-        {navigationSections.map((section, sectionIndex) => {
-          // Filter items based on permissions
-          const visibleItems = section.items.filter((item: any) => {
-            if (item.adminOnly && !(isAdmin || isSuperAdmin)) {
-              return false;
-            }
-            if (item.requiresPermission) {
-              const perms = usePermissions();
-              return perms[item.requiresPermission as keyof typeof perms];
-            }
-            return true;
-          });
+      <div
+        className="flex-1 glass min-h-0 overflow-y-auto sidebar-scroll"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'hsl(var(--muted)) transparent',
+          maxHeight: 'calc(100vh - 8rem)'
+        }}
+      >
+        <div className="p-2 space-y-2">
+          {navigationSections.map((section, sectionIndex) => {
+            // Filter items based on permissions
+            const visibleItems = section.items.filter((item: any) => {
+              if (item.adminOnly && !(isAdmin || isSuperAdmin)) {
+                return false;
+              }
+              if (item.requiresPermission) {
+                const perms = usePermissions();
+                return perms[item.requiresPermission as keyof typeof perms];
+              }
+              return true;
+            });
 
-          // Skip section if no visible items or section is admin-only and user is not admin
-          if (visibleItems.length === 0 || (section.adminOnly && !(isAdmin || isSuperAdmin))) return null;
+            // Skip section if no visible items
+            if (visibleItems.length === 0) {
+              return null;
+            }
 
-          return (
-            <div key={section.title} className="space-y-1">
-              {/* Section Header */}
-              {!collapsed && (
-                <div className="px-2 py-1 min-h-6">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
-                    {section.title}
-                  </h3>
+            return (
+              <div key={section.title} className="space-y-1">
+                {/* Section Header */}
+                {!collapsed && (
+                  <div className="px-2 py-1 min-h-6">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
+                      {section.title}
+                    </h3>
+                  </div>
+                )}
+
+                {/* Section Items */}
+                <div className="space-y-0.5">
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon;
+                    const isCurrentPage = location.pathname === item.href;
+
+                    return (
+                      <Button
+                        key={item.name}
+                        variant={isCurrentPage ? "default" : "ghost"}
+                        className={cn(
+                          "w-full justify-start gap-3 h-9 px-3 text-left overflow-hidden",
+                          isCurrentPage && "bg-primary text-primary-foreground shadow-lg",
+                          collapsed && "px-3 justify-center"
+                        )}
+                        onClick={() => handleNavigation(item.href)}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        {!collapsed && <span className="text-sm truncate">{item.name}</span>}
+                      </Button>
+                    );
+                  })}
                 </div>
-              )}
 
-              {/* Section Items */}
-              <div className="space-y-0.5">
-                {visibleItems.map((item) => {
-                  const Icon = item.icon;
-                  const isCurrentPage = location.pathname === item.href;
-
-                  return (
-                    <Button
-                      key={item.name}
-                      variant={isCurrentPage ? "default" : "ghost"}
-                      className={cn(
-                        "w-full justify-start gap-3 h-9 px-3 text-left overflow-hidden",
-                        isCurrentPage && "bg-primary text-primary-foreground shadow-lg",
-                        collapsed && "px-3 justify-center"
-                      )}
-                      onClick={() => handleNavigation(item.href)}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      {!collapsed && <span className="text-sm truncate">{item.name}</span>}
-                    </Button>
-                  );
-                })}
+                {/* Section Divider (except for last section) */}
+                {sectionIndex < navigationSections.length - 1 && (
+                  <div className="mx-2" />
+                )}
               </div>
-
-              {/* Section Divider (except for last section) */}
-              {sectionIndex < navigationSections.length - 1 && (
-                <div className="mx-2" />
-              )}
-            </div>
-          );
-        })}
-      </nav>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Collapse Toggle */}
       <div className="p-2 flex-shrink-0 relative z-10 glass">

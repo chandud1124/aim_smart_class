@@ -10,7 +10,7 @@ export const Layout = () => {
 
   return (
     <div className="min-h-screen bg-background w-full">
-      <div className="flex h-screen w-full min-w-0">
+      <div className="flex h-screen w-full min-w-0 overflow-hidden">
         <Sidebar className={`${isMobile ? 'hidden' : 'flex-shrink-0 block'}`} />
         <div className="flex-1 flex flex-col min-w-0 relative ml-0 overflow-hidden">
           <Header />

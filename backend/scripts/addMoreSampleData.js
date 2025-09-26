@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ActivityLog = require('../models/ActivityLog');
 const ErrorLog = require('../models/ErrorLog');
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot-automation', {
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/iot_classroom', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
