@@ -143,7 +143,7 @@ enum ConnState {
 // ========= CONSTANTS =========
 
 // WebSocket configuration
-#define WS_PATH "/ws"
+#define WS_PATH "/esp32-ws"
 #define WS_RECONNECT_INTERVAL_MS 5000
 #define WS_HEARTBEAT_INTERVAL_MS 30000
 

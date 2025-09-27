@@ -183,6 +183,15 @@ export const DeviceConfigDialog: React.FC<Props> = ({ open, onOpenChange, onSubm
     return () => subscription.unsubscribe();
   }, [form]);
 
+  // Reset secret state when device changes
+  useEffect(() => {
+    setSecretValue(null);
+    setSecretVisible(false);
+    setSecretError(null);
+    setSecretPin('');
+    setCopied(false);
+  }, [initialData?.id]);
+
   // Secret reveal state
   const [secretPin, setSecretPin] = useState('');
   const [secretLoading, setSecretLoading] = useState(false);
