@@ -324,6 +324,12 @@ void setup() {
         g_wsManager->setMessageCallback([](uint8_t* payload, size_t length) {
             onWsEvent(WStype_TEXT, payload, length);
         });
+        g_wsManager->setConnectCallback([]() {
+            onWsEvent(WStype_CONNECTED, nullptr, 0);
+        });
+        g_wsManager->setDisconnectCallback([]() {
+            onWsEvent(WStype_DISCONNECTED, nullptr, 0);
+        });
         g_wsManager->begin();
         isOfflineMode = false;
 
@@ -405,8 +411,11 @@ void sendJson(const JsonDocument& doc) {
     }
 
     serializeJson(doc, msgBuffer, MSG_BUFFER_SIZE);
+    LOGI("Sending WebSocket message: %s", msgBuffer);
     if (!g_wsManager->sendTXT(msgBuffer)) {
         LOGE("Failed to send WebSocket message");
+    } else {
+        LOGI("WebSocket message sent successfully");
     }
 }
 
@@ -434,6 +443,7 @@ String hmacSha256(const String& key, const String& msg) {
 }
 
 void identify() {
+    LOGI("Preparing identify message with MAC: %s, Secret: %s", WiFi.macAddress().c_str(), DEVICE_SECRET);
     DynamicJsonDocument doc(256);
     doc["type"] = "identify";
     doc["mac"] = WiFi.macAddress();
@@ -813,7 +823,7 @@ void setupRelays() {
 void onWsEvent(WStype_t type, uint8_t* payload, size_t length) {
     switch (type) {
         case WStype_CONNECTED:
-            LOGI("WebSocket connected");
+            LOGI("WebSocket connected - calling identify()");
             identified = false;
             identify();
             break;

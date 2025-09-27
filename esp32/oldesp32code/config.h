@@ -7,10 +7,13 @@
 #define WIFI_SSID "AIMS-WIFI"
 #define WIFI_PASSWORD "Aimswifi#2025"
 
-// ---------------- MQTT ----------------
-#define MQTT_BROKER_HOST "172.16.3.171" // Backend server IP (MQTT broker)
-#define MQTT_BROKER_PORT 1883            // MQTT broker port (Mosquitto)
-#define DEVICE_SECRET_KEY "c884b57e68f61d109d1fa4e1b6aefd744cc864d8b7b16d37"
+// ---------------- WebSocket ----------------
+#define WEBSOCKET_HOST "172.16.3.171" // Updated to match current backend server
+#define WEBSOCKET_PORT 3001          // Backend server port
+// Raw WebSocket endpoint path (matches backend server.js)
+#define WEBSOCKET_PATH "/esp32-ws"
+// Device authentication
+#define DEVICE_SECRET_KEY "eb2930a2e8e3e5cee3743217ea321b1e3929f15ff8e27def"
 
 // ---------------- Pins ----------------
 #define LED_PIN 2 // Built-in LED on most ESP32 dev boards
@@ -32,6 +35,7 @@
 #define WIFI_RETRY_INTERVAL_MS 3000
 #define HEARTBEAT_INTERVAL_MS 15000
 #define DEBOUNCE_MS 80
+#define USE_SECURE_WS 1
 
 // ---------------- Default switch map (factory) ----------------
 struct SwitchConfig

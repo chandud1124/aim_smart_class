@@ -19,6 +19,7 @@ import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 import ActiveLogs from "./pages/ActiveLogs";
 import SystemHealthPage from "./pages/SystemHealthPage";
+import { NoticeBoardPage as NoticeBoard } from "./pages/NoticeBoard";
 
 export const navItems = [
   // ===== DASHBOARD =====
@@ -109,6 +110,12 @@ export const navItems = [
     to: "/system-health",
     icon: <Server className="h-4 w-4" />,
     page: <SystemHealthPage />,
+  },
+  {
+    title: "Notice Board",
+    to: "/notice-board",
+    icon: <FileText className="h-4 w-4" />,
+    page: <NoticeBoard />,
   },
 
   // ===== SUPPORT & LOGS =====

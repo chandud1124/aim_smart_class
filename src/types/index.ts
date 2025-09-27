@@ -190,3 +190,97 @@ export interface DeviceStats {
   totalPirSensors: number;
   activePirSensors: number;
 }
+
+// Notice Board Types
+export interface Notice {
+  _id: string;
+  title: string;
+  content?: string;
+  type: 'text' | 'image' | 'video' | 'pdf';
+  mediaUrl?: string;
+  submittedBy: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  status: 'pending' | 'approved' | 'rejected' | 'scheduled' | 'active' | 'expired';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  approvedBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  approvedAt?: Date;
+  rejectionReason?: string;
+  tags: string[];
+  targetAudience: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DisplayDevice {
+  _id: string;
+  deviceId: string;
+  name: string;
+  location?: string;
+  capabilities: {
+    supportsVideo: boolean;
+    supportsImages: boolean;
+    supportsPdf: boolean;
+    screenResolution?: string;
+    screenSize?: string;
+  };
+  status: 'online' | 'offline' | 'maintenance';
+  currentContent?: string; // Notice ID currently displayed
+  lastSeen: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NoticeSchedule {
+  _id: string;
+  notice: string | Notice;
+  displayDevice: string | DisplayDevice;
+  startTime: Date;
+  endTime: Date;
+  duration: number; // in minutes
+  repeat: {
+    type: 'none' | 'daily' | 'weekly' | 'monthly';
+    daysOfWeek?: number[]; // 0-6, Sunday to Saturday
+    endDate?: Date;
+  };
+  isActive: boolean;
+  createdBy: {
+    _id: string;
+    name: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NoticeSubmissionData {
+  title: string;
+  content?: string;
+  type: 'text' | 'image' | 'video' | 'pdf';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  tags?: string[];
+  targetAudience?: string[];
+  media?: File;
+}
+
+export interface NoticeApprovalData {
+  status: 'approved' | 'rejected';
+  rejectionReason?: string;
+}
+
+export interface NoticeScheduleData {
+  displayDevice: string;
+  startTime: Date;
+  endTime: Date;
+  duration?: number;
+  repeat?: {
+    type: 'none' | 'daily' | 'weekly' | 'monthly';
+    daysOfWeek?: number[];
+    endDate?: Date;
+  };
+}
