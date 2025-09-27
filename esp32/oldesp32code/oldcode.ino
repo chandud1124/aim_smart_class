@@ -303,16 +303,11 @@ bool checkOfflineMemoryLimit();
 void sendJson(const JsonDocument &doc)
 {
  if (!ws.isConnected())
- {
- Serial.println("[WS] Cannot send - WebSocket not connected");
  return;
- }
 
  String out;
  serializeJson(doc, out);
- Serial.printf("[WS] Sending: %s\n", out.c_str());
  ws.sendTXT(out);
- Serial.println("[WS] Message sent to WebSocket");
 }
 
 String hmacSha256(const String &key, const String &msg)
@@ -342,7 +337,6 @@ String hmacSha256(const String &key, const String &msg)
 
 void identify()
 {
- Serial.printf("[WS] Sending identify with MAC: %s\n", WiFi.macAddress().c_str());
  DynamicJsonDocument doc(256);
  doc["type"] = "identify";
  doc["mac"] = WiFi.macAddress();
@@ -350,7 +344,6 @@ void identify()
  doc["offline_capable"] = true; // Indicate this device supports offline mode
  sendJson(doc);
  lastIdentifyAttempt = millis();
- Serial.println("[WS] Identify message sent");
 }
 
 void sendStateUpdate(bool force)
@@ -1432,8 +1425,8 @@ void setup()
  configTime(0, 0, "pool.ntp.org");
 
  // Setup WebSocket connection
- ws.onEvent(onWsEvent);  // Set event callback BEFORE begin()
  ws.begin(BACKEND_HOST, BACKEND_PORT, WS_PATH);
+ ws.onEvent(onWsEvent);
  ws.setReconnectInterval(5000);
  isOfflineMode = false;
  }
@@ -1521,8 +1514,11 @@ void loop()
  lastWsReconnectAttempt = now;
  Serial.println("[WS] Attempting WebSocket reconnection...");
  esp_task_wdt_reset(); // Reset before WebSocket operations
- // Don't manually reconnect - let the WebSocketsClient library handle it
- // The setReconnectInterval(5000) will handle reconnection automatically
+ ws.disconnect();
+ delay(100); // Small delay before reconnecting
+ ws.begin(BACKEND_HOST, BACKEND_PORT, WS_PATH);
+ ws.onEvent(onWsEvent);
+ ws.setReconnectInterval(5000);
  esp_task_wdt_reset(); // Reset after WebSocket setup
  }
  

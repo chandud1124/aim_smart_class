@@ -1,6 +1,6 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const { app } = require('../server');
+const { app, server, mqttServer } = require('../server');
 const Device = require('../models/Device');
 const User = require('../models/User');
 const { testUtils, testDb } = global;
@@ -13,6 +13,10 @@ describe('Device API', () => {
     let testDevice;
 
     beforeAll(async () => {
+        // Track servers for cleanup
+        if (server) global.testServers.push(server);
+        if (mqttServer) global.testServers.push(mqttServer);
+
         await testDb.connect();
     });
 

@@ -116,11 +116,6 @@ const deviceSchema = new mongoose.Schema({
     required: [true, 'Location is required'],
     trim: true
   },
-  deviceType: {
-    type: String,
-    enum: ['esp32', 'raspberry_pi', 'arduino', 'other'],
-    default: 'esp32'
-  },
   classroom: {
     type: String,
     trim: true,

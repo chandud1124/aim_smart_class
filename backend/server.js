@@ -63,17 +63,6 @@ setTimeout(() => {
         console.log('Subscribed to esp32/state');
       }
     });
-    // Subscribe to Raspberry Pi topics
-    mqttClient.subscribe('raspberry/+/status', (err) => {
-      if (!err) {
-        console.log('Subscribed to raspberry/+/status');
-      }
-    });
-    mqttClient.subscribe('raspberry/+/sensor', (err) => {
-      if (!err) {
-        console.log('Subscribed to raspberry/+/sensor');
-      }
-    });
   });
 
   mqttClient.on('message', (topic, message) => {
@@ -83,44 +72,6 @@ setTimeout(() => {
       // Process state updates
       const states = message.toString().split(',');
       console.log('ESP32 states:', states);
-    }
-
-    // Handle Raspberry Pi messages
-    if (topic.startsWith('raspberry/')) {
-      try {
-        const parts = topic.split('/');
-        const deviceId = parts[1];
-        const messageType = parts[2];
-        const data = JSON.parse(message.toString());
-
-        if (messageType === 'status') {
-          // Handle Raspberry Pi status updates
-          console.log(`Raspberry Pi ${deviceId} status:`, data);
-          // Update device status in database
-          const Device = require('./models/Device');
-          Device.findOneAndUpdate(
-            { deviceId, deviceType: 'raspberry_pi' },
-            {
-              status: data.status || 'online',
-              lastSeen: new Date(),
-              systemInfo: data.systemInfo,
-              networkInfo: data.networkInfo
-            },
-            { upsert: false }
-          ).exec();
-
-          // Emit real-time update
-          io.emit('raspberry_status_update', { deviceId, ...data });
-
-        } else if (messageType === 'sensor') {
-          // Handle sensor data from Raspberry Pi
-          console.log(`Raspberry Pi ${deviceId} sensor data:`, data);
-          // Store sensor data (you might want to create a separate collection for this)
-          io.emit('raspberry_sensor_data', { deviceId, ...data });
-        }
-      } catch (error) {
-        console.error('Error processing Raspberry Pi MQTT message:', error);
-      }
     }
   });
 
@@ -211,8 +162,6 @@ const ticketRoutes = require('./routes/tickets');
 const devicePermissionRoutes = require('./routes/devicePermissions');
 const deviceCategoryRoutes = require('./routes/deviceCategories');
 const classExtensionRoutes = require('./routes/classExtensions');
-const noticeRoutes = require('./routes/notices');
-const raspberryRoutes = require('./routes/raspberry');
 
 // Import auth middleware
 // Import auth middleware
@@ -393,12 +342,11 @@ const io = socketIo(server, {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token', 'access-control-allow-origin', 'access-control-allow-headers', 'access-control-allow-methods']
   },
-  // Force polling transport only to avoid WebSocket frame corruption issues
-  transports: ['polling'],
+  // More conservative WebSocket settings to prevent frame corruption
   perMessageDeflate: false, // Disable compression to avoid frame issues
   httpCompression: false, // Disable HTTP compression
-  // Disable WebSocket upgrades entirely
-  allowUpgrades: false,
+  // Force polling initially, allow WebSocket upgrade
+  transports: ['polling', 'websocket'],
   // More conservative timeouts and buffer sizes
   pingTimeout: 60000, // 60 seconds (increased)
   pingInterval: 25000, // 25 seconds (increased)
@@ -411,6 +359,7 @@ const io = socketIo(server, {
   connectTimeout: 45000, // 45 seconds (increased)
   timeout: 45000, // 45 seconds (increased)
   // Disable WebSocket upgrade initially to avoid frame issues
+  allowUpgrades: true,
   cookie: false
 });
 
@@ -550,8 +499,6 @@ apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
 apiRouter.use('/class-extensions', apiLimiter, classExtensionRoutes);
 apiRouter.use('/role-permissions', apiLimiter, require('./routes/rolePermissions'));
-apiRouter.use('/notices', apiLimiter, require('./routes/notices'));
-apiRouter.use('/raspberry', apiLimiter, raspberryRoutes);
 
 // Mount all routes under /api
 // Health check endpoint
@@ -723,22 +670,14 @@ global.wsDevices = wsDevices;
 const wss = new WebSocketServer({ server, path: '/esp32-ws' });
 logger.info('Raw WebSocket /esp32-ws endpoint ready');
 
-// -----------------------------------------------------------------------------
-// Raw WebSocket server for Raspberry Pi devices
-const raspberryWsDevices = new Map(); // deviceId -> ws
-global.raspberryWsDevices = raspberryWsDevices;
-const raspberryWss = new WebSocketServer({ server, path: '/raspberry-ws' });
-logger.info('Raw WebSocket /raspberry-ws endpoint ready');
-
 wss.on('connection', (ws) => {
-  console.log('[WS] New ESP32 WebSocket connection established');
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', async (msg) => {
     let data;
     try { data = JSON.parse(msg.toString()); } catch { return; }
     const type = data.type;
-    console.log('[WS] Received message type:', type, 'MAC:', data.mac || 'none', 'Raw data:', JSON.stringify(data));
+    console.log('[WS] Received message type:', type, 'MAC:', data.mac || 'none');
     if (type === 'identify' || type === 'authenticate') {
       const mac = (data.mac || data.macAddress || '').toUpperCase();
       const secret = data.secret || data.signature;
@@ -749,9 +688,7 @@ wss.on('connection', (ws) => {
       try {
         const Device = require('./models/Device');
         // fetch secret field explicitly
-        console.log('[identify] Looking for device with MAC:', mac);
         const device = await Device.findOne({ macAddress: mac }).select('+deviceSecret switches macAddress');
-        console.log('[identify] Found device:', device ? `YES (${device.macAddress})` : 'NO');
         if (!device || !device.deviceSecret) {
           // If deviceSecret not set, allow temporary identification without secret
           if (!device) {
@@ -1153,196 +1090,6 @@ setInterval(() => {
   });
 }, 30000);
 
-// -----------------------------------------------------------------------------
-// Raspberry Pi WebSocket server handling
-raspberryWss.on('connection', (ws) => {
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
-
-  ws.on('message', async (msg) => {
-    let data;
-    try { data = JSON.parse(msg.toString()); } catch { return; }
-    const type = data.type;
-    const deviceId = data.deviceId;
-    console.log('[Raspberry WS] Received message type:', type, 'Device ID:', deviceId || 'none');
-
-    if (type === 'identify') {
-      const deviceId = data.deviceId;
-      const deviceType = data.deviceType;
-      const secret = data.secret;
-
-      if (!deviceId) {
-        ws.send(JSON.stringify({ type: 'error', reason: 'missing_device_id' }));
-        return;
-      }
-
-      try {
-        const Device = require('./models/Device');
-        // Find device by deviceId and deviceType
-        const device = await Device.findOne({ deviceId, deviceType: 'raspberry_pi' }).select('+deviceSecret');
-
-        if (!device) {
-          logger.warn('[raspberry identify] device_not_registered', { deviceId });
-          ws.send(JSON.stringify({ type: 'error', reason: 'device_not_registered' }));
-          try { io.emit('raspberry_identify_error', { deviceId, reason: 'device_not_registered' }); } catch { }
-          return;
-        }
-
-        // Optional secret validation
-        if (device.deviceSecret && device.deviceSecret !== secret) {
-          if (process.env.ALLOW_INSECURE_RASPBERRY_IDENTIFY === '1') {
-            logger.warn('[raspberry identify] secret mismatch but ALLOW_INSECURE_RASPBERRY_IDENTIFY=1, allowing', { deviceId });
-          } else {
-            logger.warn('[raspberry identify] invalid_secret', { deviceId });
-            ws.send(JSON.stringify({ type: 'error', reason: 'invalid_secret' }));
-            try { io.emit('raspberry_identify_error', { deviceId, reason: 'invalid_secret' }); } catch { }
-            return;
-          }
-        }
-
-        ws.deviceId = deviceId;
-        ws.deviceSecret = device.deviceSecret;
-        raspberryWsDevices.set(deviceId, ws);
-
-        device.status = 'online';
-        device.lastSeen = new Date();
-        device.isIdentified = true;
-        device.connectionStatus = 'online';
-        await device.save();
-
-        ws.send(JSON.stringify({
-          type: 'identified',
-          deviceId,
-          timestamp: new Date().toISOString()
-        }));
-
-        logger.info(`[raspberry] identified ${deviceId}`);
-        // Notify frontend clients
-        try { io.emit('raspberry_device_connected', { deviceId }); } catch { }
-
-      } catch (e) {
-        logger.error('[raspberry identify] error', e.message);
-      }
-      return;
-    }
-
-    if (!ws.deviceId) return; // ignore until identified
-
-    if (type === 'status') {
-      // Handle Raspberry Pi status updates
-      try {
-        const Device = require('./models/Device');
-        const device = await Device.findOne({ deviceId: ws.deviceId, deviceType: 'raspberry_pi' });
-
-        if (device) {
-          device.status = data.status || 'online';
-          device.lastSeen = new Date();
-          device.systemInfo = data.system_info;
-          device.gpioStates = data.gpio_states;
-          await device.save();
-
-          // Emit real-time update
-          io.emit('raspberry_status_update', { deviceId: ws.deviceId, ...data });
-          logger.info(`[raspberry status] updated ${ws.deviceId}`);
-        }
-      } catch (e) {
-        logger.error('[raspberry status] error', e.message);
-      }
-      return;
-    }
-
-    if (type === 'sensor') {
-      // Handle sensor data from Raspberry Pi
-      try {
-        // Store sensor data (you might want to create a separate collection for this)
-        io.emit('raspberry_sensor_data', { deviceId: ws.deviceId, ...data });
-        logger.info(`[raspberry sensor] received data from ${ws.deviceId}`);
-      } catch (e) {
-        logger.error('[raspberry sensor] error', e.message);
-      }
-      return;
-    }
-
-    if (type === 'gpio_ack') {
-      // Handle GPIO command acknowledgment
-      try {
-        io.emit('raspberry_gpio_result', {
-          deviceId: ws.deviceId,
-          pin: data.pin,
-          requestedState: data.requested_state,
-          success: data.success,
-          timestamp: data.timestamp
-        });
-        logger.info(`[raspberry gpio_ack] ${ws.deviceId} pin ${data.pin}: ${data.success ? 'success' : 'failed'}`);
-      } catch (e) {
-        logger.error('[raspberry gpio_ack] error', e.message);
-      }
-      return;
-    }
-
-    if (type === 'gpio_state') {
-      // Handle GPIO state changes
-      try {
-        const Device = require('./models/Device');
-        const device = await Device.findOne({ deviceId: ws.deviceId, deviceType: 'raspberry_pi' });
-
-        if (device) {
-          // Update GPIO state in database
-          if (!device.gpioStates) device.gpioStates = {};
-          device.gpioStates[data.pin.toString()] = data.state;
-          device.lastSeen = new Date();
-          await device.save();
-
-          // Emit real-time update
-          io.emit('raspberry_gpio_changed', {
-            deviceId: ws.deviceId,
-            pin: data.pin,
-            state: data.state,
-            name: data.name
-          });
-        }
-      } catch (e) {
-        logger.error('[raspberry gpio_state] error', e.message);
-      }
-      return;
-    }
-  });
-
-  ws.on('close', () => {
-    if (ws.deviceId) {
-      raspberryWsDevices.delete(ws.deviceId);
-      logger.info(`[raspberry] disconnected ${ws.deviceId}`);
-      try { io.emit('raspberry_device_disconnected', { deviceId: ws.deviceId }); } catch { }
-
-      // Mark device offline
-      (async () => {
-        try {
-          const Device = require('./models/Device');
-          const d = await Device.findOne({ deviceId: ws.deviceId, deviceType: 'raspberry_pi' });
-          if (d && d.status !== 'offline') {
-            d.status = 'offline';
-            d.connectionStatus = 'disconnected';
-            d.isIdentified = false;
-            await d.save();
-            emitDeviceStateChanged(d, { source: 'raspberry:ws_close' });
-            logger.info(`[raspberry ws close] marked device offline: ${ws.deviceId}`);
-          }
-        } catch (e) {
-          logger.error('[raspberry ws close offline update] error', e.message);
-        }
-      })();
-    }
-  });
-});
-
-// Ping/purge dead Raspberry Pi WS connections every 30s
-setInterval(() => {
-  raspberryWss.clients.forEach(ws => {
-    if (!ws.isAlive) return ws.terminate();
-    ws.isAlive = false; ws.ping();
-  });
-}, 30000);
-
 // Offline detection every 60s (mark devices offline if stale)
 setInterval(async () => {
   try {
@@ -1470,4 +1217,4 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
   }, 5000); // Wait 5 seconds for database connection
 });
 
-module.exports = { app, io };
+module.exports = { app, io, server, mqttServer };

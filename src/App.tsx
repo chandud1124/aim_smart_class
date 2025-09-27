@@ -36,7 +36,6 @@ const AIMLPage = lazy(() => import("./pages/AIMLPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const GrafanaPage = lazy(() => import("./pages/GrafanaPage"));
 const PrometheusPage = lazy(() => import("./pages/PrometheusPage"));
-const NoticeBoard = lazy(() => import("./pages/NoticeBoard").then(module => ({ default: module.NoticeBoardPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,7 +117,6 @@ const App = () => {
                     <Route path="analytics" element={<AnalyticsPage />} />
                     <Route path="grafana" element={<GrafanaPage />} />
                     <Route path="prometheus" element={<PrometheusPage />} />
-                    <Route path="notice-board" element={<NoticeBoard />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />

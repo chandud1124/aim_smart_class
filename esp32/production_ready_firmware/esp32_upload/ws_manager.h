@@ -37,8 +37,6 @@ private:
     std::function<void(uint8_t*, size_t)> messageCallback;
     std::function<void()> connectCallback;
     std::function<void()> disconnectCallback;
-    std::function<void(WStype_t, uint8_t*, size_t)> eventCallback;
-    std::function<void(WStype_t, uint8_t*, size_t)> eventCallback;
 
     // Internal event handlers
     void onWSEvent(WStype_t type, uint8_t* payload, size_t length);

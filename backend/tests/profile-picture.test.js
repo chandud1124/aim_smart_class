@@ -2,7 +2,7 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
-const { app } = require('../server');
+const { app, server, mqttServer } = require('../server');
 const User = require('../models/User');
 const { testUtils, testDb } = global;
 
@@ -11,6 +11,10 @@ describe('Profile Picture API', () => {
     let testUser;
 
     beforeAll(async () => {
+        // Track servers for cleanup
+        if (server) global.testServers.push(server);
+        if (mqttServer) global.testServers.push(mqttServer);
+
         await testDb.connect();
     });
 

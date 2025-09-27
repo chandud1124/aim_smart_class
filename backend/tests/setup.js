@@ -28,6 +28,9 @@ jest.mock('../scripts/secure-config', () => ({
   }))
 }));
 
+// Store server references for cleanup
+global.testServers = [];
+
 // Mock console methods to reduce noise in tests
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
@@ -39,10 +42,20 @@ beforeAll(() => {
     console.log = jest.fn();
 });
 
-afterAll(() => {
+afterAll(async () => {
     console.error = originalConsoleError;
     console.warn = originalConsoleWarn;
     console.log = originalConsoleLog;
+
+    // Close any servers that were started during tests
+    for (const server of global.testServers) {
+        if (server && typeof server.close === 'function') {
+            await new Promise((resolve) => {
+                server.close(resolve);
+            });
+        }
+    }
+    global.testServers = [];
 });
 
 // Global test utilities
