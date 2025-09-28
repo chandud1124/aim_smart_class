@@ -76,9 +76,9 @@ const TicketList: React.FC = () => {
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [showDetails, setShowDetails] = useState(false);
     const [filters, setFilters] = useState({
-        status: '',
-        category: '',
-        priority: '',
+        status: 'all',
+        category: 'all',
+        priority: 'all',
         search: ''
     });
     const [pagination, setPagination] = useState({
@@ -92,7 +92,12 @@ const TicketList: React.FC = () => {
         try {
             setLoading(true);
             const response = await ticketAPI.getTickets({
-                ...filters,
+                ...Object.fromEntries(
+                    Object.entries(filters).map(([key, value]) => [
+                        key,
+                        value === 'all' ? '' : value
+                    ])
+                ),
                 page: pagination.page,
                 limit: pagination.limit
             });
@@ -230,7 +235,7 @@ const TicketList: React.FC = () => {
                                     <SelectValue placeholder="All Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Status</SelectItem>
+                                    <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="open">Open</SelectItem>
                                     <SelectItem value="in_progress">In Progress</SelectItem>
                                     <SelectItem value="resolved">Resolved</SelectItem>
@@ -247,7 +252,7 @@ const TicketList: React.FC = () => {
                                     <SelectValue placeholder="All Categories" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Categories</SelectItem>
+                                    <SelectItem value="all">All Categories</SelectItem>
                                     <SelectItem value="technical_issue">Technical Issue</SelectItem>
                                     <SelectItem value="device_problem">Device Problem</SelectItem>
                                     <SelectItem value="network_issue">Network Issue</SelectItem>
@@ -267,7 +272,7 @@ const TicketList: React.FC = () => {
                                     <SelectValue placeholder="All Priorities" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Priorities</SelectItem>
+                                    <SelectItem value="all">All Priorities</SelectItem>
                                     <SelectItem value="low">Low</SelectItem>
                                     <SelectItem value="medium">Medium</SelectItem>
                                     <SelectItem value="high">High</SelectItem>

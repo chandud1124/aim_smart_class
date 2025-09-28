@@ -15,6 +15,7 @@ export interface Device {
   classroom?: string;
   assignedUsers?: string[];
   aiEnabled?: boolean; // AI/ML control toggle
+  deviceType?: 'esp32' | 'raspberry_pi'; // Device type for filtering
 }
 
 export interface Switch {

@@ -29,6 +29,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '@/services/api';
 
 interface ScheduledContent {
   _id: string;
@@ -118,12 +119,8 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
   const fetchScheduledContent = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/scheduled`);
-      if (response.ok) {
-        const data = await response.json();
-        setScheduledContent(data.content);
-      }
+      const response = await api.get('/content');
+      setScheduledContent(response.data.content || []);
     } catch (error) {
       console.error('Error fetching scheduled content:', error);
       toast.error('Failed to fetch scheduled content');
@@ -132,12 +129,8 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
   const fetchUploadedMedia = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/uploaded-media`);
-      if (response.ok) {
-        const data = await response.json();
-        setUploadedMedia(data.media || []);
-      }
+      const response = await api.get('/content/uploaded-media');
+      setUploadedMedia(response.data.media || []);
     } catch (error) {
       console.error('Error fetching uploaded media:', error);
       // Don't show error toast for media fetch as it's not critical
@@ -157,28 +150,18 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
     setLoading(true);
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/scheduled`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newContent),
-      });
+      const response = await api.post('/content', newContent);
 
-      if (response.ok) {
+      if (response.status === 200 || response.status === 201) {
         toast.success('Content scheduled successfully');
         setIsCreateDialogOpen(false);
         resetNewContent();
         fetchScheduledContent();
         onScheduleUpdate();
-      } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to schedule content');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating scheduled content:', error);
-      toast.error('Failed to schedule content');
+      toast.error(error.response?.data?.message || 'Failed to schedule content');
     } finally {
       setLoading(false);
     }
@@ -219,17 +202,17 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
     setImportErrors([]);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
       const formData = new FormData();
       formData.append('file', importFile);
 
-      const response = await fetch(`${apiBaseUrl}/api/content/import`, {
-        method: 'POST',
-        body: formData,
+      const response = await api.post('/content/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status === 200 || response.status === 201) {
+        const result = response.data;
         setImportProgress(100);
         toast.success(`Successfully imported ${result.imported} content items`);
         if (result.errors.length > 0) {
@@ -240,11 +223,11 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
         fetchScheduledContent();
         onScheduleUpdate();
       } else {
-        const error = await response.json();
+        const error = response.data;
         toast.error(error.message || 'Failed to import content');
         setImportErrors([error.message || 'Import failed']);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error importing content:', error);
       toast.error('Failed to import content');
       setImportErrors(['Network error occurred during import']);
@@ -261,19 +244,19 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
     setLoading(true);
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
       const formData = new FormData();
       Array.from(mediaFiles).forEach(file => {
         formData.append('files', file);
       });
 
-      const response = await fetch(`${apiBaseUrl}/api/content/upload-media`, {
-        method: 'POST',
-        body: formData,
+      const response = await api.post('/content/upload-media', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.status === 200 || response.status === 201) {
+        const result = response.data;
         toast.success(`Successfully uploaded ${result.files.length} media files`);
         if (result.errors && result.errors.length > 0) {
           setImportErrors(result.errors.map(e => `${e.file}: ${e.error}`));
@@ -283,10 +266,10 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
         // Refresh the uploaded media list
         fetchUploadedMedia();
       } else {
-        const error = await response.json();
+        const error = response.data;
         toast.error(error.message || 'Failed to upload media files');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading media files:', error);
       toast.error('Failed to upload media files');
     } finally {
@@ -296,21 +279,14 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
   const toggleContentStatus = async (contentId: string, isActive: boolean) => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/scheduled/${contentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isActive }),
-      });
+      const response = await api.patch(`/content/${contentId}`, { isActive });
 
-      if (response.ok) {
+      if (response.status === 200) {
         toast.success(`Content ${isActive ? 'activated' : 'deactivated'}`);
         fetchScheduledContent();
         onScheduleUpdate();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling content status:', error);
       toast.error('Failed to update content status');
     }
@@ -355,16 +331,9 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
     setLoading(true);
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/scheduled/${editingContent._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newContent),
-      });
+      const response = await api.patch(`/content/${editingContent._id}`, newContent);
 
-      if (response.ok) {
+      if (response.status === 200) {
         toast.success('Content updated successfully');
         setIsEditDialogOpen(false);
         setEditingContent(null);
@@ -372,10 +341,10 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
         fetchScheduledContent();
         onScheduleUpdate();
       } else {
-        const error = await response.json();
+        const error = response.data;
         toast.error(error.message || 'Failed to update content');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating scheduled content:', error);
       toast.error('Failed to update content');
     } finally {
@@ -389,20 +358,17 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/content/scheduled/${contentId}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/content/${contentId}`);
 
-      if (response.ok) {
+      if (response.status === 200) {
         toast.success('Content deleted successfully');
         fetchScheduledContent();
         onScheduleUpdate();
       } else {
-        const error = await response.json();
+        const error = response.data;
         toast.error(error.message || 'Failed to delete content');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting content:', error);
       toast.error('Failed to delete content');
     }
@@ -1120,7 +1086,7 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="active">Active Notices</TabsTrigger>
+          <TabsTrigger value="active">Active Content</TabsTrigger>
           <TabsTrigger value="inactive">Inactive Content</TabsTrigger>
           <TabsTrigger value="all">All Content</TabsTrigger>
         </TabsList>
@@ -1129,8 +1095,8 @@ const ContentScheduler: React.FC<ContentSchedulerProps> = ({
           {scheduledContent.filter(c => c.isActive).length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Monitor className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">No Active Notices</p>
-              <p className="text-sm">Currently playing notices will appear here with options to edit, delete, or pause them.</p>
+              <p className="text-lg font-medium mb-2">No Active Content</p>
+              <p className="text-sm">Currently playing scheduled content will appear here with options to edit, delete, or pause them.</p>
             </div>
           ) : (
             scheduledContent.filter(c => c.isActive).map((content) => (
