@@ -28,12 +28,8 @@ export function useSocketConnection() {
     socketService.on('disconnect', handleDisconnect);
     socketService.on('connect_error', handleConnectError);
 
-    // Initial connection attempt
-    if (!socketService.isConnected) {
-      socketService.connect().catch((error) => {
-        setConnectionError(error.message || 'Failed to connect');
-      });
-    }
+    // Don't auto-connect here - let SocketProvider handle connections
+    // This prevents duplicate connections
 
     return () => {
       socketService.off('connect', handleConnect);

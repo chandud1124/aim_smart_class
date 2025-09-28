@@ -3,13 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { NoticeSubmissionData } from '@/types';
+import BoardSelector from './BoardSelector';
 
 interface NoticeSubmissionFormProps {
   onClose: () => void;
@@ -28,6 +29,7 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
     priority: 'medium',
     category: 'general',
     targetAudience: {},
+    selectedBoards: [],
     attachments: []
   });
 
@@ -94,6 +96,10 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
         submitData.append('targetAudienceClasses', JSON.stringify(formData.targetAudience.classes));
       }
 
+      if (formData.selectedBoards?.length) {
+        submitData.append('selectedBoards', JSON.stringify(formData.selectedBoards));
+      }
+
       attachments.forEach((file, index) => {
         submitData.append('attachments', file);
       });
@@ -123,6 +129,9 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Submit Notice</DialogTitle>
+          <DialogDescription>
+            Fill out the form below to submit a new notice. All fields marked with * are required.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -163,7 +172,7 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
                 onValueChange={(value) => handleInputChange('priority', value)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">Low</SelectItem>
@@ -181,7 +190,7 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
                 onValueChange={(value) => handleInputChange('category', value)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="general">General</SelectItem>
@@ -248,6 +257,12 @@ const NoticeSubmissionForm: React.FC<NoticeSubmissionFormProps> = ({ onClose, on
               </div>
             )}
           </div>
+
+          <BoardSelector
+            selectedBoards={formData.selectedBoards || []}
+            onSelectionChange={(boardIds) => handleInputChange('selectedBoards', boardIds)}
+            maxSelections={5}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

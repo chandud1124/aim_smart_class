@@ -19,32 +19,38 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const [isConnected, setIsConnected] = useState(socketService.isConnected);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [socketId, setSocketId] = useState<string | undefined>(socketService.socketId);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     const handleConnect = () => {
       setIsConnected(true);
       setConnectionError(null);
       setSocketId(socketService.socketId);
+      setIsConnecting(false);
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
       setSocketId(undefined);
+      setIsConnecting(false);
     };
 
     const handleConnectError = (error: any) => {
       setConnectionError(error.message || 'Connection failed');
       setIsConnected(false);
+      setIsConnecting(false);
     };
 
     socketService.on('connect', handleConnect);
     socketService.on('disconnect', handleDisconnect);
     socketService.on('connect_error', handleConnectError);
 
-    // Initial connection attempt
-    if (!socketService.isConnected) {
+    // Initial connection attempt - only from SocketProvider and only once
+    if (!socketService.isConnected && !isConnecting) {
+      setIsConnecting(true);
       socketService.connect().catch((error) => {
         setConnectionError(error.message || 'Failed to connect');
+        setIsConnecting(false);
       });
     }
 
@@ -53,7 +59,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketService.off('disconnect', handleDisconnect);
       socketService.off('connect_error', handleConnectError);
     };
-  }, []);
+  }, []); // Remove isConnecting from dependencies to prevent re-runs
 
   const reconnect = () => {
     setConnectionError(null);

@@ -227,6 +227,12 @@ export interface Notice {
     departments?: string[];
     classes?: string[];
   };
+  targetBoards?: Array<{
+    boardId: string;
+    assignedBy: string;
+    priority: number;
+    displayOrder: number;
+  }>;
   displayDevices?: Array<{
     deviceId: string;
     displayedAt: Date;
@@ -252,6 +258,7 @@ export interface NoticeSubmissionData {
     departments?: string[];
     classes?: string[];
   };
+  selectedBoards?: string[];
   attachments?: File[];
 }
 

@@ -67,7 +67,7 @@ const submitNotice = async (req, res) => {
       });
     }
 
-    const { title, content, priority, category, expiryDate, targetAudience } = req.body;
+    const { title, content, priority, category, expiryDate, targetAudience, selectedBoards } = req.body;
     const submittedBy = req.user.id;
 
     // Process file attachments
@@ -93,6 +93,27 @@ const submitNotice = async (req, res) => {
       }
     }
 
+    // Process selected boards
+    let targetBoards = [];
+    if (selectedBoards) {
+      try {
+        // selectedBoards might be a JSON string from form data
+        const parsedBoards = typeof selectedBoards === 'string' ? JSON.parse(selectedBoards) : selectedBoards;
+        if (Array.isArray(parsedBoards)) {
+          targetBoards = parsedBoards.map(boardId => ({
+            boardId: boardId,
+            assignedAt: new Date(),
+            assignedBy: submittedBy,
+            priority: 0,
+            displayOrder: 0
+          }));
+        }
+      } catch (error) {
+        console.warn('Failed to parse selectedBoards:', error.message);
+        targetBoards = [];
+      }
+    }
+
     const notice = new Notice({
       title,
       content,
@@ -101,7 +122,8 @@ const submitNotice = async (req, res) => {
       submittedBy,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       attachments,
-      targetAudience: parsedTargetAudience
+      targetAudience: parsedTargetAudience,
+      targetBoards
     });
 
     await notice.save();
@@ -176,7 +198,8 @@ const getNotices = async (req, res) => {
       sort: { [sortBy]: sortOrder === 'desc' ? -1 : 1 },
       populate: [
         { path: 'submittedBy', select: 'name email role department' },
-        { path: 'approvedBy', select: 'name email role' }
+        { path: 'approvedBy', select: 'name email role' },
+        { path: 'targetBoards.boardId', select: 'name location department isActive' }
       ]
     };
 
@@ -235,7 +258,8 @@ const getPendingNotices = async (req, res) => {
     const notices = await Notice.find({ status: 'pending' })
       .sort({ createdAt: -1 })
       .populate('submittedBy', 'name email role department')
-      .populate('approvedBy', 'name email role');
+      .populate('approvedBy', 'name email role')
+      .populate('targetBoards.boardId', 'name location department isActive');
 
     res.json({
       success: true,
@@ -409,16 +433,35 @@ const updateNotice = async (req, res) => {
     }
 
     // Update fields
-    const allowedFields = ['title', 'content', 'priority', 'category', 'expiryDate', 'targetAudience'];
+    const allowedFields = ['title', 'content', 'priority', 'category', 'expiryDate', 'targetAudience', 'selectedBoards'];
     allowedFields.forEach(field => {
       if (updates[field] !== undefined) {
-        notice[field] = updates[field];
+        if (field === 'selectedBoards') {
+          // Handle board assignment updates
+          try {
+            const parsedBoards = typeof updates.selectedBoards === 'string' ? JSON.parse(updates.selectedBoards) : updates.selectedBoards;
+            if (Array.isArray(parsedBoards)) {
+              notice.targetBoards = parsedBoards.map(boardId => ({
+                boardId: boardId,
+                assignedAt: new Date(),
+                assignedBy: req.user.id,
+                priority: 0,
+                displayOrder: 0
+              }));
+            }
+          } catch (error) {
+            console.warn('Failed to parse selectedBoards for update:', error.message);
+          }
+        } else {
+          notice[field] = updates[field];
+        }
       }
     });
 
     await notice.save();
     await notice.populate('submittedBy', 'name email role');
     await notice.populate('approvedBy', 'name email role');
+    await notice.populate('targetBoards.boardId', 'name location department isActive');
 
     res.json({
       success: true,

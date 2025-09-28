@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Eye, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, Eye, Clock, CheckCircle, XCircle, AlertTriangle, Monitor } from 'lucide-react';
 import { NoticeSubmissionForm } from '@/components/NoticeSubmissionForm';
 import { NoticeApprovalPanel } from '@/components/NoticeApprovalPanel';
+import { NoticePublishingPanel } from '@/components/NoticePublishingPanel';
+import BoardManager from '@/components/BoardManager';
+import ContentScheduler from '@/components/ContentScheduler';
 import { useAuth } from '@/hooks/useAuth';
 import { Notice, NoticeFilters } from '@/types';
 import api from '@/services/api';
@@ -16,6 +19,7 @@ const NoticeBoard: React.FC = () => {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [activeNotices, setActiveNotices] = useState<Notice[]>([]);
   const [pendingNotices, setPendingNotices] = useState<Notice[]>([]);
+  const [approvedNotices, setApprovedNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
@@ -47,9 +51,15 @@ const NoticeBoard: React.FC = () => {
 
       // Fetch pending notices for admin users
       if (user?.role === 'admin' || user?.role === 'super-admin') {
-        const pendingResponse = await api.get('/notices/pending');
+        const [pendingResponse, approvedResponse] = await Promise.all([
+          api.get('/notices/pending'),
+          api.get('/notices', { params: { status: 'approved' } })
+        ]);
         if (pendingResponse.data.success) {
           setPendingNotices(pendingResponse.data.notices);
+        }
+        if (approvedResponse.data.success) {
+          setApprovedNotices(approvedResponse.data.notices);
         }
       }
     } catch (err: any) {
@@ -138,9 +148,16 @@ const NoticeBoard: React.FC = () => {
           <TabsTrigger value="active">Active Notices</TabsTrigger>
           <TabsTrigger value="all">All Notices</TabsTrigger>
           {(user?.role === 'admin' || user?.role === 'super-admin') && (
-            <TabsTrigger value="pending">
-              Pending Approval ({pendingNotices.length})
-            </TabsTrigger>
+            <>
+              <TabsTrigger value="board-management">Board Management</TabsTrigger>
+              <TabsTrigger value="content-scheduler">Content Scheduler</TabsTrigger>
+              <TabsTrigger value="approved">
+                Approved ({approvedNotices.length})
+              </TabsTrigger>
+              <TabsTrigger value="pending">
+                Pending Approval ({pendingNotices.length})
+              </TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -203,6 +220,21 @@ const NoticeBoard: React.FC = () => {
                         </div>
                       </div>
                     )}
+                    {notice.targetBoards && notice.targetBoards.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2 flex items-center">
+                          <Monitor className="h-4 w-4 mr-2" />
+                          Display Boards:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {notice.targetBoards.map((assignment, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              Board ID: {assignment.boardId.slice(-6)} • Priority: {assignment.priority}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -252,6 +284,30 @@ const NoticeBoard: React.FC = () => {
             </div>
           )}
         </TabsContent>
+
+        {(user?.role === 'admin' || user?.role === 'super-admin') && (
+          <TabsContent value="board-management">
+            <BoardManager />
+          </TabsContent>
+        )}
+
+        {(user?.role === 'admin' || user?.role === 'super-admin') && (
+          <TabsContent value="content-scheduler">
+            <ContentScheduler
+              boards={[]} // TODO: Fetch boards from API
+              onScheduleUpdate={() => fetchNotices()}
+            />
+          </TabsContent>
+        )}
+
+        {(user?.role === 'admin' || user?.role === 'super-admin') && (
+          <TabsContent value="approved">
+            <NoticePublishingPanel
+              notices={approvedNotices}
+              onRefresh={fetchNotices}
+            />
+          </TabsContent>
+        )}
 
         {(user?.role === 'admin' || user?.role === 'super-admin') && (
           <TabsContent value="pending">

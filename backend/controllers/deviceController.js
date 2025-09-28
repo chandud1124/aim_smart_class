@@ -59,7 +59,10 @@ const getAllDevices = async (req, res) => {
       });
     }
 
-    const devices = await Device.find(query).populate('assignedUsers', 'name email role').lean();
+    // Filter devices based on access control
+    const deviceQuery = query;
+
+    const devices = await Device.find(deviceQuery).populate('assignedUsers', 'name email role').lean();
 
     res.json({
       success: true,
@@ -1151,7 +1154,10 @@ const bulkToggleByLocation = async (req, res) => {
     }
     
     // Combine access control with location filter
-    const match = { ...accessQuery, location };
+    const match = {
+      ...accessQuery,
+      location
+    };
     const devices = await Device.find(match);
     let switchesChanged = 0;
     for (const device of devices) {

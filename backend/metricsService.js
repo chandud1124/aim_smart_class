@@ -1060,9 +1060,9 @@ async function getAnomalyHistory(timeframe = '7d') {
 }
 
 // Initialize metrics on startup
-(async () => {
-  await initializeMetrics();
-})();
+// (async () => {
+//   await initializeMetrics();
+// })();
 
 // Update metrics every 30 seconds
 setInterval(updateMetrics, 30000);
@@ -1516,5 +1516,6 @@ module.exports = {
   calculateDevicePowerConsumption,
   calculateEnergyConsumption,
   calculatePreciseEnergyConsumption,
+  initializeMetrics,
   updateDeviceMetrics: () => {} // Legacy function, kept for compatibility
 };

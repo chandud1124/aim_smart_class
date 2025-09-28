@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,6 +124,9 @@ export const UserDialog: React.FC<UserDialogProps> = ({
           <DialogTitle>
             {user ? 'Edit User' : 'Add New User'}
           </DialogTitle>
+          <DialogDescription>
+            {user ? 'Update user information and permissions.' : 'Create a new user account with appropriate permissions.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -154,7 +157,7 @@ export const UserDialog: React.FC<UserDialogProps> = ({
               <Label htmlFor="role">Role</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value as any }))}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="super-admin">Super Administrator</SelectItem>

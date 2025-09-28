@@ -22,7 +22,9 @@ const noticeValidation = [
   body('priority').optional().isIn(['low', 'medium', 'high', 'urgent']).withMessage('Invalid priority'),
   body('category').optional().isIn(['general', 'academic', 'administrative', 'event', 'emergency', 'maintenance']).withMessage('Invalid category'),
   body('expiryDate').optional().isISO8601().withMessage('Invalid expiry date'),
-  body('targetAudience').optional().isJSON().withMessage('Invalid target audience format')
+  body('targetAudience').optional().isJSON().withMessage('Invalid target audience format'),
+  body('selectedBoards').optional().isArray({ min: 0, max: 5 }).withMessage('Selected boards must be an array with max 5 boards'),
+  body('selectedBoards.*').optional().isMongoId().withMessage('Each selected board must be a valid ID')
 ];
 
 const reviewValidation = [
@@ -64,7 +66,7 @@ router.get('/pending',
 );
 
 // Review notice (approve/reject) - admin only
-router.put('/:id/review',
+router.patch('/:id/review',
   auth,
   authorize('admin', 'super-admin'),
   param('id').isMongoId().withMessage('Invalid notice ID'),
@@ -73,7 +75,7 @@ router.put('/:id/review',
 );
 
 // Publish approved notice - admin only
-router.put('/:id/publish',
+router.patch('/:id/publish',
   auth,
   authorize('admin', 'super-admin'),
   param('id').isMongoId().withMessage('Invalid notice ID'),
@@ -81,7 +83,7 @@ router.put('/:id/publish',
 );
 
 // Update notice
-router.put('/:id',
+router.patch('/:id',
   auth,
   param('id').isMongoId().withMessage('Invalid notice ID'),
   noticeValidation,

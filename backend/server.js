@@ -45,7 +45,9 @@ aedes.on('subscribe', (subscriptions, client) => {
   console.log(`[MQTT] Aedes client ${client.id} subscribed to topics: ${subscriptions.map(s => s.topic).join(', ')}`);
 });
 
-// Initialize MQTT client (connects to our own broker) - delayed to avoid conflicts
+// Initialize MQTT client (connects to our own broker) - DISABLED for device communication
+// Keeping MQTT broker running for safety/fallback purposes only
+/*
 setTimeout(() => {
   const mqtt = require('mqtt');
   const mqttClient = mqtt.connect(`mqtt://localhost:${MQTT_PORT}`, {
@@ -89,14 +91,22 @@ setTimeout(() => {
   // Make MQTT functions available globally
   global.sendMqttSwitchCommand = sendMqttSwitchCommand;
 }, 2000); // Wait 2 seconds for server to fully start
+*/
+
+console.log('[MQTT] MQTT client disabled for device communication - using WebSocket only');
+console.log('[MQTT] MQTT broker kept running for safety/fallback purposes');
 
 // Load secure configuration if available
 let secureConfig = {};
 try {
+    // Temporarily disable secure config loading for debugging
+    console.log('⚠️  Secure configuration loading disabled for debugging');
+    /*
     const SecureConfigManager = require('./scripts/secure-config');
     const configManager = new SecureConfigManager();
     secureConfig = configManager.loadSecureConfig();
     console.log('✅ Secure configuration loaded successfully');
+    */
 } catch (error) {
     console.log('⚠️  Secure configuration not available, using environment variables');
     console.log('   Run: node scripts/secure-config.js setup');
@@ -205,11 +215,11 @@ const connectDB = async (retries = 5) => {
       logger.error('Admin user creation error:', adminError);
     }
     // Initialize schedule service after DB connection
-    try {
-      await scheduleService.initialize();
-    } catch (scheduleError) {
-      logger.error('Schedule service initialization error:', scheduleError);
-    }
+    // try {
+    //   await scheduleService.initialize();
+    // } catch (scheduleError) {
+    //   logger.error('Schedule service initialization error:', scheduleError);
+    // }
   } catch (err) {
     const msg = err && (err.message || String(err));
     logger.error('MongoDB connection error (continuing in LIMITED MODE):', msg);
@@ -498,6 +508,8 @@ apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
 apiRouter.use('/class-extensions', apiLimiter, classExtensionRoutes);
 apiRouter.use('/role-permissions', apiLimiter, require('./routes/rolePermissions'));
 apiRouter.use('/notices', apiLimiter, require('./routes/notices'));
+apiRouter.use('/boards', apiLimiter, require('./routes/boards'));
+apiRouter.use('/content', apiLimiter, require('./routes/contentScheduler'));
 
 // Mount all routes under /api
 // Health check endpoint
@@ -1186,14 +1198,11 @@ if (io && io.opts) {
     methods: ['GET', 'POST']
   };
 }
-server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
-  const host = process.env.HOST || '0.0.0.0';
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[SERVER] Listen callback executed`);
+  const host = '0.0.0.0';
   console.log(`Server running on ${host}:${PORT}`);
-  if (host === '0.0.0.0') {
-    console.log(`Server accessible on all network interfaces`);
-  } else {
-    console.log(`Server bound to specific IP: ${host}`);
-  }
+  console.log(`Server accessible on localhost:${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 
   // Connect to database after server starts
@@ -1201,19 +1210,28 @@ server.listen(PORT, process.env.HOST || '0.0.0.0', () => {
 
   // Start enhanced services after successful startup
   setTimeout(() => {
+    // Initialize metrics service after database connection
+    try {
+      const metricsService = require('./metricsService');
+      (async () => {
+        await metricsService.initializeMetrics();
+      })();
+    } catch (error) {
+      console.error('Error initializing metrics service:', error);
+    }
+
     // Start device monitoring service (5-minute checks)
-    deviceMonitoringService.start();
-    
-    // Set up log cleanup (run daily at midnight)
-    setInterval(async () => {
-      const now = new Date();
-      if (now.getHours() === 0 && now.getMinutes() === 0) {
-        await EnhancedLoggingService.cleanupLogs();
-      }
-    }, 60000); // Check every minute
-    
+    // deviceMonitoringService.start(); // Temporarily disabled for debugging
+
     console.log('[SERVICES] Enhanced logging and monitoring services started');
   }, 5000); // Wait 5 seconds for database connection
 });
 
+console.log(`[SERVER] server.listen called, PORT=${PORT}`);
 module.exports = { app, io, server, mqttServer };
+
+server.on('error', (error) => {
+  console.error('Server error:', error);
+});
+
+console.log('Server.js file execution completed');

@@ -92,6 +92,11 @@ const deviceSchema = new mongoose.Schema({
     required: [true, 'Device name is required'],
     trim: true
   },
+  deviceType: {
+    type: String,
+    enum: ['esp32'],
+    default: 'esp32'
+  },
   macAddress: {
     type: String,
     required: [true, 'MAC address is required'],
@@ -137,7 +142,7 @@ const deviceSchema = new mongoose.Schema({
         validator: function(switches) {
           return switches.length <= 8;
         },
-        message: 'Maximum 8 switches allowed per device'
+        message: 'Maximum 8 switches allowed per ESP32 device'
       },
       {
         validator: function(switches) {
@@ -149,7 +154,7 @@ const deviceSchema = new mongoose.Schema({
         message: 'Each switch (including manual switch GPIOs) must use a unique GPIO pin'
       }
     ],
-    required: [true, 'At least one switch is required']
+    required: true
   },
   pirEnabled: {
     type: Boolean,

@@ -57,21 +57,92 @@ const noticeSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  targetAudience: {
-    roles: [{
-      type: String,
-      enum: ['super-admin', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest']
-    }],
-    departments: [String],
-    classes: [String]
-  },
-  displayDevices: [{
-    deviceId: {
+  targetBoards: [{
+    boardId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'DisplayDevice'
+      ref: 'Board'
     },
-    displayedAt: Date,
-    displayDuration: Number // in minutes
+    assignedAt: { type: Date, default: Date.now },
+    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    priority: { type: Number, default: 0 },
+    displayOrder: { type: Number, default: 0 }
+  }],
+  schedule: {
+    type: {
+      type: String,
+      enum: ['fixed', 'recurring', 'playlist'],
+      default: 'fixed'
+    },
+    startDate: Date,
+    endDate: Date,
+    duration: { type: Number, default: 60 }, // minutes
+    recurring: {
+      frequency: {
+        type: String,
+        enum: ['daily', 'weekly', 'monthly'],
+        default: 'daily'
+      },
+      daysOfWeek: [{ type: Number, min: 0, max: 6 }], // 0=Sunday, 6=Saturday
+      timeSlots: [{
+        startTime: String, // HH:MM format
+        endTime: String
+      }]
+    },
+    playlist: {
+      items: [{
+        content: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Notice'
+        },
+        duration: Number, // minutes
+        order: Number
+      }],
+      loop: { type: Boolean, default: true },
+      shuffle: { type: Boolean, default: false }
+    }
+  },
+  display: {
+    template: {
+      type: String,
+      enum: ['default', 'text-image', 'video-caption', 'ticker', 'split-screen'],
+      default: 'default'
+    },
+    layout: {
+      zones: [{
+        id: String,
+        type: { type: String, enum: ['notice', 'weather', 'clock', 'news', 'custom'] },
+        position: {
+          x: Number,
+          y: Number,
+          width: Number,
+          height: Number
+        },
+        content: mongoose.Schema.Types.Mixed
+      }]
+    },
+    transitions: {
+      type: {
+        type: String,
+        enum: ['fade', 'slide', 'zoom', 'none'],
+        default: 'fade'
+      },
+      duration: { type: Number, default: 1000 } // milliseconds
+    }
+  },
+  isDraft: {
+    type: Boolean,
+    default: false
+  },
+  playbackHistory: [{
+    boardId: { type: mongoose.Schema.Types.ObjectId, ref: 'Board' },
+    startedAt: Date,
+    endedAt: Date,
+    duration: Number, // actual display time in minutes
+    userInteractions: [{
+      type: { type: String, enum: ['view', 'click', 'dismiss'] },
+      timestamp: Date,
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }]
   }],
   viewCount: {
     type: Number,

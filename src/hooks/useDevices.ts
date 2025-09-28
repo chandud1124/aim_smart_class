@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, createContext, useContext, use
 import { Device, DeviceStats } from '@/types';
 import { deviceAPI } from '@/services/api';
 import { useSecurityNotifications } from './useSecurityNotifications';
-import socketService from '@/services/socketService';
+import socketService from '@/services/socket';
 
 // Internal hook (not exported directly) so we can provide a context-backed singleton
 const useDevicesInternal = () => {
@@ -17,7 +17,7 @@ const useDevicesInternal = () => {
   const [toggleQueue, setToggleQueue] = useState<Array<{ deviceId: string; switchId: string; desiredState?: boolean; timestamp: number }>>([]);
   const [bulkPending, setBulkPending] = useState<{ desiredState: boolean; startedAt: number; deviceIds: Set<string> } | null>(null);
 
-  const handleDeviceStateChanged = useCallback((data: { deviceId: string; state: Device; ts?: number; seq?: number; source?: string }) => {
+  const handleDeviceStateChanged = useCallback((data: { deviceId: string; state: import('../services/socket').DeviceState; ts?: number; seq?: number; source?: string }) => {
     const eventTs = data.ts || Date.now();
     setDevices(prev => prev.map(device => {
       if (device.id !== data.deviceId) return device;
@@ -349,7 +349,7 @@ const useDevicesInternal = () => {
   // Periodic fallback refresh if socket disconnected or stale
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!socketService.isConnected() || Date.now() - lastLoaded > STALE_MS) {
+      if (!socketService.isConnected || Date.now() - lastLoaded > STALE_MS) {
         loadDevices({ background: true, force: true });
       }
     }, 15000);

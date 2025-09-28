@@ -3,7 +3,7 @@ import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -263,6 +263,9 @@ const PermissionManagement: React.FC = () => {
                                                     <DialogContent className="max-w-2xl">
                                                         <DialogHeader>
                                                             <DialogTitle>Review Permission Request</DialogTitle>
+                                                            <DialogDescription>
+                                                                Review the user's permission request details and make a decision.
+                                                            </DialogDescription>
                                                         </DialogHeader>
                                                         <div className="space-y-4">
                                                             <div className="grid grid-cols-2 gap-4">
@@ -334,6 +337,9 @@ const PermissionManagement: React.FC = () => {
                                                                     <DialogContent>
                                                                         <DialogHeader>
                                                                             <DialogTitle>Reject Permission Request</DialogTitle>
+                                                                            <DialogDescription>
+                                                                                Please provide a reason for rejecting this permission request.
+                                                                            </DialogDescription>
                                                                         </DialogHeader>
                                                                         <div className="space-y-4">
                                                                             <div>

@@ -1,0 +1,6 @@
+title,content,type,priority,duration,schedule_type,start_time,end_time,days_of_week,assigned_boards
+Welcome Message,Welcome to our smart classroom system!,default,5,30,always,09:00,17:00,1,2,3,4,5,Main Hall Display
+Morning Announcement,Good morning students! Have a great day of learning.,user,3,45,recurring,08:00,09:00,1,2,3,4,5,Classroom A,Classroom B
+Emergency Alert,This is an emergency broadcast. Please evacuate immediately.,emergency,10,60,fixed,12:00,13:00,,All Boards
+Lunch Break,It's time for lunch! Please proceed to the cafeteria.,user,4,30,recurring,12:00,13:00,1,2,3,4,5,Cafeteria Display
+End of Day,School day is ending. Please gather your belongings and head home safely.,user,3,30,recurring,15:00,16:00,1,2,3,4,5,Main Hall Display,Classroom A

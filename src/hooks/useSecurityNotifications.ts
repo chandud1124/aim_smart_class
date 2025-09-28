@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import socketService from '@/services/socketService';
+import socketService from '@/services/socket';
 
 interface SecurityAlert {
   id: string;
@@ -89,7 +89,7 @@ export const useSecurityNotifications = () => {
       // Handle security alerts (existing functionality)
       if (payload.type === 'security_alert' || payload.type === 'timeout' || payload.type === 'motion_override' || payload.type === 'device_offline') {
         const isAdmin = user.role === 'admin';
-        const isSecurity = user.role === 'security' || user.role === 'guard';
+        const isSecurity = user.role === 'security';
         const adminTypes = ['motion_override', 'timeout', 'device_offline'];
         const securityTypes = ['timeout', 'motion_override'];
         const userDeviceAllowed = !user.assignedDevices?.length || user.assignedDevices.includes(String(payload.deviceId));

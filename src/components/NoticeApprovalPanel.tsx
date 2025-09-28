@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, XCircle, Eye, AlertTriangle } from 'lucide-react';
@@ -113,7 +113,7 @@ const NoticeApprovalPanel: React.FC<NoticeApprovalPanelProps> = ({ notices, onRe
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Review pending notices. Approved notices will be published immediately.
+            Review pending notices. Approved notices will be moved to the "Approved" tab where they can be published to make them active.
             Rejected notices will be returned to the submitter with feedback.
           </AlertDescription>
         </Alert>
@@ -210,12 +210,18 @@ const NoticeApprovalPanel: React.FC<NoticeApprovalPanelProps> = ({ notices, onRe
             <DialogTitle>
               {reviewDialog.action === 'approve' ? 'Approve Notice' : 'Reject Notice'}
             </DialogTitle>
+            <DialogDescription>
+              {reviewDialog.action === 'approve'
+                ? 'Review the notice details and confirm approval. Approved notices can be published later to make them active.'
+                : 'Review the notice details and provide a reason for rejection.'
+              }
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {reviewDialog.action === 'approve'
-                ? 'Are you sure you want to approve and publish this notice?'
+                ? 'Are you sure you want to approve this notice? It will be moved to the Approved tab for publishing.'
                 : 'Please provide a reason for rejecting this notice.'
               }
             </p>

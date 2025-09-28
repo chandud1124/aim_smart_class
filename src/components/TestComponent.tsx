@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
-import socketService from '@/services/socketService';
+import socketService from '@/services/socket';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 

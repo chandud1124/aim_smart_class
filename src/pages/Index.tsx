@@ -165,15 +165,23 @@ const Index = () => {
   // Log dashboard access for admin users
   useEffect(() => {
     if (user?.role === 'admin') {
-      logSecurityEvent('Admin Dashboard Access', {
-        accessedBy: user.name,
-        userRole: user.role,
-        accessTime: new Date().toISOString(),
-        deviceCount: devices.length,
-        onlineDevices: devices.filter(d => d.status === 'online').length
-      });
+      // Prevent duplicate logging by checking if we already logged recently
+      const lastLogKey = 'admin_dashboard_access_logged';
+      const lastLogTime = localStorage.getItem(lastLogKey);
+      const now = Date.now();
+
+      if (!lastLogTime || (now - parseInt(lastLogTime)) > 300000) { // 5 minutes
+        localStorage.setItem(lastLogKey, now.toString());
+        logSecurityEvent('Admin Dashboard Access', {
+          accessedBy: user.name,
+          userRole: user.role,
+          accessTime: new Date().toISOString(),
+          deviceCount: devices.length,
+          onlineDevices: devices.filter(d => d.status === 'online').length
+        });
+      }
     }
-  }, [user]);
+  }, [user?.id, user?.role]); // More specific dependencies
 
   // Security monitoring for suspicious activities
   useEffect(() => {

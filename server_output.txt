@@ -1,0 +1,67 @@
+[startup] Starting server.js ...
+✅ Secure configuration loaded successfully
+[CRASH-MONITOR] ESP32 crash monitoring started
+Connecting to MongoDB: mongodb://localhost:27017/iot_classroom
+[MQTT] Aedes MQTT broker started and listening on 0.0.0.0:5200
+[MQTT] Broker accessible from network: true
+Server running on 0.0.0.0:3001
+Server accessible on all network interfaces
+Environment: undefined
+Connecting to MongoDB: mongodb://localhost:27017/iot_classroom
+Initialized metrics for 3 devices and 3 classrooms
+Initializing Schedule Service...
+Initializing Schedule Service...
+Created cron job for schedule: morning (pattern: 2 8 * * 1,2,3,4,5,6, tz: Asia/Kolkata)
+Created cron job for schedule: evening (pattern: 20 17 * * 1,2,3,4,5,6, tz: Asia/Kolkata)
+Loaded 2 active schedules
+Created cron job for schedule: morning (pattern: 2 8 * * 1,2,3,4,5,6, tz: Asia/Kolkata)
+Created cron job for schedule: evening (pattern: 20 17 * * 1,2,3,4,5,6, tz: Asia/Kolkata)
+Loaded 2 active schedules
+[MQTT] Aedes client connected: backend_server
+Connected to MQTT broker
+[MQTT] Aedes client backend_server subscribed to topics: esp32/state
+Subscribed to esp32/state
+[MONITORING] Starting device monitoring service (5-minute intervals)
+[MONITORING] Starting scheduled device status check...
+[SERVICES] Enhanced logging and monitoring services started
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices
+[MONITORING] Starting scheduled device status check...
+[STATUS-CHECK] Computer_Lab - 4 switches on
+[STATUS-CHECK] IOT_Lab - 5 switches on
+[STATUS-CHECK] LH_D_28 - 6 switches on
+[POWER-MONITORING] Stored power consumption data: 410W total
+[MONITORING] Completed status check for 3 devices

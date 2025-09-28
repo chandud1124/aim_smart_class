@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom
 import { Suspense, lazy } from "react";
 import { Layout } from "@/components/Layout";
 import { PrivateRoute } from "./components/PrivateRoute";
+import { AuthProvider } from '@/context/AuthContext';
 import { GlobalLoadingProvider } from '@/hooks/useGlobalLoading';
 import { GlobalLoadingOverlay } from '@/components/GlobalLoadingOverlay';
 import { DevicesProvider } from '@/hooks/useDevices';
@@ -37,6 +38,7 @@ const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const GrafanaPage = lazy(() => import("./pages/GrafanaPage"));
 const PrometheusPage = lazy(() => import("./pages/PrometheusPage"));
 const NoticeBoard = lazy(() => import("./pages/NoticeBoard"));
+const SocketTest = lazy(() => import("./components/SocketTest"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,61 +76,64 @@ const PageLoader = () => (
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <SocketProvider>
-        <GlobalLoadingProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true
-            }}>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password/:resetToken" element={<ResetPassword />} />
+      <AuthProvider>
+        <SocketProvider>
+          <GlobalLoadingProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true
+              }}>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password/:resetToken" element={<ResetPassword />} />
 
-                  {/* Protected Routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <PrivateRoute>
-                        <DevicesProvider>
-                          <Layout />
-                        </DevicesProvider>
-                      </PrivateRoute>
-                    }
-                  >
-                    <Route index element={<Index />} />
-                    <Route path="devices" element={<Devices />} />
-                    <Route path="switches" element={<Switches />} />
-                    <Route path="master" element={<Master />} />
-                    <Route path="schedule" element={<Schedule />} />
-                    <Route path="users" element={<Users />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="profile" element={<UserProfile />} />
-                    <Route path="permissions" element={<PermissionManagement />} />
-                    <Route path="roles" element={<RoleManagement />} />
-                    <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
-                    <Route path="system-health" element={<SystemHealthPage />} />
-                    <Route path="tickets" element={<Tickets />} />
-                    <Route path="aiml" element={<AIMLPage />} />
-                    <Route path="analytics" element={<AnalyticsPage />} />
-                    <Route path="grafana" element={<GrafanaPage />} />
-                    <Route path="prometheus" element={<PrometheusPage />} />
-                    <Route path="notices" element={<NoticeBoard />} />
-                  </Route>
+                    {/* Protected Routes */}
+                    <Route
+                      path="/"
+                      element={
+                        <PrivateRoute>
+                          <DevicesProvider>
+                            <Layout />
+                          </DevicesProvider>
+                        </PrivateRoute>
+                      }
+                    >
+                      <Route index element={<Index />} />
+                      <Route path="devices" element={<Devices />} />
+                      <Route path="switches" element={<Switches />} />
+                      <Route path="master" element={<Master />} />
+                      <Route path="schedule" element={<Schedule />} />
+                      <Route path="users" element={<Users />} />
+                      <Route path="settings" element={<Settings />} />
+                      <Route path="profile" element={<UserProfile />} />
+                      <Route path="permissions" element={<PermissionManagement />} />
+                      <Route path="roles" element={<RoleManagement />} />
+                      <Route path="logs" element={<PrivateRoute><ActiveLogs /></PrivateRoute>} />
+                      <Route path="system-health" element={<SystemHealthPage />} />
+                      <Route path="tickets" element={<Tickets />} />
+                      <Route path="aiml" element={<AIMLPage />} />
+                      <Route path="analytics" element={<AnalyticsPage />} />
+                      <Route path="grafana" element={<GrafanaPage />} />
+                      <Route path="prometheus" element={<PrometheusPage />} />
+                      <Route path="notices" element={<NoticeBoard />} />
+                      <Route path="socket-test" element={<SocketTest />} />
+                    </Route>
 
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </BrowserRouter>
-            <GlobalLoadingOverlay />
-          </TooltipProvider>
-        </GlobalLoadingProvider>
-      </SocketProvider>
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </BrowserRouter>
+              <GlobalLoadingOverlay />
+            </TooltipProvider>
+          </GlobalLoadingProvider>
+        </SocketProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };export default App;

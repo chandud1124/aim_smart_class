@@ -1,0 +1,1 @@
+[email] Email credentials not fully configured. Falling back to console log mode.

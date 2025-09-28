@@ -11,7 +11,7 @@ import type { UserData } from '@/components/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import io from 'socket.io-client';
+import socketService from '@/services/socket';
 
 interface User {
   id: string;
@@ -108,8 +108,6 @@ const Users = () => {
   const [me, setMe] = useState<string | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
-  const [socketConnected, setSocketConnected] = useState(false);
 
   // load self id and role once
   useEffect(() => {
@@ -127,8 +125,8 @@ const Users = () => {
     try {
       const response = await api.get('/users/online');
       const onlineUsersList = response.data.data;
-      console.log('[DEBUG] Online users from backend:', onlineUsersList);
-  const onlineUserIds = new Set<string>(onlineUsersList.map((user: { _id: string }) => user._id.toString()));
+      // console.log('[DEBUG] Online users from backend:', onlineUsersList); // Removed duplicate logging
+      const onlineUserIds = new Set<string>(onlineUsersList.map((user: { _id: string }) => user._id.toString()));
       setOnlineUsers(onlineUserIds);
     } catch (error) {
       console.error('Failed to fetch online users:', error);
@@ -149,27 +147,8 @@ const Users = () => {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
 
-    const socketConnection = io(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001', {
-      auth: { token }
-    });
-
-    socketConnection.on('connect', () => {
-      console.log('Connected to server for real-time updates');
-      setSocketConnected(true);
-      // Authenticate the socket connection
-      socketConnection.emit('authenticate', token);
-    });
-
-  socketConnection.on('authenticated', (data: unknown) => {
-      console.log('Socket authentication successful');
-    });
-
-  socketConnection.on('auth_error', (error: unknown) => {
-      console.error('Socket authentication error:', error);
-      setSocketConnected(false);
-    });
-
-  socketConnection.on('user_status_change', (data: { userId: string; isOnline: boolean }) => {
+    // Use the centralized socket service instead of creating a new connection
+    const handleUserStatusChange = (data: { userId: string; isOnline: boolean }) => {
       console.log('User status change:', data);
       setOnlineUsers(prev => {
         const newSet = new Set(prev);
@@ -180,22 +159,12 @@ const Users = () => {
         }
         return newSet;
       });
-    });
+    };
 
-    socketConnection.on('disconnect', () => {
-      console.log('Disconnected from server');
-      setSocketConnected(false);
-    });
-
-  socketConnection.on('connect_error', (error: unknown) => {
-      console.error('Socket connection error:', error);
-      setSocketConnected(false);
-    });
-
-    setSocket(socketConnection);
+    socketService.on('user_status_change', handleUserStatusChange);
 
     return () => {
-      socketConnection.disconnect();
+      socketService.off('user_status_change', handleUserStatusChange);
     };
   }, []);
 
@@ -413,7 +382,7 @@ const Users = () => {
   const handleBulkActivate = async () => {
     if (selectedUserIds.length === 0) return;
     try {
-      const response = await api.usersAPI.bulkActivateUsers(selectedUserIds);
+      const response = await usersAPI.bulkActivateUsers(selectedUserIds);
       toast({ title: 'Success', description: response.data.message });
       setSelectedUserIds([]);
       await fetchUsers();
@@ -425,7 +394,7 @@ const Users = () => {
   const handleBulkDeactivate = async () => {
     if (selectedUserIds.length === 0) return;
     try {
-      const response = await api.usersAPI.bulkDeactivateUsers(selectedUserIds);
+      const response = await usersAPI.bulkDeactivateUsers(selectedUserIds);
       toast({ title: 'Success', description: response.data.message });
       setSelectedUserIds([]);
       await fetchUsers();
@@ -440,7 +409,7 @@ const Users = () => {
       return;
     }
     try {
-      const response = await api.usersAPI.bulkDeleteUsers(selectedUserIds);
+      const response = await usersAPI.bulkDeleteUsers(selectedUserIds);
       toast({ title: 'Success', description: response.data.message });
       setSelectedUserIds([]);
       await fetchUsers();
@@ -461,7 +430,7 @@ const Users = () => {
     }
 
     try {
-      const response = await api.usersAPI.bulkAssignRole(selectedUserIds, role);
+      const response = await usersAPI.bulkAssignRole(selectedUserIds, role);
       toast({ title: 'Success', description: response.data.message });
       setSelectedUserIds([]);
       await fetchUsers();

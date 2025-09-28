@@ -63,11 +63,11 @@ const AnalyticsPanel: React.FC = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      console.log('Fetching analytics data...');
+      // console.log('Fetching analytics data...'); // Removed duplicate logging
 
       // Try individual API calls instead of Promise.all to see which one fails
       const dashboardRes = await apiService.get('/analytics/dashboard');
-      console.log('Dashboard data received:', dashboardRes.data);
+      // console.log('Dashboard data received:', dashboardRes.data); // Removed duplicate logging
 
       setAnalyticsData(dashboardRes.data);
       setError(null);
@@ -146,7 +146,7 @@ const AnalyticsPanel: React.FC = () => {
     try {
       const endpoint = classroomId ? `/analytics/occupancy/${classroomId}` : '/analytics/occupancy';
       const response = await apiService.get(endpoint);
-      console.log('Occupancy data received:', response.data);
+      // console.log('Occupancy data received:', response.data); // Removed duplicate logging
       setOccupancyData(response.data);
     } catch (err) {
       console.error('Error fetching occupancy data:', err);
@@ -213,7 +213,7 @@ const AnalyticsPanel: React.FC = () => {
     { name: 'Offline', value: (analyticsData.summary?.totalDevices ?? 0) - (analyticsData.summary?.onlineDevices ?? 0), color: '#ef4444' }
   ].filter(item => item.value > 0); // Only show items with value > 0
 
-  console.log('Chart data:', { deviceStatusData, occupancyData });
+  // console.log('Chart data:', { deviceStatusData, occupancyData }); // Removed duplicate logging
 
   return (
     <div className="w-full space-y-6">

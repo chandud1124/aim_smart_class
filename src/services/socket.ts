@@ -47,6 +47,7 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private eventListeners: Map<string, Set<Function>> = new Map();
+  private isConnecting = false;
 
   constructor() {
     this.setupGlobalErrorHandling();
@@ -75,34 +76,53 @@ class SocketService {
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.socket?.connected) {
-        resolve();
+      // Prevent duplicate connection attempts
+      if (this.isConnecting || this.socket?.connected) {
+        if (this.socket?.connected) {
+          resolve();
+        } else {
+          // Wait for existing connection attempt to complete
+          const checkConnection = () => {
+            if (this.socket?.connected) {
+              resolve();
+            } else if (!this.isConnecting) {
+              reject(new Error('Connection failed'));
+            } else {
+              setTimeout(checkConnection, 100);
+            }
+          };
+          setTimeout(checkConnection, 100);
+        }
         return;
       }
+
+      this.isConnecting = true;
 
       try {
         const backendUrl = getBackendOrigin();
         console.log('[Socket.IO] Connecting to:', backendUrl);
 
         this.socket = io(backendUrl, {
-          // Start with polling transport to avoid WebSocket upgrade issues
-          transports: ['polling', 'websocket'],
+          // Force polling transport only to avoid WebSocket frame header issues
+          transports: ['polling'],
           timeout: 20000,
           forceNew: false, // Don't force new connections
           reconnection: true,
-          reconnectionAttempts: this.maxReconnectAttempts,
+          reconnectionAttempts: 5,
           reconnectionDelay: 1000,
-          // Disable perMessageDeflate to match server settings
+          // Disable perMessageDeflate to avoid header corruption
           perMessageDeflate: { threshold: 0 },
-          // Force polling initially, then allow upgrade
-          rememberUpgrade: true,
+          // Don't remember upgrades to avoid header issues
+          rememberUpgrade: false,
           // Add auth token if available
           auth: {
             token: localStorage.getItem('auth_token')
           },
           // Additional stability settings
-          upgrade: true,
-          randomizationFactor: 0.5
+          upgrade: false, // Disable WebSocket upgrade
+          randomizationFactor: 0.5,
+          // Disable compression to avoid frame header issues
+          forceBase64: false
         });
 
         this.setupEventListeners();
@@ -110,23 +130,27 @@ class SocketService {
         this.socket.on('connect', () => {
           console.log('[Socket.IO] Connected successfully');
           this.reconnectAttempts = 0;
+          this.isConnecting = false;
           resolve();
         });
 
         this.socket.on('connect_error', (error) => {
           console.error('[Socket.IO] Connection error:', error);
+          this.isConnecting = false;
           reject(error);
         });
 
         // Timeout for connection attempt
         setTimeout(() => {
           if (!this.socket?.connected) {
+            this.isConnecting = false;
             reject(new Error('Connection timeout'));
           }
         }, 10000);
 
       } catch (error) {
         console.error('[Socket.IO] Setup error:', error);
+        this.isConnecting = false;
         reject(error);
       }
     });
@@ -274,6 +298,7 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.isConnecting = false;
     this.eventListeners.clear();
   }
 
@@ -333,9 +358,30 @@ class SocketService {
     return this.socket?.connected || false;
   }
 
-  // Get connection ID
+  // Get socket ID
   get socketId(): string | undefined {
     return this.socket?.id;
+  }
+
+  // Device specific events
+  public onDeviceStateChanged(callback: (data: { deviceId: string; state: DeviceState }) => void) {
+    this.on('device_state_changed', callback);
+  }
+
+  public onDevicePirTriggered(callback: (data: { deviceId: string; triggered: boolean }) => void) {
+    this.on('device_pir_triggered', callback);
+  }
+
+  public onDeviceConnected(callback: (data: { deviceId: string }) => void) {
+    this.on('device_connected', callback);
+  }
+
+  public onDeviceDisconnected(callback: (data: { deviceId: string }) => void) {
+    this.on('device_disconnected', callback);
+  }
+
+  public onDeviceToggleBlocked(callback: (data: { deviceId: string; switchId: string; reason: string; requestedState?: boolean; timestamp: number }) => void) {
+    this.on('device_toggle_blocked', callback);
   }
 }
 

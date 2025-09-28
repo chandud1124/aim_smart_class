@@ -100,7 +100,8 @@ router.get('/:deviceId/pir/data',
   require('../controllers/deviceController').getPirData
 );
 
-// MQTT switch command
+// MQTT switch command - DISABLED (keeping for safety/fallback only)
+/*
 router.post('/mqtt/switch/:relay/:state', authorize('admin', 'principal', 'dean', 'hod', 'faculty'), (req, res) => {
   const { relay, state } = req.params;
   if (!global.sendMqttSwitchCommand) {
@@ -113,5 +114,8 @@ router.post('/mqtt/switch/:relay/:state', authorize('admin', 'principal', 'dean'
     res.status(500).json({ error: 'Failed to send MQTT command' });
   }
 });
+*/
+
+console.log('[MQTT] MQTT switch command route disabled - using WebSocket communication only');
 
 module.exports = router;
