@@ -266,16 +266,6 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Debug middleware to log all requests (moved to the very beginning)
-app.use((req, res, next) => {
-  logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  logger.debug('Headers:', JSON.stringify(req.headers, null, 2));
-  if (req.body && Object.keys(req.body).length > 0) {
-    logger.debug('Body:', JSON.stringify(req.body, null, 2));
-  }
-  next();
-});
-
 // Manual preflight handler (before cors) to guarantee PATCH visibility
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
@@ -320,11 +310,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'User-Agent', 'DNT', 'Cache-Control', 'X-Mx-ReqToken', 'Keep-Alive', 'X-Requested-With', 'If-Modified-Since', 'X-CSRF-Token', 'access-control-allow-origin', 'access-control-allow-headers', 'access-control-allow-methods']
 }));
 
-
-
 // Body parser (single instance)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Debug middleware to log all requests (moved after body parser)
+app.use((req, res, next) => {
+  logger.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  logger.debug('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.body && Object.keys(req.body).length > 0) {
+    logger.debug('Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
 
 // Serve static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -499,6 +497,7 @@ apiRouter.use('/device-permissions', apiLimiter, devicePermissionRoutes);
 apiRouter.use('/device-categories', apiLimiter, deviceCategoryRoutes);
 apiRouter.use('/class-extensions', apiLimiter, classExtensionRoutes);
 apiRouter.use('/role-permissions', apiLimiter, require('./routes/rolePermissions'));
+apiRouter.use('/notices', apiLimiter, require('./routes/notices'));
 
 // Mount all routes under /api
 // Health check endpoint

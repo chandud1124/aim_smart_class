@@ -64,6 +64,11 @@ const userSchema = new mongoose.Schema({
     trim: true,
     index: true
   },
+  class: {
+    type: String,
+    trim: true,
+    index: true
+  },
   employeeId: {
     type: String,
     trim: true,

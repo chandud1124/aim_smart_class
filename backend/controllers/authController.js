@@ -28,6 +28,7 @@ const register = async (req, res) => {
       password,
       role,
       department,
+      class: userClass,
       employeeId,
       phone,
       designation,
@@ -291,18 +292,19 @@ const register = async (req, res) => {
       }
     };
 
-    // Create new user
+        // Create new user
     const user = new User({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
       role: role || 'student',
       department: department ? department.trim() : '',
+      class: userClass ? userClass.trim() : '',
       employeeId: employeeId ? employeeId.trim() : undefined,
       phone: phone ? phone.trim() : undefined,
       designation: designation ? designation.trim() : undefined,
       registrationReason: reason ? reason.trim() : undefined,
-      // Permissions will be automatically assigned by User model pre-save hook based on role
+      // Permissions will be automatically assigned by User model pre-save hook
       // isApproved and isActive remain false until admin approval
     });
 
@@ -464,6 +466,7 @@ const getProfile = async (req, res) => {
       email: user.email,
       role: user.role,
       department: user.department,
+      class: user.class,
       phone: user.phone,
       designation: user.designation,
       accessLevel: user.accessLevel,
@@ -536,6 +539,7 @@ const updateProfile = async (req, res) => {
         email: user.email,
         role: user.role,
         department: user.department,
+        class: user.class,
         phone: user.phone,
         designation: user.designation,
         accessLevel: user.accessLevel,

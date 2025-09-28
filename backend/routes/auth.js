@@ -31,11 +31,28 @@ const registerValidation = [
   body('email').isEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('role').isIn(['super-admin', 'dean', 'admin', 'faculty', 'teacher', 'student', 'security', 'guest']).withMessage('Invalid role'),
-  body('department').trim().isLength({ min: 2 }).withMessage('Department must be at least 2 characters'),
+  body('department').optional().trim().isLength({ min: 2 }).withMessage('Department must be at least 2 characters'),
+  body('class').optional().trim().isLength({ min: 2 }).withMessage('Class must be at least 2 characters'),
   body('employeeId').optional().trim().isLength({ min: 1 }).withMessage('Employee ID is required for non-student roles'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
   body('designation').optional().trim().isLength({ min: 2 }).withMessage('Designation must be at least 2 characters'),
-  body('reason').optional().trim().isLength({ min: 1 }).withMessage('Reason is required')
+  body('reason').optional().trim().isLength({ min: 1 }).withMessage('Reason is required'),
+  // Custom validation for role-based fields
+  body().custom((value, { req }) => {
+    const { role, department, class: userClass } = req.body;
+    
+    if (role === 'student') {
+      if (!userClass || userClass.trim().length < 2) {
+        throw new Error('Class is required for students');
+      }
+    } else {
+      if (!department || department.trim().length < 2) {
+        throw new Error('Department is required for non-student roles');
+      }
+    }
+    
+    return true;
+  })
 ];
 
 const loginValidation = [

@@ -15,15 +15,10 @@ import { authAPI } from '@/services/api';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const departments = [
-  'Information Technology',
-  'Electrical Engineering',
-  'Business Administration',
-  'Management Studies',
-  'Security',
-  'Maintenance',
-  'Administration',
-  'Library',
-  'Sports',
+  'School of IT',
+  'School of Business',
+  'School of hospitality',
+  'Admision Department',
   'Other'
 ];
 
@@ -89,6 +84,7 @@ const Register: React.FC = () => {
     confirmPassword: '',
     role: '',
     department: '',
+    class: '',
     employeeId: '',
     designation: ''
   });
@@ -140,7 +136,11 @@ const Register: React.FC = () => {
         if (!form.name.trim()) newErrors.name = 'Full name is required';
         if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) newErrors.email = 'Valid email is required';
         if (!form.role) newErrors.role = 'Please select your role';
-        if (!form.department) newErrors.department = 'Please select your department';
+        if (form.role === 'student') {
+          if (!form.class.trim()) newErrors.class = 'Please enter your class';
+        } else {
+          if (!form.department) newErrors.department = 'Please select your department';
+        }
         break;
 
       case 2: // Account Security
@@ -181,7 +181,7 @@ const Register: React.FC = () => {
         email: form.email,
         password: form.password,
         role: form.role,
-        department: form.department,
+        department: form.role === 'student' ? form.class : form.department,
         employeeId: form.employeeId || undefined,
         designation: form.designation || undefined
       };
@@ -293,22 +293,37 @@ const Register: React.FC = () => {
               {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="department">Department *</Label>
-              <Select name="department" value={form.department} onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}>
-                <SelectTrigger className={errors.department ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select your department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.department && <p className="text-sm text-red-500">{errors.department}</p>}
-            </div>
+            {form.role === 'student' ? (
+              <div className="space-y-2">
+                <Label htmlFor="class">Class *</Label>
+                <Input
+                  id="class"
+                  name="class"
+                  placeholder="e.g., BSCS-2024, MBA-2023"
+                  value={form.class}
+                  onChange={handleChange}
+                  className={errors.class ? 'border-red-500' : ''}
+                />
+                {errors.class && <p className="text-sm text-red-500">{errors.class}</p>}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="department">Department *</Label>
+                <Select name="department" value={form.department} onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}>
+                  <SelectTrigger className={errors.department ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select your department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.department && <p className="text-sm text-red-500">{errors.department}</p>}
+              </div>
+            )}
           </div>
         );
 

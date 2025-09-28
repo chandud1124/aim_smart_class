@@ -190,3 +190,94 @@ export interface DeviceStats {
   totalPirSensors: number;
   activePirSensors: number;
 }
+
+export interface Notice {
+  _id: string;
+  title: string;
+  content: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: 'general' | 'academic' | 'administrative' | 'event' | 'emergency' | 'maintenance';
+  status: 'pending' | 'approved' | 'rejected' | 'published' | 'archived';
+  submittedBy: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    department?: string;
+  };
+  approvedBy?: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  approvedAt?: Date;
+  publishedAt?: Date;
+  expiryDate?: Date;
+  attachments: Array<{
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    size: number;
+    url: string;
+    uploadedAt: Date;
+  }>;
+  targetAudience: {
+    roles?: string[];
+    departments?: string[];
+    classes?: string[];
+  };
+  displayDevices?: Array<{
+    deviceId: string;
+    displayedAt: Date;
+    displayDuration: number;
+  }>;
+  viewCount: number;
+  isActive: boolean;
+  rejectionReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isExpired?: boolean;
+  formattedExpiryDate?: string;
+}
+
+export interface NoticeSubmissionData {
+  title: string;
+  content: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: 'general' | 'academic' | 'administrative' | 'event' | 'emergency' | 'maintenance';
+  expiryDate?: string;
+  targetAudience: {
+    roles?: string[];
+    departments?: string[];
+    classes?: string[];
+  };
+  attachments?: File[];
+}
+
+export interface NoticeReviewData {
+  action: 'approve' | 'reject';
+  rejectionReason?: string;
+}
+
+export interface NoticeStats {
+  total: number;
+  pending: number;
+  published: number;
+  rejected: number;
+  breakdown: Array<{
+    _id: string;
+    count: number;
+  }>;
+}
+
+export interface NoticeFilters {
+  status?: string;
+  category?: string;
+  priority?: string;
+  submittedBy?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}

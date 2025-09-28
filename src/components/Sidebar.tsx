@@ -73,6 +73,7 @@ const navigationSections = [
   {
     title: 'Operations & Maintenance',
     items: [
+      { name: 'Notice Board', icon: FileText, href: '/notices', current: false },
       { name: 'System Health', icon: Server, href: '/system-health', current: false, adminOnly: true },
     ]
   },

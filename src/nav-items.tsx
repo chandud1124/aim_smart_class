@@ -4,6 +4,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import AIMLPage from "./pages/AIMLPage";
 import GrafanaPage from "./pages/GrafanaPage";
 import PrometheusPage from "./pages/PrometheusPage";
+import NoticeBoard from "./pages/NoticeBoard";
 
 import { Home, Zap, Calendar, Users as UsersIcon, Settings as SettingsIcon, Bell, LogOut, Shield, UserCheck, User, Ticket, FileText, Activity, BarChart3, Server, Settings2, Brain, Monitor } from "lucide-react";
 import Index from "./pages/Index";
@@ -104,6 +105,12 @@ export const navItems = [
   },
 
   // ===== OPERATIONS & MAINTENANCE =====
+  {
+    title: "Notice Board",
+    to: "/notices",
+    icon: <FileText className="h-4 w-4" />,
+    page: <NoticeBoard />,
+  },
   {
     title: "System Health",
     to: "/system-health",
