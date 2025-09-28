@@ -176,15 +176,21 @@ const Register: React.FC = () => {
     setLoading(true);
     try {
       // Prepare user data object (no longer using FormData since we removed file uploads)
-      const userData = {
+      const userData: any = {
         name: form.name,
         email: form.email,
         password: form.password,
         role: form.role,
-        department: form.role === 'student' ? form.class : form.department,
         employeeId: form.employeeId || undefined,
         designation: form.designation || undefined
       };
+
+      // Add role-specific fields
+      if (form.role === 'student') {
+        userData.class = form.class;
+      } else {
+        userData.department = form.department;
+      }
 
       const response = await authAPI.register(userData);
 
