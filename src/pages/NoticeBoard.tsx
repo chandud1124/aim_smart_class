@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Eye, Clock, CheckCircle, XCircle, AlertTriangle, Monitor } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, Plus, Eye, Clock, CheckCircle, XCircle, AlertTriangle, Monitor, Edit, Trash2 } from 'lucide-react';
 import { NoticeSubmissionForm } from '@/components/NoticeSubmissionForm';
 import { NoticeApprovalPanel } from '@/components/NoticeApprovalPanel';
 import { NoticePublishingPanel } from '@/components/NoticePublishingPanel';
@@ -23,12 +26,18 @@ const NoticeBoard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [boards, setBoards] = useState<any[]>([]);
   const [filters, setFilters] = useState<NoticeFilters>({
     page: 1,
     limit: 10,
     sortBy: 'createdAt',
     sortOrder: 'desc'
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Fetch notices based on user role
   const fetchNotices = async () => {
@@ -69,9 +78,60 @@ const NoticeBoard: React.FC = () => {
     }
   };
 
+  // Fetch boards for ContentScheduler
+  const fetchBoards = async () => {
+    try {
+      const response = await api.get('/boards');
+      if (response.data.success) {
+        setBoards(response.data.boards);
+      }
+    } catch (err) {
+      console.error('Failed to fetch boards:', err);
+    }
+  };
+
   useEffect(() => {
     fetchNotices();
+    fetchBoards();
   }, [filters, user]);
+
+  const handleEditNotice = (notice: Notice) => {
+    setEditingNotice(notice);
+    setEditContent(notice.content);
+    setShowEditForm(true);
+  };
+
+  const handleUpdateNotice = async () => {
+    if (!editingNotice || !editContent.trim()) {
+      setError('Content cannot be empty');
+      return;
+    }
+
+    try {
+      await api.put(`/notices/${editingNotice._id}`, {
+        content: editContent.trim()
+      });
+      setShowEditForm(false);
+      setEditingNotice(null);
+      setEditContent('');
+      fetchNotices();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update notice');
+    }
+  };
+
+  const handleDeleteNotice = async (noticeId: string) => {
+    if (!confirm('Are you sure you want to delete this notice? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/notices/${noticeId}`);
+      fetchNotices();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete notice');
+    }
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -113,6 +173,19 @@ const NoticeBoard: React.FC = () => {
     });
   };
 
+  // Filter notices based on search and status
+  const getFilteredNotices = (noticesList: Notice[]) => {
+    return noticesList.filter(notice => {
+      const matchesSearch = searchTerm === '' ||
+        notice.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        notice.content.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === 'all' || notice.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -142,6 +215,30 @@ const NoticeBoard: React.FC = () => {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {/* Filter Section */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search notices by title or content..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList>
@@ -187,14 +284,33 @@ const NoticeBoard: React.FC = () => {
                           </Badge>
                         </div>
                       </div>
-                      <div className="text-right text-sm text-muted-foreground">
-                        <p>By: {notice.submittedBy.name}</p>
-                        <p>{formatDate(notice.createdAt)}</p>
-                        {notice.expiryDate && (
-                          <p className="text-orange-600">
-                            Expires: {formatDate(notice.expiryDate)}
-                          </p>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditNotice(notice)}
+                          title="Edit this notice"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteNotice(notice._id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Delete this notice"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <div className="text-right text-sm text-muted-foreground">
+                          <p>By: {notice.submittedBy.name}</p>
+                          <p>{formatDate(notice.createdAt)}</p>
+                          {notice.expiryDate && (
+                            <p className="text-orange-600">
+                              Expires: {formatDate(notice.expiryDate)}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -243,15 +359,19 @@ const NoticeBoard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
-          {notices.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <p className="text-muted-foreground">No notices found</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {notices.map((notice) => (
+          {(() => {
+            const filteredNotices = getFilteredNotices(notices);
+            return filteredNotices.length === 0 ? (
+              <Card>
+                <CardContent className="flex items-center justify-center h-32">
+                  <p className="text-muted-foreground">
+                    {notices.length === 0 ? 'No notices found' : 'No notices match your filters'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {filteredNotices.map((notice) => (
                 <Card key={notice._id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex justify-between items-start">
@@ -268,16 +388,72 @@ const NoticeBoard: React.FC = () => {
                           </Badge>
                         </div>
                       </div>
-                      <div className="text-right text-sm text-muted-foreground">
-                        <p>By: {notice.submittedBy.name}</p>
-                        <p>{formatDate(notice.createdAt)}</p>
+                      <div className="flex items-center gap-2">
+                        {(user?.role === 'admin' || user?.role === 'super-admin' || notice.submittedBy._id === user?.id) && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditNotice(notice)}
+                              title="Edit this notice"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteNotice(notice._id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Delete this notice"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <div className="text-right text-sm text-muted-foreground">
+                          <p>By: {notice.submittedBy.name}</p>
+                          <p>{formatDate(notice.createdAt)}</p>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {notice.content}
-                    </p>
+                    <div className="prose prose-sm max-w-none">
+                      <p className="whitespace-pre-wrap">{notice.content}</p>
+                    </div>
+                    {notice.attachments && notice.attachments.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2">Attachments:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {notice.attachments.map((attachment, index) => (
+                            <Button
+                              key={index}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(attachment.url, '_blank')}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              {attachment.originalName}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {notice.targetBoards && notice.targetBoards.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2 flex items-center">
+                          <Monitor className="h-4 w-4 mr-2" />
+                          Display Boards:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {notice.targetBoards.map((assignment, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              Board ID: {assignment.boardId.slice(-6)} • Priority: {assignment.priority}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -294,7 +470,7 @@ const NoticeBoard: React.FC = () => {
         {(user?.role === 'admin' || user?.role === 'super-admin') && (
           <TabsContent value="content-scheduler">
             <ContentScheduler
-              boards={[]} // TODO: Fetch boards from API
+              boards={boards}
               onScheduleUpdate={() => fetchNotices()}
             />
           </TabsContent>
@@ -327,6 +503,45 @@ const NoticeBoard: React.FC = () => {
             fetchNotices();
           }}
         />
+      )}
+
+      {showEditForm && editingNotice && (
+        <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Notice</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                <p><strong>Title:</strong> {editingNotice.title}</p>
+                <p><strong>Status:</strong> {editingNotice.status}</p>
+                <p><strong>Priority:</strong> {editingNotice.priority}</p>
+                <p><strong>Category:</strong> {editingNotice.category}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Content</label>
+                <textarea
+                  className="w-full p-3 border rounded-md min-h-[200px]"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="Enter notice content..."
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setShowEditForm(false);
+                  setEditingNotice(null);
+                  setEditContent('');
+                }}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateNotice}>
+                  Update Notice
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
